@@ -491,6 +491,10 @@ type sessionExecutorStore interface {
 	GetTaskDeferredLaunch(ctx context.Context, taskID string) (map[string]interface{}, interface{}, error)
 	SetTaskDeferredLaunchIfUnchanged(ctx context.Context, taskID string, prior interface{}, value map[string]interface{}) (stored bool, lostCompare bool, err error)
 	ListChildCompletionRows(ctx context.Context, parentID string) ([]models.ChildCompletionRow, error)
+	// CountStepEntries returns the number of committed task_step_transitions
+	// rows for (taskID, workflowStepID) — the recorded entry count that backs
+	// the {step_entry_number} prompt placeholder (REQ-TWS-001).
+	CountStepEntries(ctx context.Context, taskID, workflowStepID string) (int, error)
 	// Git snapshots and commits
 	GetLatestGitSnapshot(ctx context.Context, sessionID string) (*models.GitSnapshot, error)
 	CreateGitSnapshot(ctx context.Context, snapshot *models.GitSnapshot) error
