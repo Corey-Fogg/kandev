@@ -63,7 +63,6 @@ test.describe("Session resume — CLI fallback after fast-fail", () => {
     // CI shard, while the task route can load the same persisted task directly.
     await testPage.goto(`/t/${task.id}`);
     await expect(testPage).toHaveURL(/\/t\//, { timeout: 15_000 });
-
     const session = new SessionPage(testPage);
     await session.waitForPassthroughLoad();
     await session.waitForPassthroughLoaded();
