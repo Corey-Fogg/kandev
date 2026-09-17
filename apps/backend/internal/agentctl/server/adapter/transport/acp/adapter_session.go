@@ -119,6 +119,9 @@ func (a *Adapter) newSession(ctx context.Context, mcpServers []types.McpServer) 
 	ctx, span := shared.TraceProtocolRequest(ctx, shared.ProtocolACP, a.agentID, "session.new")
 	defer span.End()
 
+	if _, err := a.assistantSessionMeta(mcpServers); err != nil {
+		return "", err
+	}
 	caps := effectiveMcpCapabilities(a.capabilities.McpCapabilities, a.cfg)
 	filteredServers, decisions := filterMcpServersWithDecisions(mcpServers, caps, a.logger)
 	for _, decision := range decisions {
@@ -128,7 +131,12 @@ func (a *Adapter) newSession(ctx context.Context, mcpServers []types.McpServer) 
 		}
 		a.emitMCPAttachmentEvidence(ctx, decision.Server, kind, decision.ReasonCode, "")
 	}
+	meta, err := a.assistantSessionMeta(filteredServers)
+	if err != nil {
+		return "", err
+	}
 	resp, err := conn.NewSession(ctx, acp.NewSessionRequest{
+		Meta:       meta,
 		Cwd:        a.cfg.WorkDir,
 		McpServers: toACPMcpServers(filteredServers),
 	})
@@ -485,6 +493,9 @@ func (a *Adapter) LoadSession(ctx context.Context, sessionID string, mcpServers 
 	defer span.End()
 
 	// Filter MCP servers by agent capabilities (same logic as NewSession).
+	if _, err := a.assistantSessionMeta(mcpServers); err != nil {
+		return err
+	}
 	caps := effectiveMcpCapabilities(a.capabilities.McpCapabilities, a.cfg)
 	filteredServers, decisions := filterMcpServersWithDecisions(mcpServers, caps, a.logger)
 	for _, decision := range decisions {
@@ -505,7 +516,12 @@ func (a *Adapter) LoadSession(ctx context.Context, sessionID string, mcpServers 
 	delete(a.usageBySession, sessionID)
 	a.mu.Unlock()
 
+	meta, err := a.assistantSessionMeta(filteredServers)
+	if err != nil {
+		return err
+	}
 	resp, err := conn.LoadSession(ctx, acp.LoadSessionRequest{
+		Meta:       meta,
 		SessionId:  acp.SessionId(sessionID),
 		Cwd:        a.cfg.WorkDir,
 		McpServers: toACPMcpServers(filteredServers),
@@ -866,6 +882,12 @@ func currentModelFromConfig(options []streams.ConfigOption) string {
 
 // SetMode changes the agent's session mode via ACP session/set_mode.
 func (a *Adapter) SetMode(ctx context.Context, modeID string) error {
+	if a.assistantRestricted() {
+		if modeID == "default" {
+			return nil
+		}
+		return fmt.Errorf("assistant policy forbids mode changes")
+	}
 	a.mu.RLock()
 	conn := a.acpConn
 	sessionID := a.sessionID
@@ -1113,6 +1135,9 @@ func (a *Adapter) maybeEmitAuthRequired(err error) bool {
 // equivalent event; downstream persistence is idempotent so duplicates are
 // harmless.
 func (a *Adapter) SetConfigOption(ctx context.Context, configID, value string) error {
+	if a.assistantRestricted() && configID != "model" {
+		return fmt.Errorf("assistant policy forbids configuration changes")
+	}
 	a.mu.RLock()
 	conn := a.acpConn
 	sessionID := a.sessionID

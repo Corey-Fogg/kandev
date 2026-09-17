@@ -504,6 +504,7 @@ func (a *Adapter) Initialize(ctx context.Context) error {
 	a.acpClient = acpclient.NewClient(
 		acpclient.WithLogger(a.logger.Zap()),
 		acpclient.WithWorkspaceRoot(a.cfg.WorkDir),
+		acpclient.WithRestrictedTools(a.assistantRestricted()),
 		acpclient.WithUpdateHandler(a.enqueueACPUpdate),
 		acpclient.WithPermissionHandler(a.handlePermissionRequest),
 		acpclient.WithCursorTaskHandler(a.handleCursorTask),
