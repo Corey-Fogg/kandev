@@ -71,7 +71,7 @@ func runKandevCLI(args []string) int {
 func printUsage() {
 	if os.Getenv("KANDEV_RUNTIME_API_PREFIX") == orchestrationAPIPrefix {
 		if os.Getenv("KANDEV_PERSONAL_ASSISTANT_ENABLED") == "true" {
-			fmt.Fprintln(os.Stderr, "Usage: agentctl kandev <workspace|objective|context|task|comment|memory> [flags]")
+			fmt.Fprintln(os.Stderr, "Usage: agentctl kandev <workspace|objective|context|capabilities|task|comment|memory> [flags]")
 		} else {
 			fmt.Fprintln(os.Stderr, "Usage: agentctl kandev <workspace|task|comment|memory> [flags]")
 		}
@@ -144,11 +144,13 @@ func getWithQuery(basePath string, values url.Values) int {
 }
 
 func runOrchestrationCLI(args []string) int {
-	if (args[0] == "objective" || args[0] == "context") && os.Getenv("KANDEV_PERSONAL_ASSISTANT_ENABLED") != "true" {
+	if (args[0] == "objective" || args[0] == "context" || args[0] == "capabilities") && os.Getenv("KANDEV_PERSONAL_ASSISTANT_ENABLED") != "true" {
 		cliError("personal_assistant_disabled")
 		return 1
 	}
 	switch args[0] {
+	case "capabilities":
+		return runCapabilitiesCmd(args[1:])
 	case "context":
 		return runContextCmd(args[1:])
 	case "objective":
@@ -165,7 +167,7 @@ func runOrchestrationCLI(args []string) int {
 		printUsage()
 		return 0
 	default:
-		cliError("command is unavailable for workspace orchestration; use workspace, objective, context, task, comment or memory")
+		cliError("command is unavailable for workspace orchestration; use workspace, objective, context, capabilities, task, comment or memory")
 		return 1
 	}
 }
