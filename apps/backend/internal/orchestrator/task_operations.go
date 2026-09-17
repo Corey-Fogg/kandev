@@ -1210,7 +1210,8 @@ type startTaskOptions struct {
 	// ProfileExplicit marks a non-empty profile selected through an explicit
 	// selector-backed choice. It bypasses workflow-step profile resolution for
 	// this new session.
-	ProfileExplicit bool
+	ProfileExplicit   bool
+	OnSessionPrepared func(context.Context, string) error
 	// Env holds launch-scoped environment variables for the agent runtime.
 	Env map[string]string
 	// AdditionalSkillSlugs are materialized for this launch in addition to the
@@ -1721,6 +1722,7 @@ func (s *Service) startTask(ctx context.Context, taskID string, agentProfileID s
 			taskID:                    task.ID,
 			sessionID:                 sessionID,
 			isOfficeTask:              isOfficeTask,
+			isConversation:            opts.Env["KANDEV_RUNTIME_API_PREFIX"] == "/api/v1/orchestration",
 			isPassthrough:             skipKandevMCPWrap,
 			configMode:                configMode,
 			referenceContext:          promptReferenceContext,
@@ -1754,6 +1756,9 @@ func (s *Service) startTask(ctx context.Context, taskID string, agentProfileID s
 		}
 	}
 
+	if opts.Env["KANDEV_RUNTIME_API_PREFIX"] == "/api/v1/orchestration" {
+		mcpMode = executor.McpModeConversation
+	}
 	// Cache the raw prompt so a transient-provider-error (529) retry can
 	// re-drive this first turn — initial launches bypass PromptTask.
 	s.rememberTurnPrompt(sessionID, prompt, "", planMode, attachments)
@@ -1823,6 +1828,7 @@ func (s *Service) applyWorkflowSessionConfigBeforeLaunchForStep(
 // launchPromptContext carries what the first turn of a launch needs in order to
 // compose its system context.
 type launchPromptContext struct {
+	isConversation            bool
 	prompt                    string
 	taskID                    string
 	sessionID                 string
@@ -1860,6 +1866,9 @@ func (s *Service) applyLaunchPromptContext(ctx context.Context, p launchPromptCo
 	// not recognize, so the block has to be generated from the same server state
 	// that whitelists it as trusted content.
 	prompt, spawnContext := applySpawnOriginContext(p.prompt, p.spawnOrigin)
+	if p.isConversation {
+		return sysprompt.InjectConversationContext(p.taskID, p.sessionID, prompt, p.referenceContext, spawnContext)
+	}
 	if p.isOfficeTask {
 		return sysprompt.InjectOfficeContextWithOptions(
 			p.taskID, p.sessionID, prompt,
@@ -2237,6 +2246,10 @@ func (s *Service) createStartSessionWithWorkflowRoute(
 		return sessionID, prepareErr == nil, prepareErr
 	}
 
+	if resetErr := s.resetNativeConversation(ctx, dbTask); resetErr != nil {
+		return "", false, resetErr
+	}
+
 	sessionOwnerID := s.officeSessionOwnerID(dbTask, agentProfileID, officeAgentProfileID)
 	if sessionOwnerID == "" {
 		var sessionID string
@@ -2308,6 +2321,10 @@ func (s *Service) moveTaskToWorkflowStep(ctx context.Context, taskID, workflowSt
 // This ensures the initial task start uses the step's agent — not just the
 // workspace default the frontend sends.
 func (s *Service) resolveEffectiveAgentProfile(ctx context.Context, taskID, workflowStepID, callerProfileID string) (string, error) {
+	if pinned := s.orchestrationProfile(ctx, taskID); pinned != "" {
+		return pinned, nil
+	}
+
 	if s.workflowStepGetter == nil {
 		s.logger.Debug("resolveEffectiveAgentProfile: no workflowStepGetter, using caller profile",
 			zap.String("task_id", taskID),

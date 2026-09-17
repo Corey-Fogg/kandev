@@ -261,7 +261,7 @@ func initCoreTaskServices(
 		taskservice.RepositoryDiscoveryConfig{
 			Roots:             cfg.RepositoryDiscovery.Roots,
 			MaxDepth:          cfg.RepositoryDiscovery.MaxDepth,
-			TaskWorktreeRoots: []string{filepath.Join(cfg.ResolvedHomeDir(), "tasks")},
+			TaskWorktreeRoots: []string{filepath.Join(cfg.ResolvedHomeDir(), workspaceTasksKey)},
 			DesktopRuntime:    strings.EqualFold(strings.TrimSpace(os.Getenv("KANDEV_DESKTOP_RUNTIME")), "true"),
 		},
 	)
@@ -466,6 +466,7 @@ func wireTaskWorkflowCrossReferences(
 	log *logger.Logger,
 ) {
 	taskSvc.SetSecretStore(userSecretStore)
+	wireAssistantOwnership(taskSvc, repos.Orchestration)
 	if deleter, ok := userSecretStore.(taskservice.WorkspaceSecretDeleter); ok {
 		taskSvc.SetWorkspaceSecretDeleter(deleter)
 	}

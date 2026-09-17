@@ -1,11 +1,15 @@
 "use client";
 
+import { ChatIdentityContext } from "./persona-identity-context";
+import { createComment } from "@/lib/api/domains/office-api";
+import { CommentTransportContext } from "./comment-transport";
+
 import { useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kandev/ui/tabs";
 import { CompositorPulse } from "@kandev/ui/compositor-pulse";
 import { useAppStore } from "@/components/state-provider";
 import { selectOfficeAgentProfiles } from "@/lib/state/slices/office/selectors";
-import { agentTint } from "@/app/office/components/agent-avatar";
+import { agentTint } from "@/components/shared/agent-avatar";
 import { TaskChat } from "./task-chat";
 import { TaskActivity } from "./task-activity";
 import { AdvancedChatPanel } from "@/app/office/tasks/[id]/advanced-panels/chat-panel";
@@ -22,7 +26,7 @@ import type {
   TaskComment,
   TaskSession,
   TimelineEvent,
-} from "@/app/office/tasks/[id]/types";
+} from "@/components/task/simple/types";
 import { useTranslation } from "react-i18next";
 import { TaskLaunchErrorProvider } from "@/components/task/task-launch-error-context";
 import { TaskSharedError } from "@/components/task/task-shared-error";
@@ -133,6 +137,11 @@ export function ChatActivityTabs({
   onCommentsChanged,
 }: ChatActivityTabsProps) {
   const { t } = useTranslation();
+  const profiles = useAppStore(selectOfficeAgentProfiles);
+  const identities = useMemo(
+    () => Object.fromEntries(profiles.map((p) => [p.id, p.name])),
+    [profiles],
+  );
   const officeGroups = useMemo(
     () => groupSessionsForTimeline(sessions, task.reviewers, task.approvers).filter(isOfficeGroup),
     [sessions, task.reviewers, task.approvers],

@@ -21,7 +21,8 @@ const RunPayloadOneTimeInstructionsKey = "one_time_instructions"
 
 // PromptContext holds the data needed to build a run prompt.
 type PromptContext struct {
-	Reason string
+	WorkspaceTaskCallback *WorkspaceTaskCallback
+	Reason                string
 
 	// OneTimeInstructions carries a workflow move's one-shot instructions for
 	// this run only. When set, BuildPrompt appends it after the per-reason
@@ -105,6 +106,8 @@ type PromptContext struct {
 func BuildPrompt(pc *PromptContext) string {
 	var prompt string
 	switch pc.Reason {
+	case RunReasonWorkspaceTaskCallback:
+		prompt = buildWorkspaceTaskCallbackPrompt(pc)
 	case RunReasonTaskAssigned:
 		prompt = buildTaskAssignedPrompt(pc)
 	case legacyRunReasonReviewStarted:

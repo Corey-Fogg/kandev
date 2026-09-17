@@ -142,6 +142,9 @@ const (
 )
 
 func contextKindForBlock(block string, trustedContents []string) contextKind {
+	if strings.Contains(block, "KANDEV CONVERSATION MCP TOOLS") {
+		return contextOffice
+	}
 	if strings.Contains(block, officeContextMarker) {
 		return contextOffice
 	}

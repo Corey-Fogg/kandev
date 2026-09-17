@@ -1544,6 +1544,10 @@ func (s *Service) insertQueueMessageWithMetadata(ctx context.Context, identity *
 
 func (s *Service) insertQueueMessageWithMetadataAtWorkflowEntry(ctx context.Context, identity *QueueSessionIdentity, sessionID, taskID, content, model, userID string, planMode bool, attachments []MessageAttachment, metadata map[string]interface{}, claim *QueueAttachmentClaim, maxPerSession int, policy *AutoMergePolicy, workflowEntry *WorkflowEntryIdentity) (*QueuedMessage, error) {
 	metadataCopy := copyMessageMetadata(metadata, 0)
+	metadataCopy, err := s.captureDispatchContext(ctx, taskID, metadataCopy)
+	if err != nil {
+		return nil, err
+	}
 	msg := &QueuedMessage{
 		SessionID:   sessionID,
 		TaskID:      taskID,

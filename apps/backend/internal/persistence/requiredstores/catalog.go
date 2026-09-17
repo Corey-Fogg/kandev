@@ -9,6 +9,10 @@ import (
 	"github.com/kandev/kandev/internal/startup"
 )
 
+const (
+	runsStoreID = "runs"
+)
+
 // Capability identifies a SQL behavior that a store conformance adapter must
 // exercise on every supported database engine.
 type Capability string
@@ -72,7 +76,9 @@ var catalog = []Descriptor{
 	{ID: "editor", OwnerPackage: "internal/editors/store", RequiredTables: []string{"editors"}, DependsOn: []string{storeIDUser}, Capabilities: []Capability{CapabilityTimestamp, CapabilityConflict}, Sweep: startup.StepStoresRepositories},
 	{ID: "prompts", OwnerPackage: "internal/prompts/store", RequiredTables: []string{"custom_prompts"}, DependsOn: []string{storeIDUser}, Capabilities: []Capability{CapabilityTimestamp, CapabilityConflict}, Sweep: startup.StepStoresRepositories},
 	{ID: "utility", OwnerPackage: "internal/utility/store", RequiredTables: []string{"utility_agents"}, DependsOn: []string{storeIDAgentSettings}, Capabilities: []Capability{CapabilityBoolean, CapabilityTimestamp, CapabilityConflict}, Sweep: startup.StepStoresRepositories},
-	{ID: "office", OwnerPackage: "internal/office/repository/sqlite", RequiredTables: []string{"office_projects", "runs"}, DependsOn: []string{storeIDTask, storeIDAgentSettings}, Capabilities: []Capability{CapabilityBoolean, CapabilityTimestamp, CapabilityConflict, CapabilityTransaction}, Sweep: startup.StepStoresRepositories},
+	{ID: runsStoreID, OwnerPackage: "internal/runs/repository/sqlite", RequiredTables: []string{runsStoreID, "run_events"}, DependsOn: []string{storeIDSchemaMeta}, Capabilities: []Capability{CapabilityConflict, CapabilityTransaction}, Sweep: startup.StepStoresRepositories},
+	{ID: "orchestration", OwnerPackage: "internal/orchestration/repository/sqlite", RequiredTables: []string{"workspace_orchestrators", "orchestration_roles", "orchestration_conversations", "orchestration_memory"}, DependsOn: []string{storeIDTask, storeIDAgentSettings}, Capabilities: []Capability{CapabilityTimestamp, CapabilityConflict}, Sweep: startup.StepStoresRepositories},
+	{ID: "office", OwnerPackage: "internal/office/repository/sqlite", RequiredTables: []string{"office_projects"}, DependsOn: []string{storeIDTask, storeIDAgentSettings, runsStoreID, "orchestration"}, Capabilities: []Capability{CapabilityBoolean, CapabilityTimestamp, CapabilityConflict, CapabilityTransaction}, Sweep: startup.StepStoresRepositories},
 	{ID: "terminal", OwnerPackage: "internal/terminal/repository", RequiredTables: []string{"user_terminals"}, DependsOn: []string{storeIDUser}, Capabilities: []Capability{CapabilityBoolean, CapabilityTimestamp, CapabilityConflict}, Sweep: startup.StepStoresRepositories},
 	{ID: "quick-terminal", OwnerPackage: "internal/quickterminal/repository", RequiredTables: []string{"quick_terminal_tabs"}, DependsOn: []string{storeIDUser}, Capabilities: []Capability{CapabilityTimestamp, CapabilityConflict}, Sweep: startup.StepStoresRepositories},
 	{ID: "runtime-flags", OwnerPackage: "internal/runtimeflags", RequiredTables: []string{"runtime_flag_overrides"}, DependsOn: []string{storeIDSchemaMeta}, Capabilities: []Capability{CapabilityBoolean, CapabilityTimestamp, CapabilityConflict}, Sweep: startup.StepStoresRepositories},

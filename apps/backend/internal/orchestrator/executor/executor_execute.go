@@ -52,6 +52,9 @@ func (e *Executor) resolveTaskSessionMCPMode(ctx context.Context, taskID string,
 	if task != nil && task.Origin == models.TaskOriginAutomationRun {
 		return McpModeAutomation, nil
 	}
+	if task != nil && task.Origin == "native_conversation" {
+		return McpModeConversation, nil
+	}
 	if task != nil && task.IsFromOffice {
 		return McpModeOffice, nil
 	}
@@ -87,6 +90,9 @@ func (e *Executor) resolveTaskSessionMCPProfile(ctx context.Context, taskID stri
 	surface := mcpprofile.SurfaceKanbanTask
 	if task.IsFromOffice {
 		surface = mcpprofile.SurfaceOfficeTask
+	}
+	if task.Origin == "native_conversation" {
+		surface = mcpprofile.SurfaceConversation
 	}
 	capabilities := make([]mcpprofile.Capability, 0, 2)
 	if task.Autopilot {
@@ -1474,6 +1480,9 @@ func (e *Executor) LaunchPreparedSession(ctx context.Context, task *v1.Task, ses
 		// connection config reaches lifecycle instead of falling back to the
 		// workspace default (or an empty config).
 		executorID = strings.TrimSpace(session.ExecutorID)
+	}
+	if err := e.CheckDispatch(ctx, task.ID, sessionID, agentProfileID); err != nil {
+		return nil, err
 	}
 	if opts.McpMode == "" {
 		opts.McpMode, err = e.resolveTaskSessionMCPMode(ctx, task.ID, session, opts.StartAgent)

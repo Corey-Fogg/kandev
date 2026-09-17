@@ -18,6 +18,7 @@ import { usePathname } from "@/lib/routing/client-router";
 import { useHasSavedSidebarLayout } from "@/hooks/domains/sidebar/use-sidebar-layout-navigation";
 import { AppNavSections, useAppNavDialogs } from "./app-nav-sections";
 import { MobileAutomationsSection } from "./mobile-automations-section";
+import { WorkspaceChiefNav } from "@/components/app-sidebar/workspace-chief-nav";
 import { AppNavTrigger } from "./app-nav-trigger";
 import { AppNavSurface } from "./app-nav-surface";
 
@@ -74,6 +75,7 @@ export function AppNavSheet({ pageNav, omitDestinations, onOpenTaskViews }: AppN
           onClick={closeOnLinkClick}
         >
           {isMobile && <NavigationWorkspacePicker close={close} />}
+          <WorkspaceChiefNav onNavigate={close} />
           {!isMobile && renderedPageNav}
           <AppNavSections
             onNavigate={close}
