@@ -269,7 +269,9 @@ for all current links of explicitly selected providers on the current task.
 Association targets require `provider`, `repository_id`, and `number`. Task
 targets require a nonempty `providers` list. Prompt overrides are task/provider
 settings and can be changed only with a task target. The tool does not create
-defaults for future links.
+defaults for future links. The read and automation tools are bound to the
+calling session's own task: they take no `task_id` argument, and passing one is
+rejected with an error that names the argument and states the binding.
 
 `report_change_request_auto_fix_outcome_kandev` is available only when GitHub is
 among the task's supported providers. It reports the outcome of a server-bound

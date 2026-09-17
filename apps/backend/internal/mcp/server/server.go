@@ -1363,7 +1363,7 @@ func (s *Server) registerPRAutomationTools() {
 func (s *Server) registerTaskPRLinkTools() {
 	s.mcpServer.AddTool(
 		mcp.NewToolWithRawSchema("get_task_change_requests_kandev",
-			"Get the current task's linked GitHub pull requests and GitLab merge requests, automation settings, and provider capabilities.",
+			"Get the current task's linked GitHub pull requests and GitLab merge requests, automation settings, and provider capabilities. The task is bound to the calling session and is not a tool argument.",
 			json.RawMessage(`{"type":"object","properties":{},"additionalProperties":false}`),
 		),
 		s.wrapHandler("get_task_change_requests_kandev", s.getTaskChangeRequestsHandler()),
@@ -1377,7 +1377,7 @@ func (s *Server) registerTaskPRLinkTools() {
 	)
 	s.mcpServer.AddTool(
 		mcp.NewToolWithRawSchema("update_task_change_request_automation_kandev",
-			"Update automation switches for one linked change request or for explicitly selected providers on the current task. Task prompts are provider-scoped and task-level; association targets cannot set a prompt.",
+			"Update automation switches for one linked change request or for explicitly selected providers on the current task. Task prompts are provider-scoped and task-level; association targets cannot set a prompt. The task is bound to the calling session and is not a tool argument.",
 			taskChangeRequestAutomationToolSchema(),
 		),
 		s.wrapHandler("update_task_change_request_automation_kandev", s.updateTaskChangeRequestAutomationHandler()),
