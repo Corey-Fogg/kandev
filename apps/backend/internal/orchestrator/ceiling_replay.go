@@ -186,6 +186,7 @@ func (s *Service) retryOneDeferredCeilingLaunch(ctx context.Context, task *model
 		return
 	}
 	deferral = claim.deferral
+	ctx = withCeilingDispatchClaim(ctx, claim)
 
 	defer claim.releaseIfHeld(ctx)
 	currentTask, currentErr := s.repo.GetTask(ctx, task.ID)
@@ -348,6 +349,14 @@ func (s *Service) clearCeilingDeferredRecord(ctx context.Context, taskID string,
 			}
 			if !equivalent {
 				s.logger.Zap().Info("leaving a newer ceiling deferred record in place after stale replay",
+					zap.String("task_id", taskID))
+				return
+			}
+		}
+		if claim, ok := ctx.Value(ceilingDispatchClaimContextKey{}).(*ceilingDeferredLaunchClaim); ok && claim.taskID == taskID {
+			claimID, _, held := models.ReadCeilingLaunchClaim(existingRaw)
+			if !held || claimID != claim.id {
+				s.logger.Zap().Debug("skipping ceiling record clear: claim replaced by successor",
 					zap.String("task_id", taskID))
 				return
 			}
