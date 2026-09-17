@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -168,6 +169,9 @@ func (m *Manifest) validateAgentTools() []error {
 	for i, tool := range m.AgentTools {
 		prefix := fmt.Sprintf("agent_tools[%d]", i)
 		errs = append(errs, validateAgentTool(prefix, tool, seen)...)
+		if m.APIVersion < 2 && slices.Contains(tool.Surfaces, AgentToolSurfaceConversation) {
+			errs = append(errs, fmt.Errorf("%s conversation surface requires api_version 2", prefix))
+		}
 	}
 	return errs
 }
@@ -206,7 +210,7 @@ func validateAgentToolSurfaces(prefix string, surfaces []string) []error {
 	var errs []error
 	seen := map[string]struct{}{}
 	for _, surface := range surfaces {
-		if surface != AgentToolSurfaceKanban && surface != AgentToolSurfaceOffice {
+		if surface != AgentToolSurfaceKanban && surface != AgentToolSurfaceOffice && surface != AgentToolSurfaceConversation {
 			errs = append(errs, fmt.Errorf("%s.surfaces contains unsupported surface %q", prefix, surface))
 		}
 		if _, ok := seen[surface]; ok {
