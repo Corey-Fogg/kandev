@@ -21,8 +21,8 @@ import (
 	"github.com/kandev/kandev/internal/common/logger"
 	"github.com/kandev/kandev/internal/events"
 	"github.com/kandev/kandev/internal/events/bus"
-	"github.com/kandev/kandev/internal/office/models"
 	"github.com/kandev/kandev/internal/runs/commentkeys"
+	"github.com/kandev/kandev/internal/runs/models"
 	runssqlite "github.com/kandev/kandev/internal/runs/repository/sqlite"
 )
 

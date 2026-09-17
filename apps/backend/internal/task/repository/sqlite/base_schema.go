@@ -27,6 +27,7 @@ func (r *Repository) initSchemaContext(ctx context.Context) error {
 		r.initCoreSchema,
 		r.initRepositorySetsSchema,
 		r.initRepositoryBranchPoliciesSchema,
+		r.initTaskCommentsSchema,
 		r.initPlansSchema,
 		r.initWalkthroughsSchema,
 		r.initDocumentsSchema,

@@ -3,6 +3,7 @@ package models
 
 import (
 	"encoding/json"
+	runmodels "github.com/kandev/kandev/internal/runs/models"
 	"time"
 
 	settingsmodels "github.com/kandev/kandev/internal/agent/settings/models"
@@ -598,14 +599,7 @@ type ProviderHealth struct {
 // lifecycle event for an office run: init, adapter.invoke, step,
 // complete, error. The frontend renders these in the run detail
 // page's Events log.
-type RunEvent struct {
-	RunID     string        `json:"run_id" db:"run_id"`
-	Seq       int           `json:"seq" db:"seq"`
-	EventType RunEventType  `json:"event_type" db:"event_type"`
-	Level     RunEventLevel `json:"level" db:"level"`
-	Payload   string        `json:"payload" db:"payload"`
-	CreatedAt time.Time     `json:"created_at" db:"created_at"`
-}
+type RunEvent = runmodels.RunEvent
 
 // Routine represents a recurring task definition.
 type Routine struct {

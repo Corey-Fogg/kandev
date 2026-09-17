@@ -3,6 +3,8 @@ package backendapp
 import (
 	"context"
 	"fmt"
+	orchestrationstore "github.com/kandev/kandev/internal/orchestration/repository/sqlite"
+	runstore "github.com/kandev/kandev/internal/runs/repository/sqlite"
 
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
@@ -66,6 +68,10 @@ func provideRepositories(ctx context.Context, cfg *config.Config, log *logger.Lo
 	}
 	if err := recordRequiredStore(tracker, "schema-meta", nil); err != nil {
 		return nil, nil, nil, err
+	}
+	runsRepo := runstore.NewWithDB(writer, reader)
+	if err := recordRequiredStore(tracker, "runs", runsRepo.Migrate()); err != nil {
+		return nil, nil, nil, fmt.Errorf("runs schema: %w", err)
 	}
 
 	if err := checkStartupContext(ctx, "task repository"); err != nil {
@@ -201,6 +207,8 @@ func provideRepositories(ctx context.Context, cfg *config.Config, log *logger.Lo
 		Workflow:       workflowRepo,
 		Secrets:        secretStore,
 		Office:         officeRepo,
+		Orchestration:  orchestrationRepo,
+		Runs:           runsRepo,
 		Terminal:       terminalRepoImpl,
 		QuickTerminal:  quickTerminalRepoImpl,
 		RuntimeFlags:   runtimeFlagsStore,

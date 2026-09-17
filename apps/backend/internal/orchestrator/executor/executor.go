@@ -652,6 +652,7 @@ const McpModeOffice = mcpmode.Office
 // McpModeAutomation selects the fixed coordinator MCP surface for tasks
 // created by a user-configured automation.
 const McpModeAutomation = mcpmode.Automation
+const McpModeConversation = mcpmode.Conversation
 
 // LaunchOptions contains optional parameters for LaunchPreparedSession.
 type LaunchOptions struct {
@@ -950,6 +951,7 @@ type GitLabCredentialResolver interface {
 
 // Executor manages agent execution for tasks
 type Executor struct {
+	dispatchGuard     DispatchGuard
 	agentManager      AgentManagerClient
 	attachmentReader  AttachmentReader
 	repo              executorStore

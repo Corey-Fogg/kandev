@@ -491,6 +491,7 @@ func (s *Service) CreateAutomation(ctx context.Context, req *CreateAutomationReq
 		return nil, err
 	}
 	a := &Automation{
+		OrchestratorID:     req.OrchestratorID,
 		WorkspaceID:        req.WorkspaceID,
 		Name:               req.Name,
 		Description:        req.Description,
@@ -507,6 +508,9 @@ func (s *Service) CreateAutomation(ctx context.Context, req *CreateAutomationReq
 		Enabled:            true,
 		MaxConcurrentRuns:  maxRuns,
 		ContinuationPolicy: continuationPolicy,
+	}
+	if err := s.validateOrchestratorTarget(ctx, a); err != nil {
+		return nil, err
 	}
 	if err := s.validateAgentProfileID(ctx, req.AgentProfileID); err != nil {
 		return nil, err
@@ -1574,6 +1578,15 @@ func (s *Service) FireTrigger(ctx context.Context, automationID, triggerID strin
 		DedupKey:     dedup.Key(),
 	}
 
+	if a.OrchestratorID != "" {
+		result, err := s.dispatchOrchestrator(ctx, a, evt)
+		if err == nil {
+			if updateErr := s.store.UpdateLastTriggered(ctx, automationID, now); updateErr != nil {
+				s.logger.Warn("failed to update last_triggered_at", zap.String("automation_id", automationID), zap.Error(updateErr))
+			}
+		}
+		return result, err
+	}
 	event := bus.NewEvent(events.AutomationTriggered, "automation_service", evt)
 	if err := s.eventBus.Publish(ctx, events.AutomationTriggered, event); err != nil {
 		if markErr := s.store.MarkRunTerminal(ctx, admittedRun.ID, "", "", RunStatusFailed, err.Error()); markErr != nil {

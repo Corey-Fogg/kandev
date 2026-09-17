@@ -92,7 +92,14 @@ export default function AgentDetailLayout({ children, params }: AgentDetailLayou
         </div>
       </div>
 
+      <Link
+        className="text-sm underline cursor-pointer"
+        href={`/settings/workspaces/${agent.workspaceId}/agents`}
+      >
+        {t("office:backToWorkspaceAgents")}
+      </Link>
       <AgentRouteStrip agentId={id} />
+      <OpenConversationButton agentId={id} workspaceId={agent.workspaceId} />
 
       <nav className="flex border-b border-border gap-1" aria-label={t("office:agentSections")}>
         {TABS.map((tab) => (

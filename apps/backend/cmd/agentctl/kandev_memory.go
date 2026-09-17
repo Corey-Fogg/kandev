@@ -32,6 +32,7 @@ func memoryGet(args []string) int {
 	fs := flag.NewFlagSet("memory get", flag.ContinueOnError)
 	layerFlag := fs.String("layer", "", "Filter by layer")
 	keyFlag := fs.String("key", "", "Filter by key")
+	idFlag := fs.String("id", "", "Exact orchestration memory ID")
 	if err := fs.Parse(args); err != nil {
 		cliError("parse flags: %v", err)
 		return 1

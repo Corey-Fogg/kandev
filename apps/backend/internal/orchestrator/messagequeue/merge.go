@@ -35,6 +35,9 @@ func mergeAllowed(source, target *QueuedMessage, queuedBy string) bool {
 		hasPlanCommentAdmission(source.Metadata) || hasPlanCommentAdmission(target.Metadata) {
 		return false
 	}
+	if !sameDispatchContext(source.Metadata, target.Metadata) {
+		return false
+	}
 	if source.QueuedBy == QueuedByAgent {
 		if target.QueuedBy != QueuedByAgent {
 			return false

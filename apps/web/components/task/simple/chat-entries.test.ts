@@ -5,7 +5,7 @@ import {
   liveSessionMetadataFromStore,
   mergeLiveSessionMetadata,
 } from "./chat-entries";
-import type { TaskSession } from "@/app/office/tasks/[id]/types";
+import type { TaskSession } from "@/components/task/simple/types";
 
 const URL = "https://opencode.ai/workspace/wrk_01KQM7K5CYT715264YKKFB17ZY/go";
 const SESSION_STARTED_AT = "2026-08-02T15:00:00Z";

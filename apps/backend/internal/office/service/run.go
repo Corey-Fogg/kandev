@@ -20,6 +20,7 @@ import (
 
 // Run reason constants.
 const (
+	RunReasonWorkspaceTaskCallback = "workspace_task_callback"
 	RunReasonTaskAssigned          = "task_assigned"
 	RunReasonTaskComment           = "task_comment"
 	RunReasonTaskBlockersResolved  = "task_blockers_resolved"
@@ -160,8 +161,8 @@ func (s *Service) queueRunInline(
 
 	s.logger.Info("run queued",
 		zap.String("id", req.ID),
-		zap.String("agent", agentInstanceID),
-		zap.String("reason", reason))
+		zap.String(participantTypeAgent, agentInstanceID),
+		zap.String(conversationReasonKey, reason))
 
 	s.publishRunQueued(ctx, req, idempotencyKey)
 	return runsservice.QueueOutcomeQueued, nil
@@ -177,7 +178,7 @@ func payloadWithAgent(payload, agentInstanceID string) map[string]any {
 	if payload != "" {
 		_ = json.Unmarshal([]byte(payload), &out)
 	}
-	out["agent_profile_id"] = agentInstanceID
+	out[eventKeyAgentProfileID] = agentInstanceID
 	return out
 }
 
@@ -192,17 +193,17 @@ func (s *Service) publishRunQueued(ctx context.Context, req *models.Run, idempot
 	}
 	taskID, commentID := commentkeys.IdentityFromPayload(req.Payload)
 	data := map[string]interface{}{
-		"run_id":           req.ID,
-		"agent_profile_id": req.AgentProfileID,
-		"reason":           req.Reason,
-		"task_id":          taskID,
-		"comment_id":       commentID,
-		"idempotency_key":  idempotencyKey,
+		conversationRunIDKey:   req.ID,
+		eventKeyAgentProfileID: req.AgentProfileID,
+		conversationReasonKey:  req.Reason,
+		conversationTaskIDKey:  taskID,
+		"comment_id":           commentID,
+		"idempotency_key":      idempotencyKey,
 	}
 	event := bus.NewEvent(events.OfficeRunQueued, "office-service", data)
 	if err := s.eb.Publish(ctx, events.OfficeRunQueued, event); err != nil {
 		s.logger.Debug("publish run queued event failed",
-			zap.String("run_id", req.ID),
+			zap.String(conversationRunIDKey, req.ID),
 			zap.Error(err))
 	}
 }
