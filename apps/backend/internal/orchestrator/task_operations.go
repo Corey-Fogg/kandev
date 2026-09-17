@@ -26,6 +26,7 @@ import (
 	"github.com/kandev/kandev/internal/editors/capabilities"
 	"github.com/kandev/kandev/internal/events"
 	"github.com/kandev/kandev/internal/events/bus"
+	mcpprofile "github.com/kandev/kandev/internal/mcp/profile"
 	"github.com/kandev/kandev/internal/orchestrator/dto"
 	"github.com/kandev/kandev/internal/orchestrator/executor"
 	"github.com/kandev/kandev/internal/orchestrator/messagequeue"
@@ -1163,6 +1164,7 @@ func (s *Service) StartTaskWithEnvAndSkills(ctx context.Context, taskID string, 
 // some callers supply. Keeping them in one struct avoids growing startTask's
 // already long positional parameter list for every new orthogonal concern.
 type startTaskOptions struct {
+	McpProfile *mcpprofile.Context
 	// ProfileExplicit marks a non-empty profile selected through an explicit
 	// selector-backed choice. It bypasses workflow-step profile resolution for
 	// this new session.
@@ -1721,6 +1723,7 @@ func (s *Service) startTask(ctx context.Context, taskID string, agentProfileID s
 		WorkflowStepID:       workflowStepID,
 		StartAgent:           true,
 		McpMode:              mcpMode,
+		McpProfile:           opts.McpProfile,
 		Attachments:          attachments,
 		Env:                  env,
 		AdditionalSkillSlugs: append([]string(nil), opts.AdditionalSkillSlugs...),

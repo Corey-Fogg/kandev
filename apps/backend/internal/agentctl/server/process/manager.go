@@ -1435,6 +1435,10 @@ func (m *Manager) startOneShot() error {
 // buildAdapterConfig constructs the adapter configuration and initialises the
 // protocol adapter, including merging any adapter-provided environment variables.
 func (m *Manager) buildAdapterConfig() error {
+	if err := config.ValidateAssistantCommand(m.cfg, m.cfg.AgentArgs); err != nil {
+		return err
+	}
+	config.RefreshAssistantPolicy(m.cfg)
 	mcpServers := make([]adapter.McpServerConfig, len(m.cfg.McpServers))
 	for i, mcp := range m.cfg.McpServers {
 		mcpServers[i] = adapter.McpServerConfig{
@@ -1457,6 +1461,9 @@ func (m *Manager) buildAdapterConfig() error {
 		RequiresProcessKill:       m.cfg.RequiresProcessKill,
 		NotificationQueueCapacity: m.cfg.NotificationQueueCapacity,
 		ProviderGatewayAuth:       m.cfg.ProviderGatewayAuth,
+	}
+	if m.cfg.AssistantRestricted() {
+		m.adapterCfg.ToolPolicy = config.AssistantToolPolicy
 	}
 
 	// Configure one-shot mode when a continue command is provided.
@@ -1778,6 +1785,9 @@ func (m *Manager) configure(command string, agentArgs []string, agentArgsPresent
 		args = config.ParseCommand(command)
 	}
 	if err := config.ValidateCommandArgs(args); err != nil {
+		return err
+	}
+	if err := config.ValidateAssistantCommand(m.cfg, args); err != nil {
 		return err
 	}
 	if continueArgsPresent {
