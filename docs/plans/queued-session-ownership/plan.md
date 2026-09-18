@@ -12,6 +12,15 @@ legacy_specs: []
 
 # Implementation plan: Queued session ownership
 
+## Policy supersession, 2026-09-18
+
+The [revised conversation recovery package](../session-open-recovery-eligibility/plan.md)
+supersedes parked-session suppression and parking-note presentation in this
+historical package. Opening an earlier conversation now follows normal recovery.
+Keep queue identity, admission, callback, and reconciliation coverage. Replace
+old no-resume and parked-note assertions in the revised package's work orders.
+Historical results and outstanding PostgreSQL checks below are unchanged.
+
 ## Overview
 
 Keep Luna queued when a workflow enters Implement, keep the parked Astra
@@ -297,3 +306,11 @@ Implementation and available rendered verification on 2026-09-17:
 - Projection refreshes can accidentally count as user activity and reorder tasks.
 - Legacy ambiguous ownership must surface recovery without dispatch or data loss.
 - The unexplained warning must not cause blanket suppression of genuine empty turns.
+
+## Follow-up: Session-open recovery eligibility
+
+The [recovery eligibility repair](../session-open-recovery-eligibility/plan.md)
+owns the historical-stop and settled-deferral regressions found after restart.
+It replaces the parking suppression policy and removes the parking note, with
+separate and combined recovery cases on desktop and phone. Existing results and PostgreSQL prerequisites here
+remain unchanged. The follow-up work order is pending implementation.

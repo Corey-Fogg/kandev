@@ -2989,7 +2989,21 @@ func (s *Service) resumeTaskSessionWithContinuation(
 	if isOfficeTask {
 		return nil, decorateResumeFailure(errOfficeTaskResumeRequiresScheduler)
 	}
-	seam4Res, deferred, err := s.admitOrDeferSeam4(ctx, taskID, sessionID, launchOrigin(options.Origin), seam4ResumePayloadWithBinding(sessionID, options, entryBinding))
+	admissionCtx := ctx
+	releaseAdmission := func() {}
+	if isSessionOpenRecoveryContext(ctx) {
+		admissionCtx, releaseAdmission = s.lockCeilingEntryAdmission(ctx, taskID)
+	}
+	seam4Res, deferred, err := func() (*sessionKeyedCeilingReservation, bool, error) {
+		defer releaseAdmission()
+		if isSessionOpenRecoveryContext(ctx) {
+			if reason := s.sessionOpenRecoveryBlockReason(admissionCtx, taskID, session); reason != "" {
+				return nil, false, &sessionOpenRecoveryBlockedError{reason: reason}
+			}
+		}
+		return s.admitOrDeferSeam4(admissionCtx, taskID, sessionID, launchOrigin(options.Origin),
+			seam4ResumePayloadWithBinding(sessionID, options, entryBinding))
+	}()
 	if err != nil {
 		return nil, err
 	}
@@ -4182,41 +4196,39 @@ func (s *Service) GetTaskSessionStatus(ctx context.Context, taskID, sessionID st
 }
 
 const (
-	autoResumeBlockedWorkflowParked       = "workflow_parked"
 	autoResumeBlockedLaunchQueued         = "launch_queued"
 	autoResumeBlockedOwnershipUnavailable = "ownership_unavailable"
 )
 
-// autoResumeEligibility is intentionally conservative. Passive inspection may
-// resume only a session whose ownership markers are absent or valid and whose
-// durable launch does not belong to another session. A malformed marker blocks
-// recovery instead of falling back to a fresh launch.
+func (s *Service) sessionOpenRecoveryBlockReason(
+	ctx context.Context,
+	taskID string,
+	session *models.TaskSession,
+) string {
+	if s == nil || s.repo == nil || session == nil {
+		return autoResumeBlockedOwnershipUnavailable
+	}
+	task, err := s.repo.GetTask(ctx, taskID)
+	if err != nil || task == nil {
+		return autoResumeBlockedOwnershipUnavailable
+	}
+	allowed, reason := s.autoResumeEligibility(ctx, task, session)
+	if allowed {
+		return ""
+	}
+	return reason
+}
+
+// autoResumeEligibility is intentionally conservative about deferred launches.
+// Passive inspection may resume a session unless a valid durable launch belongs
+// to that exact session. A malformed deferred record blocks recovery instead of
+// falling back to a fresh launch.
 //
 //nolint:cyclop // Passive recovery checks each ownership source independently.
 func (s *Service) autoResumeEligibility(
 	ctx context.Context, task *models.Task, session *models.TaskSession,
 ) (bool, string) {
 	if session == nil || task == nil {
-		return false, autoResumeBlockedOwnershipUnavailable
-	}
-	if raw, present := session.Metadata[models.SessionMetaKeyWorkflowParking]; present {
-		if _, ok := models.LoadWorkflowParking(session.Metadata); ok {
-			return false, autoResumeBlockedWorkflowParked
-		}
-		if raw != nil {
-			return false, autoResumeBlockedOwnershipUnavailable
-		}
-	}
-	// Sessions written before workflow_parking was introduced can still carry
-	// the stamped stop-intent tombstone. Treat it as parked only when the
-	// committed route identifies this exact non-primary session as the source.
-	// Otherwise ownership is ambiguous and passive recovery must remain read-only.
-	if _, ok := workflowProfileSwitchStopIntentFromMetadata(session.Metadata); ok {
-		route, routeOK := models.LoadWorkflowSessionRoute(task.Metadata)
-		if routeOK && !session.IsPrimary && route.SourceSessionID == session.ID &&
-			route.DestinationID != "" && route.DestinationID != session.ID {
-			return false, autoResumeBlockedWorkflowParked
-		}
 		return false, autoResumeBlockedOwnershipUnavailable
 	}
 	raw, present := task.Metadata[models.MetaKeyDeferredLaunch]
@@ -4226,6 +4238,9 @@ func (s *Service) autoResumeEligibility(
 	record, ok := raw.(map[string]interface{})
 	if !ok {
 		return false, autoResumeBlockedOwnershipUnavailable
+	}
+	if len(record) == 0 {
+		return true, ""
 	}
 	deferral, err := models.ReadCeilingDeferral(record)
 	if err != nil {

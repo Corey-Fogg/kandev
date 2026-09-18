@@ -22,6 +22,15 @@ system_design:
 
 # Task 03: Expose queue status across task surfaces
 
+## Policy supersession, 2026-09-18
+
+The [revised conversation recovery package](../session-open-recovery-eligibility/plan.md)
+supersedes parked-session suppression and parking-note presentation in this
+historical package. Opening an earlier conversation now follows normal recovery.
+Keep queue identity, admission, callback, and reconciliation coverage. Replace
+old no-resume and parked-note assertions in the revised package's work orders.
+Historical results and outstanding PostgreSQL checks below are unchanged.
+
 ## Summary
 
 Deliver the bounded queue summary and its desktop/phone presentation as one
