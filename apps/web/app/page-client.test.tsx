@@ -1,6 +1,10 @@
-import { render, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { ONBOARDING_CHANGED } from "@/hooks/use-kanban-onboarding-complete";
+import { getLocalStorage, setLocalStorage } from "@/lib/local-storage";
+import { STORAGE_KEYS } from "@/lib/settings/constants";
 
 const replaceMock = vi.hoisted(() => vi.fn());
 const kanbanWithPreviewMock = vi.hoisted(() => vi.fn(() => null));
@@ -16,7 +20,8 @@ vi.mock("@/components/kanban-with-preview", () => ({
   KanbanWithPreview: kanbanWithPreviewMock,
 }));
 vi.mock("@/components/onboarding-dialog", () => ({
-  OnboardingDialog: () => null,
+  OnboardingDialog: ({ open, onComplete }: { open: boolean; onComplete: () => void }) =>
+    open ? <button onClick={onComplete}>Finish setup</button> : null,
 }));
 vi.mock("@/hooks/use-task-listing-view", () => ({
   useTaskListingView: () => ({ preferredView: preferredViewMock.value }),
@@ -39,11 +44,16 @@ vi.mock("@/lib/recent-tasks", () => ({
 
 import { PageClient } from "./page-client";
 
+const WORKSPACE_ID = "workspace-1";
+const FINISH_SETUP = "Finish setup";
+
 beforeEach(() => {
+  setLocalStorage(STORAGE_KEYS.ONBOARDING_COMPLETED, true);
   getRecentTasksMock.mockImplementation(() => recentTasksMock.entries);
 });
 
 afterEach(() => {
+  localStorage.removeItem(STORAGE_KEYS.ONBOARDING_COMPLETED);
   replaceMock.mockReset();
   kanbanWithPreviewMock.mockClear();
   getRecentTasksMock.mockReset();
@@ -134,7 +144,7 @@ describe("PageClient existing startup choices", () => {
     startupPageMock.value = "last_task";
     recentTasksMock.entries = [
       { taskId: "foreign-task", workspaceId: "workspace-2" },
-      { taskId: "last-task", workspaceId: "workspace-1" },
+      { taskId: "last-task", workspaceId: WORKSPACE_ID },
     ];
 
     render(<PageClient workspaceId="workspace-1" />);
@@ -147,7 +157,7 @@ describe("PageClient existing startup choices", () => {
 
   it("does not read browser recent tasks during server rendering", () => {
     startupPageMock.value = "last_task";
-    recentTasksMock.entries = [{ taskId: "last-task", workspaceId: "workspace-1" }];
+    recentTasksMock.entries = [{ taskId: "last-task", workspaceId: WORKSPACE_ID }];
 
     const markup = renderToString(<PageClient workspaceId="workspace-1" />);
 
@@ -178,7 +188,7 @@ describe("PageClient existing startup choices", () => {
 
   it("keeps an explicit overview entry from resuming the last task", async () => {
     startupPageMock.value = "last_task";
-    recentTasksMock.entries = [{ taskId: "last-task", workspaceId: "workspace-1" }];
+    recentTasksMock.entries = [{ taskId: "last-task", workspaceId: WORKSPACE_ID }];
     searchMock.value = "home=overview";
 
     render(<PageClient workspaceId="workspace-1" />);
