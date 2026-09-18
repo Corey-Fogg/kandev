@@ -96,7 +96,7 @@ Review                       Scheduling
 
 +-------------------------------------------------------------------+
 | Investigate issue                                      Implement  |
-| Queued: Luna. Waiting for session capacity                         |
+| Queued: Luna. Waiting for global session capacity                  |
 | 5 of 5 in use. Checked just now. Queued since 21:15                 |
 | Starts automatically when capacity is available.                   |
 | [Astra] [Luna: Queued] [Plan]                                      |
@@ -123,7 +123,7 @@ Task detail (direct navigation)
 +------------------------------------+
 | Investigate issue        Implement |
 | Queued: Luna                       |
-| Waiting for session capacity       |
+| Waiting for global session capacity       |
 | 5 of 5. Checked just now.           |
 | Queued since 21:15                 |
 | Starts automatically.              |
@@ -190,6 +190,11 @@ auto-start step. Assert Luna exists and is queued before inspection. Capture
 transport before opening the task, selecting Astra, reloading, and reconnecting.
 Prove no Astra boot/prompt/queued-message additions and unchanged primary ownership.
 Do not use helpers that click recovery or reload as part of an idle wait.
+
+The [opt-in ceiling follow-up](../session-ceiling-opt-in/plan.md) disables the
+unconfigured default and adds live Settings. Keep this explicit environment
+fixture: queue-ownership scenarios require an enabled ceiling and must not rely
+on CPU count. This note changes no recorded results or task completion status.
 
 Release only the fixture's capacity holder. Observe Luna's one prompt delivery,
 queue removal, and untouched Astra. Add explicit Astra follow-up as a separate

@@ -117,6 +117,16 @@ destination entry, whereas a ceiling can delay a session already selected by ent
 - **AC-TASKS-QUEUED-SESSION-OWNERSHIP-003.7:** Passive inspection and ordinary
   queue waiting shall not generate an empty-output completion warning. A real
   prompt that completes without output shall retain its existing warning behavior.
+- **AC-TASKS-QUEUED-SESSION-OWNERSHIP-003.8:** When a launch waits for session
+  capacity, its banner shall name the Global session limit and state that it
+  applies across all workspaces. It shall offer a link to the Session capacity
+  section in Settings. The link shall work on desktop and phone without starting
+  or resuming a session. Settings permissions and environment locks still apply.
+- **AC-TASKS-QUEUED-SESSION-OWNERSHIP-003.9:** The banner shall distinguish global
+  session capacity from workflow WIP, ownership errors, and replay errors. A
+  stale or unavailable capacity count shall not hide the known limit scope.
+  After a limit change, the banner shall show refreshed state without a page
+  reload and remain until dispatch or final disposition is confirmed.
 
 ## Compatibility and exclusions
 

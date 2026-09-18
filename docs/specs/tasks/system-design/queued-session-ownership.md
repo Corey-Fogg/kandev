@@ -293,6 +293,44 @@ uses restrained polite announcements for state changes, and never announces ever
 capacity sample. All new copy uses five-language i18n and the Traditional Chinese
 generation command. Previews and viewport assertions live in the work orders.
 
+## Limit scope and configuration navigation
+
+The [opt-in ceiling package](../../../plans/session-ceiling-opt-in/plan.md)
+extends the existing live status with explicit limit scope and Settings links
+(AC-TASKS-QUEUED-SESSION-OWNERSHIP-003.8-.9). It does not create another queue.
+
+`components/task/launch-queue-status.tsx` renders "Global session limit" and
+"Across all workspaces" for `reason: session_capacity`, retaining the selected
+destination, sessions-in-use observation, freshness, and retry status. Its
+configuration link targets
+`/settings/preferences/task-behavior#setting-session-capacity`, the target
+registered by the agent-owned Settings work order. Use ordinary internal
+navigation, not an execution or task mutation. Members can inspect the setting
+but existing permissions prevent writes. Environment-managed settings explain
+the lock on arrival; the banner never implies that a link bypasses it.
+
+Ownership-unavailable and replay-error reasons retain their specific explanation;
+do not rename them as capacity refusals. An old count can remain labelled stale,
+but the global scope is known from the queue kind even without a count. When a
+live setting changes, use the existing controller observation and task summary
+refresh path. Wake replay on expansion and refresh observations on every applied
+change. Do not clear queue ownership just because the effective limit is zero
+or its count has room; retain "Retry pending" until confirmed dispatch.
+
+Task details also render the separate WIP queue explanation from the
+[WIP design](wip-limit-pull-system.md#limit-updates-and-queue-explanations).
+Use task-level composition above conversation content so a WIP task without a
+session can expose its reason. Do not put a WIP record into `launch_queue` or
+give it the selected-session semantics of global deferral. If independent queue
+records legitimately coexist, render their reasons separately with their own
+links. Derive neither queue from English message text.
+
+The existing desktop task status region and dedicated phone task layout remain
+the surfaces. Links wrap below reason/count text and have at least 44px touch
+hit areas. They do not add a scroll owner or require a hover disclosure. Follow
+the existing navigation/back behavior; returning to the task remains passive
+inspection. Localize labels and link text in all five catalogs.
+
 ## Failure and observability
 
 Emit structured, bounded reason codes for suppressed inspection, queued replay,

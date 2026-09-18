@@ -58,9 +58,12 @@ const maxStartupTransferReconcileAttempts = 30
 
 // ServiceConfig holds orchestrator service configuration
 type ServiceConfig struct {
-	Scheduler                     scheduler.SchedulerConfig
-	QueueSize                     int
-	QueueGroup                    string
+	Scheduler  scheduler.SchedulerConfig
+	QueueSize  int
+	QueueGroup string
+	// SessionCapacity is the effective instance-wide limit for automatic
+	// session launches. Zero disables the ceiling.
+	SessionCapacity               int
 	ClaudeBackgroundPromptHandoff bool
 
 	// ClaudeMidTurnSteering enables delivering a prompt into a still-generating
@@ -103,9 +106,10 @@ type LaunchAttachmentClaimer interface {
 // DefaultServiceConfig returns default configuration
 func DefaultServiceConfig() ServiceConfig {
 	return ServiceConfig{
-		Scheduler:  scheduler.DefaultSchedulerConfig(),
-		QueueSize:  1000,
-		QueueGroup: "orchestrator",
+		Scheduler:       scheduler.DefaultSchedulerConfig(),
+		QueueSize:       1000,
+		QueueGroup:      "orchestrator",
+		SessionCapacity: unlimitedSessionCeiling,
 	}
 }
 
@@ -1134,8 +1138,8 @@ type Service struct {
 	idleReaper *idleSessionReaper
 
 	// sessionCeiling is the instance-wide admission controller for agent
-	// session launches. Its ceiling is resolved once here, at construction,
-	// and is constant for the lifetime of the process.
+	// session launches. Its initial effective capacity is resolved by the
+	// composition root and can be changed by the install Settings service.
 	sessionCeiling *sessionCeilingController
 
 	// ceilingSweeper is the single background goroutine that expires stale
@@ -1721,7 +1725,7 @@ func NewService(
 		dynamicSuccessorCancel:       dynamicSuccessorCancel,
 		idleReaper:                   newIdleSessionReaper(),
 		ceilingSweeper:               newCeilingSweeper(),
-		sessionCeiling:               newSessionCeilingForRepo(repo, svcLogger.Zap()),
+		sessionCeiling:               newSessionCeilingForRepo(repo, cfg.SessionCapacity, svcLogger.Zap()),
 		backgroundProbeConfig:        LoadBackgroundProbeConfig(svcLogger),
 		parkedStates:                 make(map[string]*parkedSessionState),
 		taskParkedStates:             make(map[string]*taskParkedState),

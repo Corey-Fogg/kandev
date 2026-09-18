@@ -43,6 +43,7 @@ export const GENERAL_SETTINGS_TARGETS = {
   unreadMessages: "setting-unread-messages",
   transcriptNavigation: "setting-transcript-navigation",
   messageQueue: "setting-message-queue",
+  sessionCapacity: "setting-session-capacity",
   spritesConnection: "setting-sprites-connection",
   spritesInstances: "setting-sprites-instances",
 } as const;
@@ -429,5 +430,15 @@ export const PREFERENCES_DISCOVERY_DEFINITIONS: SettingsDiscoveryDefinition[] = 
     href: TASK_BEHAVIOR_SETTINGS_HREF,
     targetId: GENERAL_SETTINGS_TARGETS.messageQueue,
     order: 66,
+  },
+  {
+    id: "task-behavior-session-capacity",
+    kind: "section",
+    labelKey: "system:sessionCapacityTitle",
+    parentId: TASK_BEHAVIOR_ID,
+    groupId: "preferences",
+    href: TASK_BEHAVIOR_SETTINGS_HREF,
+    targetId: GENERAL_SETTINGS_TARGETS.sessionCapacity,
+    order: 67,
   },
 ];

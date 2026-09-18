@@ -62,7 +62,7 @@ Excerpt of [the full plan previews](plan.md#ascii-ui-preview), requirement 003:
 ```text
 UI-01 Desktop
 Sidebar: [clock] Investigate issue  Queued
-Detail:  Queued: Luna. Waiting for session capacity
+Detail:  Queued: Luna. Waiting for global session capacity
          5 of 5. Checked just now. Queued since 21:15
          Starts automatically when capacity is available.
          [Astra] [Luna: Queued] [Plan]
@@ -72,7 +72,7 @@ UI-02 Phone
 Task drawer row: [clock] Investigate issue  Queued
 Task detail:
   Queued: Luna
-  Waiting for session capacity
+  Waiting for global session capacity
   5 of 5. Checked just now. Queued since 21:15
   Starts automatically.
   [Astra                         v]

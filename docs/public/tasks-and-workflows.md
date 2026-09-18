@@ -622,17 +622,38 @@ destination queue. If the configured
 feeder is also full, creation returns a conflict. Ephemeral tasks are not
 counted.
 
+A queued task detail shows a **Workflow WIP limit** banner. It names the
+destination workflow and step, reports task counts, and links to that
+workflow's WIP settings when the destination identity is available. The
+banner can appear before the task has a session. A feeder's name or limit is
+never shown as the destination.
+
 A task can also show **Queued** after workflow entry selects a session but the
-agent session ceiling blocks automatic launch. This is different from WIP
-queueing: WIP waits before destination entry, while session-capacity queueing
-keeps the selected session and retries it automatically. Task details and the
-task navigator show the destination, the latest capacity observation, queue
+global session capacity blocks automatic launch. This is a separate queue:
+WIP queueing waits before destination entry, while global capacity queueing
+keeps the selected session and retries it automatically. The task detail and
+task navigator identify this cause as **Global session limit**, state that it
+applies to all workspaces, and link to Settings > Task Behavior > Session
+capacity. They show the destination, the latest capacity observation, queue
 time, and retry state. They do not show a queue position or estimated start
 time. Capacity counts older than 40 seconds, or counts unavailable because the
 client is disconnected, are labelled stale while the destination remains
 visible. Opening a task or a parked predecessor does not start it. Use the
 explicit **Start** or **Resume** action, or send a message, to override the
 automatic ceiling for that conversation.
+
+The instance session capacity is disabled by default. An administrator can
+enable it in Settings > Task Behavior > Session capacity, enter a positive
+maximum, and save the change. The saved value applies to later automatic
+starts without a restart and persists across restarts. Disabling it retains
+the maximum for later use. Manual starts can exceed the limit. Workflow WIP
+limits remain separate and are checked before session capacity.
+
+`KANDEV_MAX_CONCURRENT_SESSIONS` is an optional startup override. A valid
+non-negative value takes precedence over the saved setting, and `0` disables
+the ceiling. When the override is present, Settings shows the effective value
+and prevents edits. Change the environment and restart Kandev to remove the
+override.
 
 Integration watchers use the same admission rule. For example, a GitHub review
 watch targeting a `Review` step with a limit of two admits at most two newly
