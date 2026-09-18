@@ -2522,6 +2522,7 @@ export class ApiClient {
       id: string;
       task_id: string;
       queue_incarnation_id: string;
+      agent_execution_id?: string;
       agent_profile_id?: string;
       executor_id?: string;
       executor_profile_id?: string;
