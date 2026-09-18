@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 const state = {
-  features: { office: false, personalAssistant: false },
+  features: { office: false, orchestration: false },
   workspaces: { activeId: "ws-1" as string | null },
   userSettings: { ...defaultState.userSettings },
   features: { ...defaultFeatureFlags } as FeatureFlags,
