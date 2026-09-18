@@ -43,6 +43,14 @@ vi.mock("@/hooks/use-in-office", () => ({
   useOfficeModeState: () => mode,
 }));
 
+vi.mock("@/hooks/use-kanban-onboarding-complete", () => ({
+  useKanbanOnboardingComplete: () => true,
+}));
+
+vi.mock("@/hooks/domains/orchestration/use-orchestrator-conversation", () => ({
+  useWorkspaceOrchestrators: () => ({ data: { orchestrators: [] } }),
+}));
+
 vi.mock("@/hooks/use-quick-chat-launcher", () => ({
   useQuickChatLauncher: () => mocks.openQuickChat,
 }));
