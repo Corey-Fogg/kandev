@@ -15,6 +15,7 @@ import { useQuickChatActivity } from "@/components/quick-chat/use-quick-chat-act
 import { homeDestinationHref } from "@/lib/navigation/core-destinations";
 import { NEEDS_YOU_INBOX_HREF } from "@/lib/navigation/needs-you-inbox-destination";
 import { AppSidebarNavItem } from "./app-sidebar-nav-item";
+import { AssistantNav } from "./assistant-nav";
 import { WorkspaceChiefNav } from "./workspace-chief-nav";
 import { AppSidebarNewTaskItem } from "./app-sidebar-new-task-item";
 
@@ -82,6 +83,7 @@ export function AppSidebarPrimaryNav({ collapsed }: AppSidebarPrimaryNavProps) {
           activity={quickChatActivity}
         />
       )}
+      <AssistantNav collapsed={collapsed} />
       <WorkspaceChiefNav collapsed={collapsed} />
       <AppSidebarNewTaskItem collapsed={collapsed} />
     </div>
