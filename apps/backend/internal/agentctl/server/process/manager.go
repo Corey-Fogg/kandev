@@ -1462,7 +1462,9 @@ func (m *Manager) buildAdapterConfig() error {
 		NotificationQueueCapacity: m.cfg.NotificationQueueCapacity,
 		ProviderGatewayAuth:       m.cfg.ProviderGatewayAuth,
 	}
-	if m.cfg.AssistantRestricted() {
+	// The managed Claude broker policy preapproves only Kandev MCP calls.
+	// Workspace account configuration remains valid without a private binding.
+	if m.cfg.AssistantRestricted() || (m.cfg.BrokerRestricted() && m.cfg.AgentType == "claude-acp") {
 		m.adapterCfg.ToolPolicy = config.AssistantToolPolicy
 	}
 
