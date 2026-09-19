@@ -522,6 +522,10 @@ func (s *Service) retryTransientPrompt(ctx context.Context, taskID, sessionID, e
 		return
 	}
 	cp, _ := v.(capturedPrompt)
+	initialCreatePromptPassthrough := false
+	if session, sessionErr := s.repo.GetTaskSession(ctx, sessionID); sessionErr == nil && session != nil {
+		_, initialCreatePromptPassthrough = s.hydrateInitialCreatePromptPassthrough(session)
+	}
 
 	if execID != "" {
 		if !s.claimForcedExecutionCleanup(sessionID, execID) {
@@ -556,7 +560,8 @@ func (s *Service) retryTransientPrompt(ctx context.Context, taskID, sessionID, e
 	}
 
 	if _, err := s.promptTask(ctx, taskID, sessionID, cp.text, cp.model, cp.planMode, cp.attachments, false, launchOriginAutomatic, promptTaskOptions{
-		onAccepted: cp.onAccepted,
+		onAccepted:                     cp.onAccepted,
+		initialCreatePromptPassthrough: initialCreatePromptPassthrough,
 	}); err != nil {
 		if ctx.Err() != nil {
 			return
