@@ -124,7 +124,14 @@ func (s *Service) resolveSourceWorkflowSessionTarget(
 	if err != nil {
 		return workflowSessionTargetResolution{}, err
 	}
-	return workflowSessionTargetResolution{session: session, profileID: sourceStep.AgentProfileID}, nil
+	profileID, err := s.resolveStepAgentProfileForTaskID(ctx, taskID, sourceStep)
+	if err != nil {
+		return workflowSessionTargetResolution{}, err
+	}
+	return workflowSessionTargetResolution{
+		session:   session,
+		profileID: profileID,
+	}, nil
 }
 
 func validateWorkflowSessionTargetSource(destination, source *wfmodels.WorkflowStep) error {
@@ -154,15 +161,19 @@ func (s *Service) resolveBoundSourceWorkflowSession(
 	if err != nil {
 		return nil, err
 	}
+	effectiveProfileID, err := s.resolveStepAgentProfileForTaskID(ctx, taskID, sourceStep)
+	if err != nil {
+		return nil, err
+	}
 	if binding == nil || binding.TaskID != taskID || binding.WorkflowID != workflowID ||
-		binding.AgentProfileID != sourceStep.AgentProfileID || binding.SessionID == "" {
+		binding.AgentProfileID != effectiveProfileID || binding.SessionID == "" {
 		return nil, nil
 	}
 	session, err := s.repo.GetTaskSession(ctx, binding.SessionID)
 	if err != nil {
 		return nil, fmt.Errorf("load session target binding %q: %w", sourceStep.ID, err)
 	}
-	if session == nil || session.TaskID != taskID || session.AgentProfileID != sourceStep.AgentProfileID {
+	if session == nil || session.TaskID != taskID || session.AgentProfileID != effectiveProfileID {
 		return nil, nil
 	}
 	return session, nil
@@ -611,6 +622,10 @@ func (s *Service) recordWorkflowSourceBinding(
 	if task == nil || (task.WorkflowStepID != "" && task.WorkflowStepID != step.ID) {
 		return nil
 	}
+	effectiveProfileID := s.resolveStepAgentProfileForTask(ctx, task, step)
+	if effectiveProfileID == "" {
+		effectiveProfileID = step.AgentProfileID
+	}
 	updatedAt := task.UpdatedAt
 	if updatedAt.IsZero() {
 		updatedAt = time.Now().UTC()
@@ -622,7 +637,7 @@ func (s *Service) recordWorkflowSourceBinding(
 		TaskID:         taskID,
 		TargetKey:      workflowSessionBindingTargetKey(step.ID),
 		WorkflowID:     step.WorkflowID,
-		AgentProfileID: step.AgentProfileID,
+		AgentProfileID: effectiveProfileID,
 		SessionID:      session.ID,
 		OperationID:    operationID,
 		UpdatedAt:      updatedAt,
