@@ -960,6 +960,24 @@ func (a *lifecycleAdapter) ListExecutionsForTask(taskID string) []lifecycle.Exec
 	return a.mgr.ListExecutionsForTask(taskID)
 }
 
+// LiveSessionIDsForTask satisfies taskservice.SessionExecutionRegistry: the
+// session IDs under taskID that currently have a live in-memory execution
+// registered by the agent runtime. The session reconciliation sweep uses the
+// snapshot to tell an active session whose backing actor is alive from one
+// whose actor is gone. Pinned here so a signature drift is a build error.
+var _ taskservice.SessionExecutionRegistry = (*lifecycleAdapter)(nil)
+
+func (a *lifecycleAdapter) LiveSessionIDsForTask(taskID string) []string {
+	references := a.mgr.ListExecutionsForTask(taskID)
+	sessionIDs := make([]string, 0, len(references))
+	for _, reference := range references {
+		if reference.SessionID != "" {
+			sessionIDs = append(sessionIDs, reference.SessionID)
+		}
+	}
+	return sessionIDs
+}
+
 func (a *lifecycleAdapter) GetRemoteRuntimeStatusBySession(ctx context.Context, sessionID string) (*executor.RemoteRuntimeStatus, error) {
 	status, ok := a.mgr.GetRemoteStatusBySessionID(ctx, sessionID)
 	if !ok || status == nil {

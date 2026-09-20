@@ -1893,6 +1893,16 @@ type TaskSession struct {
 	TokensOut      int64 `json:"tokens_out"`
 }
 
+// ActiveSessionCancellationCandidate is the compare-and-set snapshot used by
+// the active-session stall healer. An empty ExpectedTurnID means that no turn
+// may be active when the cancellation is written.
+type ActiveSessionCancellationCandidate struct {
+	SessionID           string
+	ExpectedUpdatedAt   time.Time
+	ExpectedLastEventAt time.Time
+	ExpectedTurnID      string
+}
+
 // ToAPI converts internal TaskSession to API type
 // TODO: Add v1.TaskSession type to pkg/api/v1/
 func (s *TaskSession) ToAPI() map[string]interface{} {

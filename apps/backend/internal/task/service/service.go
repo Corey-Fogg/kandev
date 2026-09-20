@@ -125,6 +125,17 @@ type TaskExecutionStopper interface {
 	RegisterExecutionStopOwner(sessionID, executionID string, force bool)
 }
 
+// SessionExecutionRegistry reports which sessions of a task currently have a
+// live in-memory execution registered by the agent runtime's execution store.
+// The session reconciliation sweep uses it to tell an active session whose
+// backing actor is alive from one whose actor is gone (e.g. after a backend
+// restart), independent of the persisted session state.
+type SessionExecutionRegistry interface {
+	// LiveSessionIDsForTask returns the session IDs under taskID that have a
+	// registered in-memory execution. The snapshot is read-only.
+	LiveSessionIDsForTask(taskID string) []string
+}
+
 // synchronousTaskExecutionStopper is an optional cleanup-only extension. The
 // normal StopSession contract schedules process teardown asynchronously, but
 // destructive resource cleanup must wait until the process exits.
@@ -497,10 +508,19 @@ type Service struct {
 	// host process detection. Nil selects the real platform implementation
 	// (resource_cleanup_orphan_reap_host_*.go); tests override them
 	// directly since they are unexported and this is a whitebox package.
-	orphanReapHostSnapshotter   orphanReapHostSnapshotter
-	orphanReapVerifier          orphanReapVerifier
-	orphanReapSignaler          orphanReapSignaler
-	sessionRunningChecker       SessionRunningChecker
+	orphanReapHostSnapshotter orphanReapHostSnapshotter
+	orphanReapVerifier        orphanReapVerifier
+	orphanReapSignaler        orphanReapSignaler
+	sessionRunningChecker     SessionRunningChecker
+	sessionExecutionRegistry  SessionExecutionRegistry
+	stallDetectionThreshold   time.Duration
+	// stallNotifiedSessions dedupes task.stalled events per stall episode:
+	// task ID -> session IDs already reported. A session is reported at most
+	// once per episode; an episode ends when the session leaves the stalled
+	// set (terminal, healed, or a live execution reappeared), which clears
+	// its entry so a later stall on the same session reports again. Accessed
+	// only from the reconciliation sweep's single goroutine.
+	stallNotifiedSessions       map[string]map[string]struct{}
 	remoteBranchLister          RemoteBranchLister
 	repositorySelectionResolver RepositorySelectionResolver
 	repoCloneLocation           RepoCloneLocation
@@ -746,6 +766,7 @@ func NewService(repos Repos, eventBus bus.EventBus, log *logger.Logger, discover
 		branchFetcher:                 newBranchFetcher(log.Zap()),
 		lastTaskActivity:              make(map[string]v1.ForegroundActivity),
 		lastTaskSubagentCount:         make(map[string]int),
+		stallNotifiedSessions:         make(map[string]map[string]struct{}),
 		// Focused service tests do not run backend composition. Production
 		// replaces this fallback with a database-allocated generation.
 		pendingActionProjectionEpoch: "1",
@@ -810,6 +831,28 @@ func (s *Service) SetProviderDefaultBranchProber(p ProviderDefaultBranchProber) 
 // SetExecutionStopper wires the task execution stopper (orchestrator).
 func (s *Service) SetExecutionStopper(stopper TaskExecutionStopper) {
 	s.executionStopper = stopper
+}
+
+// SetSessionExecutionRegistry wires the live-execution reader (agent runtime
+// lifecycle manager) used by the session reconciliation sweep to distinguish
+// an active session whose backing actor is still registered in this process
+// from one whose actor is gone. Optional: without it the sweep's active-task
+// pass (stall detection and orphaned-session healing) is skipped rather than
+// guessing, because "no live execution" cannot be verified.
+func (s *Service) SetSessionExecutionRegistry(registry SessionExecutionRegistry) {
+	s.sessionExecutionRegistry = registry
+}
+
+// SetStallDetectionThreshold configures the event-silence window after which
+// the session reconciliation sweep classifies an execution-less active
+// session as stalled (tasks.stallDetectionThreshold, default 2h). Non-positive
+// values keep the default. The orphaned-session healing grace window is
+// derived from this threshold (twice its value).
+func (s *Service) SetStallDetectionThreshold(threshold time.Duration) {
+	if threshold <= 0 {
+		return
+	}
+	s.stallDetectionThreshold = threshold
 }
 
 // SetClarificationCanceller wires terminal clarification cleanup for session

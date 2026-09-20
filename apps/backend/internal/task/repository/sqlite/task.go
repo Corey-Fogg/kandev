@@ -4240,11 +4240,36 @@ func (r *Repository) ListTasksForAutoArchive(ctx context.Context) ([]*models.Tas
 	return r.scanTasks(rows)
 }
 
+// ListUnarchivedTasksWithActiveSessions returns the unarchived tasks that
+// still have at least one task_sessions row in an active DB state
+// (CREATED/STARTING/RUNNING/WAITING_FOR_INPUT). This is the candidate list
+// for the session reconciliation sweep's active-task pass (see
+// service.StartSessionReconciliationLoop): an active session on an
+// unarchived task whose execution is absent from the in-memory execution
+// store is left over from a lost actor (e.g. a backend restart) and must be
+// detected or healed by the sweep, not by any request path. The sweep
+// re-derives this list every pass, so tasks that regain a live execution
+// between passes are simply no longer candidates.
+func (r *Repository) ListUnarchivedTasksWithActiveSessions(ctx context.Context) ([]*models.Task, error) {
+	rows, err := r.ro.QueryContext(ctx, `
+		SELECT DISTINCT `+taskSelectColumns("t")+`
+		FROM tasks t
+		JOIN task_sessions ts ON ts.task_id = t.id
+		WHERE t.archived_at IS NULL
+			AND ts.state IN ('CREATED', 'STARTING', 'RUNNING', 'WAITING_FOR_INPUT')
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	return r.scanTasks(rows)
+}
+
 // ListArchivedTasksWithActiveSessions returns the IDs of archived tasks that
 // still have at least one task_sessions row in an active DB state
 // (CREATED/STARTING/RUNNING/WAITING_FOR_INPUT). This is the candidate list
 // for the periodic reconciliation sweep (see
-// service.StartArchivedSessionReconciliationLoop): finalizeCancelledSessions
+// service.StartSessionReconciliationLoop): finalizeCancelledSessions
 // bounds its session-cancellation retry to a handful of attempts, so
 // sustained SQLite writer contention can exhaust it and leave an archived
 // task's sessions stuck active with no session.state_changed event ever
