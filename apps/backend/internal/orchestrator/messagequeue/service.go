@@ -31,13 +31,14 @@ type autoMergePolicyLoader struct {
 
 // Service manages queued messages for sessions, backed by Repository.
 type Service struct {
-	repo            Repository
-	maxPerSession   atomic.Int64
-	mergeEnabled    atomic.Bool
-	autoMergePolicy atomic.Pointer[AutoMergePolicy]
-	autoMergeLoader atomic.Pointer[autoMergePolicyLoader]
-	statusEpoch     string
-	logger          *logger.Logger
+	repo                    Repository
+	maxPerSession           atomic.Int64
+	mergeEnabled            atomic.Bool
+	autoMergePolicy         atomic.Pointer[AutoMergePolicy]
+	autoMergeLoader         atomic.Pointer[autoMergePolicyLoader]
+	statusEpoch             string
+	logger                  *logger.Logger
+	dispatchContextResolver func(context.Context, string) (string, error)
 	// lifecycleMu fences task-wide purges against every session-scoped queue
 	// admission. A task purge cannot enumerate every possibly empty session,
 	// so the barrier must cover admissions before they reach the repository.
@@ -1558,7 +1559,7 @@ func (s *Service) insertQueueMessageWithMetadataAtWorkflowEntry(ctx context.Cont
 		Metadata:    metadataCopy,
 		QueuedBy:    userID,
 	}
-	err := s.insertQueueMessageAtWorkflowEntry(ctx, identity, workflowEntry, msg, claim, maxPerSession, policy)
+	err = s.insertQueueMessageAtWorkflowEntry(ctx, identity, workflowEntry, msg, claim, maxPerSession, policy)
 	if err != nil {
 		if errors.Is(err, ErrQueueFull) {
 			s.logger.Info("queue full",

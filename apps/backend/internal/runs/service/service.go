@@ -90,8 +90,9 @@ type QueueRunRequest struct {
 	// into by a later request, and idx_run_wake_wave deduplicates a second
 	// insert for the same (WakeWaveKey, AgentProfileID) into
 	// QueueOutcomeDeduped instead of an error.
-	WakeWaveKey    string
-	WakeWaveString string
+	WakeWaveKey       string
+	WakeWaveString    string
+	DisableCoalescing bool
 }
 
 // CoalesceWindowSeconds is the default coalescing window. When two
@@ -334,7 +335,7 @@ func runPayload(req QueueRunRequest, agentInstanceID string) map[string]any {
 // longer describe the wake it delivers. idx_run_wake_wave, not this
 // window, is what reconciles wave-carrying requests.
 func shouldCoalesceRun(req QueueRunRequest) bool {
-	return req.WakeWaveKey == "" && !commentkeys.HasTaskCommentPrefix(req.IdempotencyKey)
+	return !req.DisableCoalescing && req.WakeWaveKey == "" && !commentkeys.HasTaskCommentPrefix(req.IdempotencyKey)
 }
 
 // publishRunQueued emits the OfficeRunQueued bus event so the WS

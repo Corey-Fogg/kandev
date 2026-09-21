@@ -45,9 +45,12 @@ type Run struct {
 	// row would disagree with the derivation the claiming scheduler is
 	// still holding in memory.
 	ContinuationScope string     `json:"continuation_scope,omitempty" db:"continuation_scope"`
+	WakeWaveKey       string     `json:"wake_wave_key,omitempty" db:"wake_wave_key"`
+	WakeWaveString    string     `json:"wake_wave_string,omitempty" db:"wake_wave_string"`
 	RequestedAt       time.Time  `json:"requested_at" db:"requested_at"`
 	ClaimedAt         *time.Time `json:"claimed_at" db:"claimed_at"`
 	FinishedAt        *time.Time `json:"finished_at" db:"finished_at"`
+	CausationID       string     `json:"causation_id,omitempty" db:"causation_id"`
 
 	// Outcome records why a finished run ended (docs/specs/
 	// task-delivery-ledger/spec.md, "Office run outcome"): one of eight
