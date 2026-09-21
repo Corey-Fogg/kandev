@@ -36,5 +36,5 @@ func (a *Adapter) clientCapabilities() acpsdk.ClientCapabilities {
 	if a.assistantRestricted() {
 		return acpsdk.ClientCapabilities{}
 	}
-	return clientCapabilitiesForAgent(a.agentID)
+	return clientCapabilitiesForAgent(a.agentID, false)
 }

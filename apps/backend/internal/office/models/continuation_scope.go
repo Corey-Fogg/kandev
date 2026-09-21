@@ -1,6 +1,6 @@
 package models
 
-import runmodels "github.com/kandev/kandev/internal/runs/models"
+import "encoding/json"
 
 // ContinuationScopeForRun computes the continuation-summary scope key for
 // a run: "routine:<routine_id>" when the run's context snapshot carries a
@@ -20,5 +20,14 @@ import runmodels "github.com/kandev/kandev/internal/runs/models"
 // function is not enough on its own when its input can drift between
 // calls.
 func ContinuationScopeForRun(run *Run, agentProfileID string) string {
-	return runmodels.ContinuationScopeForRun(run, agentProfileID)
+	if run == nil {
+		return "agent:" + agentProfileID
+	}
+	var payload struct {
+		RoutineID string `json:"routine_id"`
+	}
+	if json.Unmarshal([]byte(run.ContextSnapshot), &payload) == nil && payload.RoutineID != "" {
+		return "routine:" + payload.RoutineID
+	}
+	return "agent:" + agentProfileID
 }

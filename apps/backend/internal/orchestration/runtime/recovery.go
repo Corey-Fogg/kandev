@@ -70,7 +70,7 @@ func (s *Service) RecoverInterrupted(ctx context.Context) error {
 		if err := s.Runs.RecordFailure(ctx, run.ID, "Conversation interrupted by backend restart. Inspect the latest task results before retrying."); err != nil {
 			return err
 		}
-		if err := s.Runs.FinishRun(ctx, run.ID, statusFailed, nil); err != nil {
+		if _, err := s.Runs.FinishRun(ctx, run.ID, statusFailed, nil); err != nil {
 			return err
 		}
 		if err := s.Repo.SetRuntimeWorking(ctx, run.AgentProfileID, false); err != nil {

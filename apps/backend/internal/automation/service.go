@@ -169,6 +169,7 @@ type Service struct {
 	// workflowStepLocator gates the relationship between a workflow and its
 	// selected step. Optional for isolated tests, but wired in production.
 	workflowStepLocator WorkflowStepLocator
+	orchestratorTarget  OrchestratorTarget
 
 	// repoLookup validates repository_ids on create/update — every ID must
 	// resolve to a repository belonging to the automation's workspace. Nil

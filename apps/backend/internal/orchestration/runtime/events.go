@@ -101,7 +101,7 @@ func (s *Service) finishTurn(ctx context.Context, event *bus.Event, data map[str
 			return err
 		}
 	}
-	if err := s.Runs.FinishRun(ctx, run.ID, status, nil); err != nil {
+	if _, err := s.Runs.FinishRun(ctx, run.ID, status, nil); err != nil {
 		return err
 	}
 	s.retiredExecutions.Delete(run.ID)

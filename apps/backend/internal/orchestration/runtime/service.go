@@ -120,7 +120,7 @@ func (s *Service) Process(ctx context.Context, run *runmodels.Run) (bool, error)
 	if err != nil {
 		s.retiredExecutions.Delete(run.ID)
 		_ = s.Runs.RecordFailure(ctx, run.ID, err.Error())
-		_ = s.Runs.FinishRun(ctx, run.ID, statusFailed, nil)
+		_, _ = s.Runs.FinishRun(ctx, run.ID, statusFailed, nil)
 		_ = s.Repo.SetRuntimeWorking(ctx, run.AgentProfileID, false)
 	}
 	return true, err
@@ -132,7 +132,8 @@ func (s *Service) launch(ctx context.Context, run *runmodels.Run) error {
 	}
 	if paused(a) {
 		s.retiredExecutions.Delete(run.ID)
-		return s.Runs.FinishRun(ctx, run.ID, "finished", nil)
+		_, err := s.Runs.FinishRun(ctx, run.ID, "finished", nil)
+		return err
 	}
 
 	var payload map[string]any
