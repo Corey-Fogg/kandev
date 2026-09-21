@@ -147,10 +147,10 @@ The Docker socket is effectively root-equivalent on many hosts. Do not publish i
 
 ### Core agent service
 
-| YAML key               | Environment variable                              | Default     | Current behavior                                                 |
-| ---------------------- | ------------------------------------------------- | ----------- | ---------------------------------------------------------------- |
-| `agent.standaloneHost` | `KANDEV_AGENT_STANDALONE_HOST`                    | `localhost` | Host of the core `agentctl` control server.                      |
-| `agent.standalonePort` | `AGENTCTL_PORT` or `KANDEV_AGENT_STANDALONE_PORT` | `39429`     | Preferred control port. The launcher may supply a free fallback. |
+| YAML key               | Environment variable                              | Default     | Current behavior                                                              |
+| ---------------------- | ------------------------------------------------- | ----------- | ---------------------------------------------------------------------------- |
+| `agent.standaloneHost` | `KANDEV_AGENT_STANDALONE_HOST`                    | `127.0.0.1` | Host of the core `agentctl` control server. The literal avoids IPv6 loopback resolution variance. |
+| `agent.standalonePort` | `AGENTCTL_PORT` or `KANDEV_AGENT_STANDALONE_PORT` | `39429`     | Preferred control port. The launcher may supply a free fallback.            |
 
 The launcher starts `agentctl`, performs a one-time nonce handshake, and supplies the resulting per-launch token internally. Do not persist or proxy its bootstrap/auth state. Agent command, model, environment, permission, and MCP configuration belongs in agent profiles rather than this section.
 
@@ -453,7 +453,7 @@ docker:
   volumeBasePath: "/var/lib/kandev/volumes" # compatibility-only today
 
 agent:
-  standaloneHost: "localhost"
+  standaloneHost: "127.0.0.1"
   standalonePort: 39429
 
 tasks:
