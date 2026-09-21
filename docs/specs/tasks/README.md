@@ -93,6 +93,7 @@ signals, and task-scoped scheduling contracts.
 - [Task Terminal Persistence](requirements/task-terminal-persistence.md)
 - [Runtime Task-State Publication Order](requirements/runtime-state-publication-order.md)
 - [Session Delete Preserves Task Workspaces](requirements/session-delete-resource-cleanup.md)
+- [Restart-Orphaned Session Terminalization](requirements/restart-orphaned-session-terminalization.md)
 - [Sidebar Task Editing](requirements/sidebar-task-edit.md)
 - [Task Actions Menu on Preview and Detail Surfaces](requirements/task-actions-menu.md)
 - [Task menu grouping](requirements/task-menu-grouping.md)

@@ -2855,7 +2855,7 @@ func (s *Service) runCancelledSessionEffects(
 			_, err := s.clarificationCanceller.ExpireSessionAndNotify(expireCtx, session.ID)
 			cancelExpire()
 			if err != nil {
-				s.logger.Error("failed to expire clarification after archive cancellation; response claims remain quarantined",
+				s.logger.Error("failed to expire clarification after session cancellation; response claims remain quarantined",
 					zap.String("task_id", taskID),
 					zap.String("session_id", session.ID),
 					zap.Error(err))
@@ -2872,7 +2872,7 @@ func (s *Service) runCancelledSessionEffects(
 			cancelParked()
 		}
 	}
-	// CancelActiveTaskSessionsByTaskID is a bulk writer: RETURNING reports every
+	// The cancellation writers are bulk writers: RETURNING reports every
 	// row's post-update CANCELLED state, not which were in an AC-1 state before
 	// the update, so every returned id is released unconditionally rather than
 	// branched on state (AC-51e). Releasing an id that held no reservation is a

@@ -179,6 +179,16 @@ type TaskRowLivenessProber interface {
 	RowLiveness(row *models.ExecutorRunning) models.ProcessLiveness
 }
 
+// TaskExecutionLivenessChecker reports whether a task session still has a
+// live agent execution backing it in the agent runtime's in-memory store.
+// Implementers must distinguish agent-owned executions from workspace-only
+// infrastructure and must answer from the store only — never lazily
+// (re)create an execution the way the GetOrEnsureExecution recovery
+// chokepoint does.
+type TaskExecutionLivenessChecker interface {
+	HasLiveExecution(sessionID string) bool
+}
+
 // TaskResourceCleanupActivityGate serializes durable cleanup with install-wide maintenance.
 type TaskResourceCleanupActivityGate interface {
 	AcquireTaskResourceCleanup(context.Context) (TaskResourceCleanupActivityLease, error)
@@ -481,6 +491,7 @@ type Service struct {
 	parkedProjectionCanceller       ParkedProjectionCanceller
 	sessionCeilingReleaser          SessionCeilingReleaser
 	rowLivenessProber               TaskRowLivenessProber
+	executionLivenessChecker        TaskExecutionLivenessChecker
 	contextWindowResetter           func(context.Context, string) error
 	cleanupActivity                 TaskResourceCleanupActivityGate
 	branchMaterializer              BranchMaterializer
@@ -880,6 +891,15 @@ func (s *Service) SetSessionCeilingReleaser(releaser SessionCeilingReleaser) {
 // treats every row as Unknown.
 func (s *Service) SetRowLivenessProber(prober TaskRowLivenessProber) {
 	s.rowLivenessProber = prober
+}
+
+// SetExecutionLivenessChecker wires the in-memory execution-store lookup
+// (satisfied by the lifecycle adapter) used by the orphan-session
+// reconciliation sweep. It is optional; when unwired the sweep is inert,
+// because absent-from-store is its only dead signal and a nil checker can
+// never prove a session unbacked.
+func (s *Service) SetExecutionLivenessChecker(checker TaskExecutionLivenessChecker) {
+	s.executionLivenessChecker = checker
 }
 
 // SetContextWindowResetter wires the guarded context-window reset callback

@@ -2112,7 +2112,7 @@ func completedAtForTaskSessionState(status models.TaskSessionState, now time.Tim
 // timed out. Returned sessions therefore carry only the fields the
 // RETURNING clause selects (ID, TaskID, AgentProfileID,
 // AgentProfileSnapshot, IsPassthrough, Name, ReviewStatus, Metadata,
-// TaskEnvironmentID, State, UpdatedAt) — every other models.TaskSession
+// TaskEnvironmentID, State, UpdatedAt, IsPrimary) — every other models.TaskSession
 // field is left at its zero value, and callers must not rely on fields
 // outside this list being populated.
 func (r *Repository) CancelActiveTaskSessionsByTaskID(ctx context.Context, taskID, reason string) ([]*models.TaskSession, error) {
@@ -2131,7 +2131,7 @@ func (r *Repository) CancelActiveTaskSessionsByTaskID(ctx context.Context, taskI
 		WHERE task_id = ?
 			AND state IN ('CREATED', 'STARTING', 'RUNNING', 'WAITING_FOR_INPUT')
 		RETURNING id, agent_profile_id, agent_profile_snapshot, is_passthrough, name,
-			review_status, metadata, task_environment_id, state, updated_at
+			review_status, metadata, task_environment_id, state, updated_at, is_primary
 	`), string(models.TaskSessionStateCancelled), reason, now, now, taskID)
 	if err != nil {
 		return nil, err
@@ -2147,6 +2147,97 @@ func (r *Repository) CancelActiveTaskSessionsByTaskID(ctx context.Context, taskI
 		sessions = append(sessions, session)
 	}
 	return sessions, rows.Err()
+}
+
+// ListStaleRunningSessionsOnUnarchivedTasks returns every STARTING/RUNNING
+// session of an unarchived task whose updated_at is older than staleBefore.
+// It is the candidate list for the orphan-session reconciliation sweep (see
+// service.runOrphanedSessionReconciliation): a session still holding one of
+// those states past the launch grace window, with no live in-memory execution
+// backing it, can never reach a terminal state on its own — its actor died
+// with the process. The staleBefore cutoff is applied in SQL so the sweep
+// never even loads fresh rows that may belong to an in-flight launch.
+//
+// Not part of the SessionRepository interface: it exists for that one sweep,
+// which reaches it through the narrow orphanedSessionRepository capability —
+// widening the interface would force every test double in the tree to grow
+// methods this sweep never exercises through them.
+func (r *Repository) ListStaleRunningSessionsOnUnarchivedTasks(ctx context.Context, staleBefore time.Time) ([]*models.TaskSession, error) {
+	rows, err := r.ro.QueryContext(ctx, r.ro.Rebind(`
+		SELECT `+taskSessionSelectCols+` `+taskSessionFromClause+`
+		JOIN tasks t ON t.id = ts.task_id
+		WHERE ts.state IN ('STARTING', 'RUNNING')
+			AND ts.updated_at < ?
+			AND t.archived_at IS NULL
+		ORDER BY ts.updated_at ASC
+	`), staleBefore)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	sessions, err := r.scanTaskSessions(ctx, rows)
+	if err != nil {
+		return nil, err
+	}
+	return r.loadWorktreesBatch(ctx, sessions)
+}
+
+// CancelRunningTaskSessionByID transitions a single stale STARTING/RUNNING
+// session to CANCELLED, returning the transitioned row, or nil when the
+// session no longer matches (already terminal, raced to another state, or
+// refreshed since the sweep read it). Like CancelActiveTaskSessionsByTaskID
+// it is a pure DB state change that requires no live agent execution, and it
+// is session-scoped so the orphan sweep can terminalize one session without
+// cancelling healthy sibling sessions of the same task.
+//
+// staleBefore re-asserts the sweep's staleness cutoff at write time, closing
+// the read-then-write race against an in-flight launch: a launch CAS-writes
+// its session to STARTING (bumping updated_at) before it registers an
+// execution in the in-memory store, so between the sweep's liveness check and
+// this UPDATE the row can pass from "no live execution" to "launch in
+// progress". A row refreshed since the candidate read no longer satisfies
+// updated_at < staleBefore, the UPDATE matches nothing, and the next tick
+// re-evaluates a fresh row that the grace window protects until its
+// execution registers.
+//
+// The UPDATE and the row selection happen in one atomic RETURNING statement;
+// the returned row carries only the fields that clause selects (same set as
+// CancelActiveTaskSessionsByTaskID, minus TaskID — callers pass the task ID
+// they already know). The write detaches from ctx like
+// CancelActiveTaskSessionsByTaskID: once the sweep has decided this session
+// is orphaned, the terminal transition must not be lost to a caller-context
+// cancellation, and the 10s bound keeps a locked SQLite writer from stalling
+// the sweep pass. A failed write simply retries on the next sweep tick.
+func (r *Repository) CancelRunningTaskSessionByID(ctx context.Context, sessionID, reason string, staleBefore time.Time) (*models.TaskSession, error) {
+	now := time.Now().UTC()
+	writeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer cancel()
+	rows, err := r.db.QueryContext(writeCtx, r.db.Rebind(`
+		UPDATE task_sessions
+		SET state = ?, error_message = ?, completed_at = ?, updated_at = ?
+		WHERE id = ?
+			AND state IN ('STARTING', 'RUNNING')
+			AND updated_at < ?
+		RETURNING id, agent_profile_id, agent_profile_snapshot, is_passthrough, name,
+			review_status, metadata, task_environment_id, state, updated_at, is_primary
+	`), string(models.TaskSessionStateCancelled), reason, now, now, sessionID, staleBefore)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	if !rows.Next() {
+		return nil, rows.Err()
+	}
+	// The scanner backfills TaskID from the parameter because RETURNING
+	// does not carry it; sessionID is not the task ID, so set it from the
+	// candidate row the sweep already read instead.
+	session, err := scanCancelledTaskSessionRow(rows, "")
+	if err != nil {
+		return nil, err
+	}
+	return session, rows.Err()
 }
 
 // CancelActiveTaskSessionsByIDs is documented on the SessionRepository
@@ -2175,7 +2266,7 @@ func (r *Repository) CancelActiveTaskSessionsByIDs(ctx context.Context, taskID s
 				AND id IN (`+placeholders+`)
 				AND state IN ('CREATED', 'STARTING', 'RUNNING', 'WAITING_FOR_INPUT')
 			RETURNING id, agent_profile_id, agent_profile_snapshot, is_passthrough, name,
-				review_status, metadata, task_environment_id, state, updated_at
+				review_status, metadata, task_environment_id, state, updated_at, is_primary
 		`), args...)
 		if err != nil {
 			return nil, err
@@ -2242,9 +2333,9 @@ func (r *Repository) CancelActiveTaskSessionsByCandidates(
 			SET state = ?, error_message = ?, completed_at = ?, updated_at = ?
 			WHERE task_id = ?
 			  AND state IN ('CREATED', 'STARTING', 'RUNNING', 'WAITING_FOR_INPUT')
-			  AND (`+strings.Join(predicates, " OR ")+`)
+			AND (`+strings.Join(predicates, " OR ")+`)
 			RETURNING id, agent_profile_id, agent_profile_snapshot, is_passthrough, name,
-				review_status, metadata, task_environment_id, state, updated_at
+				review_status, metadata, task_environment_id, state, updated_at, is_primary
 		`), args...)
 		if err != nil {
 			return nil, err
@@ -2305,15 +2396,16 @@ func activeSessionCancellationCandidatePredicate(
 // *models.TaskSession, mirroring scanTaskSessionRow's JSON-unmarshal and
 // int-to-bool/nullable-string conventions but for the narrower RETURNING
 // column set (id, agent_profile_id, agent_profile_snapshot, is_passthrough,
-// name, review_status, metadata, task_environment_id, state, updated_at).
-// taskID backfills TaskID, which RETURNING cannot supply since it's a query
-// parameter, not a returned column.
+// name, review_status, metadata, task_environment_id, state, updated_at,
+// is_primary). taskID backfills TaskID, which RETURNING cannot supply since
+// it's a query parameter, not a returned column.
 func scanCancelledTaskSessionRow(rows *sql.Rows, taskID string) (*models.TaskSession, error) {
 	session := &models.TaskSession{TaskID: taskID}
 	var state string
 	var metadataJSON string
 	var agentProfileSnapshotJSON string
 	var isPassthrough int
+	var isPrimary int
 	var reviewStatus sql.NullString
 	var agentProfileID sql.NullString
 	var name sql.NullString
@@ -2321,12 +2413,14 @@ func scanCancelledTaskSessionRow(rows *sql.Rows, taskID string) (*models.TaskSes
 	if err := rows.Scan(
 		&session.ID, &agentProfileID, &agentProfileSnapshotJSON, &isPassthrough, &name,
 		&reviewStatus, &metadataJSON, &session.TaskEnvironmentID, &state, &session.UpdatedAt,
+		&isPrimary,
 	); err != nil {
 		return nil, err
 	}
 
 	session.State = models.TaskSessionState(state)
 	session.IsPassthrough = isPassthrough == 1
+	session.IsPrimary = isPrimary == 1
 	if reviewStatus.Valid {
 		session.ReviewStatus = models.ReviewStatus(reviewStatus.String)
 	}
