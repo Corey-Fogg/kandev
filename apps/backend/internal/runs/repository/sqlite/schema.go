@@ -76,12 +76,18 @@ func (r *Repository) Migrate() error {
 	for _, migration := range []struct{ name, statement string }{
 		{"runs.outcome", "ALTER TABLE runs ADD COLUMN outcome TEXT"},
 		{"runs.continuation_scope", "ALTER TABLE runs ADD COLUMN continuation_scope TEXT NOT NULL DEFAULT ''"},
+		{"runs.wake_wave_key", "ALTER TABLE runs ADD COLUMN wake_wave_key TEXT NOT NULL DEFAULT ''"},
+		{"runs.wake_wave_string", "ALTER TABLE runs ADD COLUMN wake_wave_string TEXT NOT NULL DEFAULT ''"},
+		{"runs.causation_id", "ALTER TABLE runs ADD COLUMN causation_id TEXT NOT NULL DEFAULT ''"},
 	} {
 		if err := migrate.Apply(migration.name, migration.statement); err != nil {
 			return err
 		}
 	}
 	if err := r.backfillContinuationScopes(); err != nil {
+		return err
+	}
+	if err := migrate.Apply("runs.wake_wave_index", "CREATE UNIQUE INDEX IF NOT EXISTS idx_run_wake_wave ON runs(wake_wave_key, agent_profile_id) WHERE wake_wave_key <> ''"); err != nil {
 		return err
 	}
 	return migrate.Apply("runs.failure_scope_status_index", "CREATE INDEX IF NOT EXISTS idx_run_failure_scope_status ON runs(agent_profile_id, continuation_scope, status)")
