@@ -67,7 +67,8 @@ func TestConversationRecoveryFencesUnsafeAndExhaustedTurns(t *testing.T) {
 			case "permanent_auth":
 				data["error_message"] = "Invalid API key; please log in"
 			case cancelledRunStatus:
-				require.NoError(t, s.Runs.FinishRun(ctx, run.ID, cancelledRunStatus, nil))
+				_, finishErr := s.Runs.FinishRun(ctx, run.ID, cancelledRunStatus, nil)
+				require.NoError(t, finishErr)
 				expected = cancelledRunStatus
 			case "stale_session":
 				data["session_id"] = "old"

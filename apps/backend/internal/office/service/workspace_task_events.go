@@ -47,7 +47,8 @@ func (s *Service) handleWorkspaceTaskEvent(ctx context.Context, event *bus.Event
 		return s.queueWorkspaceTaskCallback(ctx, chiefID, channel.TaskID, fields, *data)
 	}
 	payload := mustJSON(map[string]any{conversationTaskIDKey: channel.TaskID, "children": []map[string]string{{"identifier": data.TaskID, "state": fields.State}}})
-	return s.QueueRun(ctx, chiefID, RunReasonTaskChildrenCompleted, payload, fmt.Sprintf("workspace-task:%s:%s", data.TaskID, event.ID))
+	_, err = s.QueueRun(ctx, chiefID, RunReasonTaskChildrenCompleted, payload, fmt.Sprintf("workspace-task:%s:%s", data.TaskID, event.ID))
+	return err
 }
 
 // Registered orchestrators own their delegated tasks; legacy Office uses one selected chief.

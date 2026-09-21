@@ -44,7 +44,8 @@ func TestWorkspaceInspectionUsesSignedScopeAndRejectsExpiredRun(t *testing.T) {
 	response = runtimeRequest(t, router, "GET", "/api/v1/orchestration/runtime/tasks/target/details?include_result=false", token, run, nil)
 	require.Equal(t, 200, response.Code, response.Body.String())
 	require.NotContains(t, response.Body.String(), "sample")
-	require.NoError(t, s.Runs.FinishRun(context.Background(), run, "finished", nil))
+	_, finishErr := s.Runs.FinishRun(context.Background(), run, "finished", nil)
+	require.NoError(t, finishErr)
 	for _, path := range []string{"content", "permissions"} {
 		response = runtimeRequest(t, router, "GET", "/api/v1/orchestration/runtime/tasks/target/"+path, token, run, nil)
 		require.Equal(t, 403, response.Code)

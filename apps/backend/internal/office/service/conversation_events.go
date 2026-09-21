@@ -68,7 +68,8 @@ func (s *Service) QueueNativeConversation(ctx context.Context, taskID string, tr
 		}
 		opID = fmt.Sprintf("%s:%x", opID, sha256.Sum256(identity))
 	}
-	return true, s.QueueRun(ctx, fields.AssigneeAgentProfileID, reason, string(body), opID)
+	_, err = s.QueueRun(ctx, fields.AssigneeAgentProfileID, reason, string(body), opID)
+	return true, err
 }
 
 func addNativeChildSummaries(data map[string]any, payload any) error {

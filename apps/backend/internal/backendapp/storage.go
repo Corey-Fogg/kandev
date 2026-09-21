@@ -134,6 +134,7 @@ func provideRepositories(ctx context.Context, cfg *config.Config, log *logger.Lo
 		return nil, nil, nil, fmt.Errorf("office repo: %w", err)
 	}
 	cleanups = append(cleanups, officeCleanup)
+	orchestrationRepo := orchestrationstore.New(writer, reader)
 	if err := checkStartupContext(ctx, "terminal repositories"); err != nil {
 		return nil, nil, nil, err
 	}

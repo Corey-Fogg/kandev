@@ -491,6 +491,7 @@ func (si *SchedulerIntegration) assembleAgentPrompt(
 	pc.TaskScope = append([]string(nil), runCtx.Capabilities.AllowedTaskIDs...)
 	pc.AllowedActions = append(runCtx.Capabilities.AllowedKeys(), runCtx.AvailableActions...)
 	wakeContext := BuildPrompt(pc)
+	nativeConversation := run.Reason == "task_comment"
 	if directory := si.delegationContext(ctx, agent); directory != "" {
 		wakeContext = directory + "\n\n" + wakeContext
 	}

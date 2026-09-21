@@ -28,7 +28,7 @@ func TestIndividuallyAddressedCallbacksDoNotOverwriteEachOther(t *testing.T) {
 			t.Fatal(err)
 		}
 		count++
-		if err := repo.FinishRun(ctx, run.ID, "finished", nil); err != nil {
+		if _, err := repo.FinishRun(ctx, run.ID, "finished", nil); err != nil {
 			t.Fatal(err)
 		}
 	}

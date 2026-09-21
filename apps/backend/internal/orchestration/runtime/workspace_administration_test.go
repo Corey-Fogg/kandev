@@ -31,7 +31,8 @@ func TestWorkspaceAdministrationRequiresCurrentSignedScope(t *testing.T) {
 	require.Equal(t, 200, response.Code, response.Body.String())
 	require.Equal(t, "ws", m.workspace)
 	require.Equal(t, 403, runtimeRequest(t, router, "POST", path+"?workspace_id=foreign", token, run, body).Code)
-	require.NoError(t, s.Runs.FinishRun(context.Background(), run, "finished", nil))
+	_, finishErr := s.Runs.FinishRun(context.Background(), run, "finished", nil)
+	require.NoError(t, finishErr)
 	require.Equal(t, 403, runtimeRequest(t, router, "POST", path, token, run, body).Code)
 	require.Equal(t, 1, m.calls)
 }

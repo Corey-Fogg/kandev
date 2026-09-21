@@ -22,9 +22,9 @@ func (q *queueFake) ClaimNextEligibleRun(context.Context) (*models.Run, error) {
 	q.rows = q.rows[1:]
 	return r, nil
 }
-func (q *queueFake) FinishRun(_ context.Context, id, status string, _ *string) error {
+func (q *queueFake) FinishRun(_ context.Context, id, status string, _ *string) (*models.Run, error) {
 	q.failed = append(q.failed, id+":"+status)
-	return nil
+	return nil, nil
 }
 func (q *queueFake) UpdateRunOutputSummary(context.Context, string, string, string) error { return nil }
 func TestDispatcherHasOneOwnerPerRun(t *testing.T) {

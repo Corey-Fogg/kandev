@@ -35,7 +35,8 @@ func TestWorkspaceOrchestratorCreatesDeliveryWithoutPrivateSetup(t *testing.T) {
 	require.EqualValues(t, 1, manager.creates.Load())
 	require.Equal(t, "execute", manager.lastSpec.ExecutionMode)
 	require.Equal(t, "ws", manager.lastSpec.WorkspaceID)
-	require.NoError(t, s.Runs.FinishRun(context.Background(), run, "finished", nil))
+	_, finishErr := s.Runs.FinishRun(context.Background(), run, "finished", nil)
+	require.NoError(t, finishErr)
 	require.Equal(t, 403, runtimeRequest(t, router, "POST", "/api/v1/orchestration/runtime/tasks", token, run, map[string]string{"title": "Stale"}).Code)
 	require.EqualValues(t, 1, manager.creates.Load())
 }
@@ -83,7 +84,8 @@ func TestWorkspaceControlUsesSignedScope(t *testing.T) {
 		require.Equal(t, "once", got.OptionID)
 		require.True(t, got.DirectProfile)
 	}
-	require.NoError(t, s.Runs.FinishRun(context.Background(), run, "finished", nil))
+	_, finishErr := s.Runs.FinishRun(context.Background(), run, "finished", nil)
+	require.NoError(t, finishErr)
 	response := runtimeRequest(t, router, "POST", "/api/v1/orchestration/runtime/tasks/target/manage", token, run, map[string]string{"action": "delete"})
 	require.Equal(t, 403, response.Code)
 	require.Len(t, manager.commands, 11)
