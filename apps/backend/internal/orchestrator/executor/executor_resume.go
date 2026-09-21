@@ -1530,7 +1530,11 @@ func (e *Executor) applyRecordedKubernetesExecutorConfigToResumeRequest(
 		ExecutorID: executorID, ExecutorType: string(current.Type), ExecutorCfg: current.Config,
 		Metadata: metadata, Resumable: current.Resumable, RuntimeName: string(current.Type),
 	}
+	if err := e.restoreKubernetesProfileEnvironment(ctx, &config, running.Metadata); err != nil {
+		return executorConfig{}, err
+	}
 	session.ExecutorID = executorID
+	session.ExecutorProfileID, _ = running.Metadata[lifecycle.MetadataKeyExecutorProfileID].(string)
 	req.ExecutorType = config.ExecutorType
 	req.ExecutorConfig = config.ExecutorCfg
 	req.Metadata = metadata
