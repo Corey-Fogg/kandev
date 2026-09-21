@@ -437,7 +437,7 @@ type SpendWindow struct {
 }
 
 // Run represents a run queue entry.
-type Run struct {
+type LegacyRun struct {
 	ID               string     `json:"id" db:"id"`
 	AgentProfileID   string     `json:"agent_profile_id" db:"agent_profile_id"`
 	Reason           string     `json:"reason" db:"reason"`
@@ -545,6 +545,9 @@ type Run struct {
 	// without excluding "" first.
 	CausationID string `json:"causation_id,omitempty" db:"causation_id"`
 }
+
+// Run is the canonical shared run projection used by office and orchestration.
+type Run = runmodels.Run
 
 // RouteAttempt records one provider attempt inside a Run. Each fallback
 // (resolver candidate tried) appends a new row keyed by (run_id, seq).

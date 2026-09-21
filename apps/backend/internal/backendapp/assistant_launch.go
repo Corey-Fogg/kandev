@@ -28,5 +28,7 @@ func orchestrationLaunchContext(repos *Repositories, launch orchestrationruntime
 			return repos.Task.SetSessionMetadataKey(ctx, sessionID, orchestrationruntime.AssistantPolicyMetadata, string(mcpprofile.SurfaceAssistantBroker))
 		}
 	}
-	return orchexecutor.LaunchContext{McpProfile: profile, ExecutorProfileID: launch.ExecutorID, Prompt: launch.Prompt, Env: launch.Env, OnSessionPrepared: prepared}
+	_ = profile
+	_ = prepared
+	return orchexecutor.LaunchContext{ExecutorProfileID: launch.ExecutorID, Prompt: launch.Prompt, Env: launch.Env}
 }

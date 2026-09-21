@@ -47,7 +47,8 @@ func newOrchestrationRuntime(cfg *config.Config, repos *Repositories, services *
 		},
 		APIURL: fmt.Sprintf("http://localhost:%d", apiPort), CLI: cli,
 		Start: func(ctx context.Context, launch orchestrationruntime.Launch) error {
-			return orch.StartTaskWithRoute(ctx, launch.TaskID, launch.PersonaID, orchestrationLaunchContext(repos, launch), orchexecutor.RouteOverride{ExecutionProfileID: launch.ProfileID})
+			_, err := orch.StartTaskWithRoute(ctx, launch.TaskID, launch.PersonaID, orchestrationLaunchContext(repos, launch), orchexecutor.RouteOverride{ExecutionProfileID: launch.ProfileID})
+			return err
 		},
 		UpdateStatus: func(ctx context.Context, ws, id, status string) error {
 			return updateOrchestratedStatus(ctx, services.Task, repos, ws, id, status)

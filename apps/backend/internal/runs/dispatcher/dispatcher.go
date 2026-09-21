@@ -11,7 +11,7 @@ import (
 
 type Queue interface {
 	ClaimNextEligibleRun(context.Context) (*models.Run, error)
-	FinishRun(context.Context, string, string, *string) error
+	FinishRun(context.Context, string, string, *string) (*models.Run, error)
 	UpdateRunOutputSummary(context.Context, string, string, string) error
 }
 type Handler func(context.Context, *models.Run) (bool, error)
@@ -63,5 +63,6 @@ func (d *Dispatcher) dispatch(ctx context.Context, run *models.Run) {
 func (d *Dispatcher) fail(ctx context.Context, run *models.Run, err error) {
 	d.report(err)
 	d.report(d.Queue.UpdateRunOutputSummary(ctx, run.ID, "", err.Error()))
-	d.report(d.Queue.FinishRun(ctx, run.ID, "failed", nil))
+	_, finishErr := d.Queue.FinishRun(ctx, run.ID, "failed", nil)
+	d.report(finishErr)
 }

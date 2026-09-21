@@ -56,7 +56,7 @@ func TestNativeConversationMultipleDelegationBatches(t *testing.T) {
 			if err != nil || len(rows) != 1 {
 				t.Fatalf("first batch: %v", err)
 			}
-			if err := svc.FinishRun(ctx, rows[0].ID, service.RunOutcomeProcessed); err != nil {
+			if _, err := svc.FinishRun(ctx, rows[0].ID, service.RunOutcomeProcessed); err != nil {
 				t.Fatal(err)
 			}
 		}
