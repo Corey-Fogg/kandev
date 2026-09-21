@@ -1220,6 +1220,8 @@ func (s *Service) StartTaskWithRoute(
 		launch.ExecutorID, launch.ExecutorProfileID, launch.Priority,
 		launch.Prompt, launch.WorkflowStepID, launch.PlanMode, false,
 		launch.Attachments, startTaskOptions{
+			McpProfile:           launch.McpProfile,
+			OnSessionPrepared:    launch.OnSessionPrepared,
 			Env:                  launch.Env,
 			AdditionalSkillSlugs: append([]string(nil), launch.AdditionalSkillSlugs...),
 			Route:                &route,

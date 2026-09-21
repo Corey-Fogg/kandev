@@ -3392,10 +3392,16 @@ func (r *Repository) ListEphemeralTasksAllWorkspaces(ctx context.Context) ([]*mo
 // used by the sidebar archive view. onlyArchived takes precedence over
 // includeArchived when both are true.
 func (r *Repository) ListTasksByWorkspaceWithArchiveMode(ctx context.Context, workspaceID, workflowID, repositoryID, query string, page, pageSize int, sort string, includeArchived, includeEphemeral, onlyEphemeral, excludeConfig, onlyArchived bool) ([]*models.Task, int, error) {
-	return r.listWorkspaceTasks(ctx, workspaceID, workflowID, repositoryID, query, page, pageSize, sort, includeArchived, includeEphemeral, onlyEphemeral, excludeConfig, onlyArchived, false)
+	return r.listWorkspaceTasks(ctx, workspaceID, workflowID, repositoryID, query, page, pageSize, sort, includeArchived, includeEphemeral, onlyEphemeral, excludeConfig, onlyArchived, false, false)
 }
 
-func (r *Repository) listWorkspaceTasks(ctx context.Context, workspaceID, workflowID, repositoryID, query string, page, pageSize int, sort string, includeArchived, includeEphemeral, onlyEphemeral, excludeConfig, onlyArchived, kanbanOnly bool) ([]*models.Task, int, error) {
+// ListDeliveryTasksByWorkspace applies the Office/ephemeral exclusion before
+// pagination so totals and page cursors describe the visible delivery set.
+func (r *Repository) ListDeliveryTasksByWorkspace(ctx context.Context, workspaceID string, page, pageSize int, sort string) ([]*models.Task, int, error) {
+	return r.listWorkspaceTasks(ctx, workspaceID, "", "", "", page, pageSize, sort, false, false, false, true, false, false, true)
+}
+
+func (r *Repository) listWorkspaceTasks(ctx context.Context, workspaceID, workflowID, repositoryID, query string, page, pageSize int, sort string, includeArchived, includeEphemeral, onlyEphemeral, excludeConfig, onlyArchived, kanbanOnly, excludeOffice bool) ([]*models.Task, int, error) {
 	ctx, span := tracing.Tracer("kandev-db").Start(ctx, "db.ListTasksByWorkspace")
 	defer span.End()
 	// Calculate offset
@@ -3419,6 +3425,9 @@ func (r *Repository) listWorkspaceTasks(ctx context.Context, workspaceID, workfl
 	// are hidden by provenance, and "include quick chats" is not a request to
 	// see them.
 	filter += andNotAutomationOrigin
+	if excludeOffice {
+		filter += " AND NOT " + isFromOfficeProjection("tasks")
+	}
 
 	if onlyArchived {
 		filter += " AND archived_at IS NOT NULL"

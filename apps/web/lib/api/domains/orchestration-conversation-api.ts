@@ -32,6 +32,7 @@ function mapComment(row: CommentDTO): TaskComment {
   // Once a run exists, run_status remains authoritative (including failures).
   const runStatus =
     row.run_status ??
+    (row.author_type === "user" && row.receipt_status === "expired" ? "failed" : undefined) ??
     (row.author_type === "user" &&
     (row.receipt_status === "accepted" || row.receipt_status === "queued")
       ? "queued"

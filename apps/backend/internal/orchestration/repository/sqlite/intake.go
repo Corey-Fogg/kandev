@@ -81,6 +81,22 @@ func (r *Repository) PendingIntake(ctx context.Context) ([]models.Intake, error)
 	return rows, err
 }
 
+// ExpireIneligibleIntake settles accepted receipts whose orchestrator can no
+// longer receive work. This prevents a stopped/deleted persona from leaving
+// the conversation UI in an endless optimistic queued state.
+func (r *Repository) ExpireIneligibleIntake(ctx context.Context) error {
+	_, err := r.db.ExecContext(ctx, r.db.Rebind(`UPDATE orchestration_intake
+		SET status='expired'
+		WHERE status='accepted' AND NOT EXISTS (
+			SELECT 1 FROM workspace_orchestrators o
+			JOIN agent_profiles a ON a.id=o.agent_id
+			WHERE o.agent_id=orchestration_intake.agent_id
+			  AND a.deleted_at IS NULL
+			  AND a.status NOT IN ('paused','stopped')
+		)`))
+	return err
+}
+
 func (r *Repository) AcknowledgeIntake(ctx context.Context, commentID, runID string) error {
 	_, err := r.db.ExecContext(ctx, r.db.Rebind(`UPDATE orchestration_intake SET status='queued',run_id=? WHERE comment_id=? AND status='accepted'`), runID, commentID)
 	return err

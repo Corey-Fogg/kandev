@@ -55,6 +55,9 @@ func (h *Handler) acceptComment(c *gin.Context, agentID string) {
 // DispatchIntake is called by the existing run scheduler, with no additional
 // goroutine. Queue idempotency closes the crash gap before outbox acknowledgement.
 func (s *Service) DispatchIntake(ctx context.Context) error {
+	if err := s.Repo.ExpireIneligibleIntake(ctx); err != nil {
+		return err
+	}
 	rows, err := s.Repo.PendingIntake(ctx)
 	if err != nil {
 		return err

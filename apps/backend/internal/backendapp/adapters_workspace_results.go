@@ -30,7 +30,7 @@ const (
 // WorkspaceTaskDetails exposes bounded worker results without copying tool transcripts.
 func (a *taskCreatorAdapter) WorkspaceTaskDetails(ctx context.Context, workspaceID, taskID string) (any, error) {
 	task, err := a.taskSvc.GetTask(ctx, taskID)
-	if err != nil || task.WorkspaceID != workspaceID {
+	if err != nil || task.WorkspaceID != workspaceID || task.IsEphemeral || task.IsFromOffice {
 		return nil, fmt.Errorf("task must belong to this workspace")
 	}
 	sessions, err := a.taskSvc.ListTaskSessions(ctx, taskID)
@@ -81,7 +81,12 @@ func (a *taskCreatorAdapter) attachLatestWorkspaceMessages(ctx context.Context, 
 
 func (a *taskCreatorAdapter) attachWorkspaceSessionResults(ctx context.Context, result map[string]any, sessions []*models.TaskSession) error {
 	ordered := append([]*models.TaskSession(nil), sessions...)
-	sort.Slice(ordered, func(i, j int) bool { return ordered[i].ID < ordered[j].ID })
+	sort.Slice(ordered, func(i, j int) bool {
+		if ordered[i].UpdatedAt.Equal(ordered[j].UpdatedAt) {
+			return ordered[i].ID > ordered[j].ID
+		}
+		return ordered[i].UpdatedAt.After(ordered[j].UpdatedAt)
+	})
 	result["has_more_sessions"] = len(ordered) > 8
 	if len(ordered) > 8 {
 		ordered = ordered[:8]

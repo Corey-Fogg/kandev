@@ -65,7 +65,12 @@ func (a *taskCreatorAdapter) AssistantWorkspaceTask(ctx context.Context, workspa
 	if err != nil {
 		return view, err
 	}
-	sort.Slice(sessions, func(i, j int) bool { return sessions[i].ID < sessions[j].ID })
+	sort.Slice(sessions, func(i, j int) bool {
+		if sessions[i].UpdatedAt.Equal(sessions[j].UpdatedAt) {
+			return sessions[i].ID > sessions[j].ID
+		}
+		return sessions[i].UpdatedAt.After(sessions[j].UpdatedAt)
+	})
 	view.HasMore = len(sessions) > 8
 	for _, s := range sessions[:min(len(sessions), 8)] {
 		messages, more, err := a.taskSvc.ListMessagesPaginated(ctx, taskservice.ListMessagesRequest{TaskSessionID: s.ID, Limit: 10, AuthorType: string(models.MessageAuthorAgent), Sort: workspaceResultSortDescending})
@@ -91,15 +96,13 @@ func (a *taskCreatorAdapter) AssistantWorkspaceTasks(ctx context.Context, worksp
 	if page < 1 || page > 100000 || limit < 1 || limit > 100 {
 		return nil, false, fmt.Errorf("invalid task page")
 	}
-	tasks, total, err := a.taskSvc.ListTasksByWorkspace(ctx, workspace, "", "", "", page, limit, "updated_at_desc", false, false, false, true)
+	tasks, total, err := a.taskSvc.ListDeliveryTasksByWorkspace(ctx, workspace, page, limit, "updated_at_desc")
 	if err != nil {
 		return nil, false, err
 	}
 	rows := []shared.WorkspaceTaskSummary{}
 	for _, task := range tasks {
-		if !task.IsEphemeral && !task.IsFromOffice {
-			rows = append(rows, workspaceTaskSummary(task))
-		}
+		rows = append(rows, workspaceTaskSummary(task))
 	}
 	return rows, page*limit < total, nil
 }
