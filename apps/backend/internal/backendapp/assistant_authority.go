@@ -73,7 +73,7 @@ func (a assistantAuthorityReader) claudeVersion(ctx context.Context) (string, er
 }
 
 func assistantRestrictionCompatibility(agent *settings.Agent, profile *settings.AgentProfile, executor *taskmodels.Executor, preset *taskmodels.ExecutorProfile, version string) string {
-	if agent.Name != assistantClaudeAgent || agent.TUIConfig != nil || profile.CLIPassthrough || version != "0.75.1" {
+	if agent.Name != assistantClaudeAgent || agent.TUIConfig != nil || profile.CLIPassthrough || version != agents.AssistantClaudeACPVersion() {
 		return "unsupported_provider_or_version"
 	}
 	if reason := assistantProfileCompatibility(profile); reason != "" {
@@ -113,8 +113,13 @@ func (a assistantAuthorityReader) authorityExecutor(ctx context.Context, id stri
 }
 
 func assistantProfileCompatibility(profile *settings.AgentProfile) string {
-	if profile.CommandPrefix != "" || len(profile.EnvVars) != 0 || profile.AutoFallback || profile.FallbackModel != "" {
+	if profile.CommandPrefix != "" || profile.AutoFallback || profile.FallbackModel != "" {
 		return "unsupported_profile_overrides"
+	}
+	for _, env := range profile.EnvVars {
+		if !agents.AssistantProfileEnvAllowed(env.Key, env.Value, env.SecretID) {
+			return "unsupported_profile_overrides"
+		}
 	}
 	for option := range profile.ConfigOptions {
 		if option != "effort" {

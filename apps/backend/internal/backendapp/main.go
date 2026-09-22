@@ -1594,6 +1594,10 @@ func newRunProcessorService(
 		TaskCanceller:      orchestratorSvc,
 		AgentctlBinaryPath: agentctlBinaryPath,
 		EventBus:           eventBus,
+		// The orchestration runtime owns registered conversations and task
+		// callbacks; Office must not execute or re-handle them.
+		RunAllowed:            orchestrationRunGuard(cfg.Features, repos.Office),
+		ExternalOrchestration: true,
 	})
 	svc.SetRunSessionLauncher(newOfficeRunSessionLauncher(repos.Office, lifecycleMgr, log))
 	return svc

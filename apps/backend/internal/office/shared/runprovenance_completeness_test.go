@@ -45,6 +45,7 @@ var attendedForTest = map[string]bool{
 	"task_ready_to_close":         true,
 	"stage_pending":               true,
 	"stage_changes_requested":     true,
+	"workspace_task_callback":     true,
 	"review_started":              true,
 	"approval_started":            true,
 	"blockers_resolved":           true,

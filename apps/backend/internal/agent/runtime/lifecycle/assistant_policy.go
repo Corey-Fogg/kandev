@@ -36,9 +36,29 @@ func validateAssistantCommand(req *LaunchRequest, profile *AgentProfileInfo, age
 	if !assistantRestrictedLaunch(req) {
 		return nil
 	}
-	if agent.ID() != assistantClaudeAgent || version != "0.75.1" || len(flags) != 0 || len(prefix) != 0 || profile == nil ||
-		profile.CLIPassthrough || len(profile.EnvVars) != 0 || len(profile.ConfigOptions) != 0 {
+	if agent.ID() != assistantClaudeAgent || version != agents.AssistantClaudeACPVersion() || len(flags) != 0 || len(prefix) != 0 || profile == nil ||
+		profile.CLIPassthrough || !assistantProfileEnvSupported(profile) || !assistantConfigOptionsSupported(profile.ConfigOptions) {
 		return fmt.Errorf("assistant policy unsupported by the selected runtime")
 	}
 	return nil
+}
+
+func assistantProfileEnvSupported(profile *AgentProfileInfo) bool {
+	for _, env := range profile.EnvVars {
+		if !agents.AssistantProfileEnvAllowed(env.Key, env.Value, env.SecretID) {
+			return false
+		}
+	}
+	return true
+}
+
+// Effort is the only provider option admission accepts; it changes reasoning
+// depth, not the tool surface.
+func assistantConfigOptionsSupported(options map[string]string) bool {
+	for option := range options {
+		if option != "effort" {
+			return false
+		}
+	}
+	return true
 }

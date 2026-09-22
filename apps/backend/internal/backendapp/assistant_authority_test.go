@@ -3,6 +3,7 @@ package backendapp
 import (
 	"context"
 	"encoding/json"
+	"github.com/kandev/kandev/internal/agent/agents"
 	"testing"
 
 	settings "github.com/kandev/kandev/internal/agent/settings/models"
@@ -70,12 +71,12 @@ func TestAssistantReadOnlySupportedMatrix(t *testing.T) {
 			profile := &settings.AgentProfile{}
 			executor := &taskmodels.Executor{Type: taskmodels.ExecutorTypeLocal, Status: taskmodels.ExecutorStatusActive}
 			preset := &taskmodels.ExecutorProfile{}
-			version := "0.75.1"
+			version := agents.AssistantClaudeACPVersion()
 			switch change {
 			case "codex":
 				agent.Name = "codex-acp"
 			case "version":
-				version = "0.75.2"
+				version = "0.0.0-unsupported"
 			case "shell":
 				profile.CommandPrefix = "sh"
 			case "setup":
@@ -106,7 +107,7 @@ func TestAssistantReadOnlyCanonicalProviderIdentity(t *testing.T) {
 			result := assistantRestrictionCompatibility(
 				&settings.Agent{ID: row.id, Name: row.name}, &settings.AgentProfile{},
 				&taskmodels.Executor{Type: taskmodels.ExecutorTypeLocal, Status: taskmodels.ExecutorStatusActive},
-				&taskmodels.ExecutorProfile{}, "0.75.1",
+				&taskmodels.ExecutorProfile{}, agents.AssistantClaudeACPVersion(),
 			)
 			require.Equal(t, row.supported, result == "", result)
 		})
@@ -119,10 +120,38 @@ func TestAssistantClaudeProfileSupportsModelAndEffort(t *testing.T) {
 	preset := &taskmodels.ExecutorProfile{}
 	profile := &settings.AgentProfile{Model: "claude-sonnet-4-5", ConfigOptions: map[string]string{"effort": "high"}}
 
-	require.Empty(t, assistantRestrictionCompatibility(agent, profile, executor, preset, "0.75.1"))
+	require.Empty(t, assistantRestrictionCompatibility(agent, profile, executor, preset, agents.AssistantClaudeACPVersion()))
 
 	profile.ConfigOptions = map[string]string{"unsupported-option": "value"}
-	require.Equal(t, "unsupported_profile_overrides", assistantRestrictionCompatibility(agent, profile, executor, preset, "0.75.1"))
+	require.Equal(t, "unsupported_profile_overrides", assistantRestrictionCompatibility(agent, profile, executor, preset, agents.AssistantClaudeACPVersion()))
 	profile.ConfigOptions = map[string]string{"effort": "high", "unsupported-option": "value"}
-	require.Equal(t, "unsupported_profile_overrides", assistantRestrictionCompatibility(agent, profile, executor, preset, "0.75.1"))
+	require.Equal(t, "unsupported_profile_overrides", assistantRestrictionCompatibility(agent, profile, executor, preset, agents.AssistantClaudeACPVersion()))
+}
+
+func TestAssistantClaudeProfileAcceptsOnlyAccountDirectoryEnv(t *testing.T) {
+	agent := &settings.Agent{ID: "claude-acp", Name: "claude-acp"}
+	executor := &taskmodels.Executor{Type: taskmodels.ExecutorTypeLocal, Status: taskmodels.ExecutorStatusActive}
+	preset := &taskmodels.ExecutorProfile{}
+	version := agents.AssistantClaudeACPVersion()
+	for _, row := range []struct {
+		env       settings.ProfileEnvVar
+		supported bool
+	}{
+		{settings.ProfileEnvVar{Key: "CLAUDE_CONFIG_DIR", Value: "/home/example/.claude-personal"}, true},
+		{settings.ProfileEnvVar{Key: "CLAUDE_CONFIG_DIR", Value: "relative/.claude"}, false},
+		{settings.ProfileEnvVar{Key: "CLAUDE_CONFIG_DIR", Value: "/home/example/../.claude"}, false},
+		{settings.ProfileEnvVar{Key: "CLAUDE_CONFIG_DIR", SecretID: "secret"}, false},
+		{settings.ProfileEnvVar{Key: "NODE_OPTIONS", Value: "--require=/tmp/x"}, false},
+	} {
+		profile := &settings.AgentProfile{EnvVars: []settings.ProfileEnvVar{row.env}}
+		result := assistantRestrictionCompatibility(agent, profile, executor, preset, version)
+		require.Equal(t, row.supported, result == "", "%+v: %s", row.env, result)
+	}
+}
+
+func TestAssistantPolicyFollowsReleaseClaudeRuntime(t *testing.T) {
+	want, err := agents.DefaultManagedNPMRuntimeVersion(agents.AssistantClaudeACPPackage)
+	require.NoError(t, err)
+	require.Equal(t, want, agents.AssistantClaudeACPVersion())
+	require.Equal(t, want, agents.NewClaudeACP().ManagedNPMRuntime().DefaultVersionOrPinned())
 }

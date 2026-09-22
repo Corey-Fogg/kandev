@@ -3,13 +3,14 @@ package sqlite
 import (
 	"fmt"
 	"github.com/kandev/kandev/internal/db"
-	"github.com/kandev/kandev/internal/db/dialect"
 	"github.com/kandev/kandev/internal/runs/models"
 )
 
 // Migrate owns the core run queue schema, independent of any feature services.
 func (r *Repository) Migrate() error {
-	_, err := r.db.Exec(dialect.MustRenderSchema(r.db.DriverName(), `	CREATE TABLE IF NOT EXISTS runs (
+	// The DDL is dialect-neutral (plain TEXT/INTEGER/TIMESTAMP), matching the
+	// Office-owned copy it replaces, so it runs unrendered on every driver.
+	_, err := r.db.Exec(`	CREATE TABLE IF NOT EXISTS runs (
 		id TEXT PRIMARY KEY,
 		agent_profile_id TEXT NOT NULL,
 		reason TEXT NOT NULL,
@@ -63,7 +64,7 @@ func (r *Repository) Migrate() error {
 		created_at TIMESTAMP NOT NULL,
 		PRIMARY KEY (run_id, seq)
 	);
-	CREATE INDEX IF NOT EXISTS idx_run_events_run_created ON run_events(run_id, created_at);`))
+	CREATE INDEX IF NOT EXISTS idx_run_events_run_created ON run_events(run_id, created_at);`)
 	if err != nil {
 		return err
 	}

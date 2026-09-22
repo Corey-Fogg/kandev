@@ -414,6 +414,7 @@ func (si *SchedulerIntegration) prepareAndLaunch(
 
 	launchCtx := LaunchContext{
 		ExecutorID:           execCfg.Type,
+		ExecutorProfileID:    execCfg.ExecutorProfileID,
 		Prompt:               prompt,
 		Env:                  env,
 		ProfileID:            profileID,
@@ -491,11 +492,14 @@ func (si *SchedulerIntegration) assembleAgentPrompt(
 	pc.TaskScope = append([]string(nil), runCtx.Capabilities.AllowedTaskIDs...)
 	pc.AllowedActions = append(runCtx.Capabilities.AllowedKeys(), runCtx.AvailableActions...)
 	wakeContext := BuildPrompt(pc)
-	nativeConversation := run.Reason == "task_comment"
-	if directory := si.delegationContext(ctx, agent); directory != "" {
-		wakeContext = directory + "\n\n" + wakeContext
-	}
+	// Only a persisted chief conversation gets conversation history and the
+	// delegation roster. Comments on ordinary Office tasks keep resume
+	// detection so AGENTS.md is not resent on every wake.
+	nativeConversation := si.isNativeConversationRun(ctx, run, taskID)
 	if nativeConversation {
+		if directory := si.delegationContext(ctx, agent); directory != "" {
+			wakeContext = directory + "\n\n" + wakeContext
+		}
 		wakeContext = si.conversationContext(ctx, taskID) + "\n\n" + wakeContext
 	}
 
@@ -1349,3 +1353,11 @@ func (si *SchedulerIntegration) ProcessRun(ctx context.Context, run *models.Run)
 
 // PrepareDispatch lifts Office routing backoff before the core claim loop.
 func (si *SchedulerIntegration) PrepareDispatch(ctx context.Context) { si.liftParkedRoutingRuns(ctx) }
+
+func (si *SchedulerIntegration) isNativeConversationRun(ctx context.Context, run *models.Run, taskID string) bool {
+	if run.Reason != RunReasonTaskComment || taskID == "" {
+		return false
+	}
+	native, err := si.svc.repo.IsNativeConversation(ctx, taskID)
+	return err == nil && native
+}

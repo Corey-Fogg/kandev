@@ -61,7 +61,8 @@ adding a wake reason cannot quietly exempt it from the ceiling.
   `task_children_completed`, `approval_resolved`, `routine_dispatch_event`,
   `manual_resume_after_failure`, `task_mentioned`, `task_reopened`,
   `task_reopened_via_comment`, `task_unblocked`, `task_ready_to_close`,
-  `stage_pending`, `stage_changes_requested`, and the legacy literals
+  `stage_pending`, `stage_changes_requested`, `workspace_task_callback`, and
+  the legacy literals
   `review_started`, `approval_started`, `blockers_resolved`,
   `children_completed`. Every other value, **including a value the build does
   not recognize**, shall classify as unattended.

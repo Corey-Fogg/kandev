@@ -278,8 +278,9 @@ type Config struct {
 	WorkDir string
 
 	// AutoApprove automatically approves permission requests
-	AutoApprove bool
-	ToolPolicy  string
+	AutoApprove       bool
+	ToolPolicy        string
+	ToolPolicyVersion string
 
 	// McpServers is a list of MCP servers to configure for the agent
 	McpServers []McpServerConfig
@@ -348,6 +349,7 @@ func (c *Config) ToSharedConfig() *shared.Config {
 		WorkDir:                   c.WorkDir,
 		AutoApprove:               c.AutoApprove,
 		ToolPolicy:                c.ToolPolicy,
+		ToolPolicyVersion:         c.ToolPolicyVersion,
 		McpServers:                mcpServers,
 		AgentID:                   c.AgentID,
 		AgentName:                 c.AgentName,

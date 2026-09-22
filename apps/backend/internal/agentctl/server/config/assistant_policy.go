@@ -4,12 +4,30 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	mcpprofile "github.com/kandev/kandev/internal/mcp/profile"
 )
 
 const AssistantToolPolicy = "claude-broker-v1"
+
+const claudeACPPackage = "@agentclientprotocol/claude-agent-acp"
+
+var exactPackageVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$`)
+
+// ClaudeACPCommandVersion returns the exact Claude ACP version a launch command
+// pins, or "" when the command does not pin one. The backend selects the
+// version; the ACP handshake must then report exactly this version.
+func ClaudeACPCommandVersion(args []string) string {
+	for _, arg := range args {
+		version, ok := strings.CutPrefix(arg, claudeACPPackage+"@")
+		if ok && exactPackageVersion.MatchString(version) {
+			return version
+		}
+	}
+	return ""
+}
 
 func (c *InstanceConfig) AssistantRestricted() bool {
 	return c.McpProfile != nil && c.McpProfile.Surface == mcpprofile.SurfaceAssistantBroker
@@ -64,7 +82,7 @@ func ValidateAssistantCommand(c *InstanceConfig, args []string) error {
 		return nil
 	}
 	if len(args) != 4 || filepath.Base(args[0]) != "npx" || args[1] != "--yes" ||
-		(args[2] != "--prefer-offline" && args[2] != "--prefer-online") || args[3] != "@agentclientprotocol/claude-agent-acp@0.75.1" {
+		(args[2] != "--prefer-offline" && args[2] != "--prefer-online") || ClaudeACPCommandVersion(args[3:]) == "" {
 		return fmt.Errorf("assistant policy requires the qualified managed Claude ACP runtime")
 	}
 	return nil

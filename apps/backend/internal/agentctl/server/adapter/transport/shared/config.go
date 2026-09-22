@@ -18,6 +18,9 @@ type Config struct {
 	// AutoApprove automatically approves permission requests
 	AutoApprove bool
 	ToolPolicy  string
+	// ToolPolicyVersion is the exact provider version the launch command
+	// pinned. A restricted session requires the handshake to report it.
+	ToolPolicyVersion string
 
 	// PermissionTimeout is the maximum time to wait for a permission response.
 	// After timeout, the request is auto-denied with interrupt. Defaults to DefaultPermissionTimeout.

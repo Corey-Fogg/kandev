@@ -816,6 +816,7 @@ export function useClarificationGroup(
   // i18n-exempt: the default reason is POSTed as the clarification answer and
   // reaches the agent verbatim; it is not rendered in the UI.
   const { submitCollected, skipAll, retry, resetLastAction } = useClarificationSubmission({
+    transport,
     pendingId,
     questionIds,
     answersRef,
@@ -832,7 +833,7 @@ export function useClarificationGroup(
     onOutcome,
     inactivePendingIdRef,
     getLatestMessage,
-    updateMessage: storeApi.getState().updateMessage,
+    updateMessage: transport?.updateMessage ?? storeApi.getState().updateMessage,
     defaultSkipReason: t("task:userSkippedClarification"),
   });
 

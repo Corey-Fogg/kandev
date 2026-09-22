@@ -16,6 +16,10 @@ import (
 	"strings"
 )
 
+// orchestrationRunGuard decides whether the shared run processor may execute a
+// persona's run. Registered orchestrators run only while orchestration is
+// enabled. Any other persona keeps upstream behavior, except one that still
+// owns private conversation history, which never becomes an Office target.
 func orchestrationRunGuard(features config.FeaturesConfig, repo *officesqlite.Repository) func(context.Context, string) (bool, error) {
 	return func(ctx context.Context, id string) (bool, error) {
 		role, err := repo.OrchestratorRoleID(ctx, id)
@@ -23,11 +27,10 @@ func orchestrationRunGuard(features config.FeaturesConfig, repo *officesqlite.Re
 			return false, err
 		}
 		if role != "" {
-			_, err := repo.OrchestrationStore().PersonaUserOwner(ctx, id)
-			return features.Orchestration, err
+			return features.Orchestration, nil
 		}
 		owner, err := repo.OrchestrationStore().PersonaUserOwner(ctx, id)
-		return features.Office && owner == "", err
+		return owner == "", err
 	}
 }
 

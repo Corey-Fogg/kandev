@@ -14,7 +14,7 @@ func (a *Adapter) assistantSessionMeta(servers []types.McpServer) (map[string]an
 		return nil, nil
 	}
 	if a.cfg.ToolPolicy != "claude-broker-v1" || a.agentID != "claude-acp" || a.agentInfo == nil ||
-		a.agentInfo.Name != "@agentclientprotocol/claude-agent-acp" || a.agentInfo.Version != "0.75.1" {
+		a.agentInfo.Name != "@agentclientprotocol/claude-agent-acp" || a.cfg.ToolPolicyVersion == "" || a.agentInfo.Version != a.cfg.ToolPolicyVersion {
 		return nil, fmt.Errorf("assistant policy unsupported by this provider version")
 	}
 	if len(servers) != 1 || servers[0].Name != "kandev_assistant" || servers[0].Command == "" || servers[0].URL != "" {

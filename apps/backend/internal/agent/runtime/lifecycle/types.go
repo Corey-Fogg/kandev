@@ -87,9 +87,7 @@ type AgentExecution struct {
 	// terminals and passthrough processes can inherit the same credentials and
 	// PATH as the agent subprocess without persisting secrets in metadata.
 	runtimeEnv       map[string]string
-	runtimeRunID     string
 	runtimeEnvMu     sync.RWMutex
-	prepareAgentEnv  func(map[string]string) error
 	promptGeneration uint64
 	// promptCompletionGeneration prevents duplicate terminal events for the
 	// same prompt from replacing the first terminal outcome or provider error.
@@ -462,9 +460,6 @@ func (e *AgentExecution) setRuntimeEnvironment(env map[string]string) {
 	}
 	e.runtimeEnvMu.Lock()
 	e.runtimeEnv = cloneStringMap(env)
-	if id := env["KANDEV_RUN_ID"]; id != "" {
-		e.runtimeRunID = id
-	}
 	e.runtimeEnvMu.Unlock()
 }
 
@@ -1536,16 +1531,3 @@ type PromptResult struct {
 // called in dispatch-only mode and returned after the agent acknowledged the
 // prompt instead of waiting for the turn to complete.
 const PromptStopReasonDispatched = "dispatched"
-
-// RuntimeRunID is non-secret correlation retained after credential teardown.
-func (e *AgentExecution) RuntimeRunID() string {
-	if e == nil {
-		return ""
-	}
-	e.runtimeEnvMu.RLock()
-	defer e.runtimeEnvMu.RUnlock()
-	if e.runtimeRunID != "" {
-		return e.runtimeRunID
-	}
-	return e.RunID
-}

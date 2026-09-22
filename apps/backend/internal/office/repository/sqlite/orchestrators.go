@@ -11,7 +11,6 @@ import (
 func (r *Repository) OrchestrationStore() *orchestrationstore.Repository {
 	return orchestrationstore.New(r.db, r.ro)
 }
-func (r *Repository) createOrchestrationTables() error { return r.OrchestrationStore().Migrate() }
 func (r *Repository) ListOrchestratorRoles(ctx context.Context) ([]orchestrationmodels.OrchestratorRole, error) {
 	return r.OrchestrationStore().ListOrchestratorRoles(ctx)
 }

@@ -33,8 +33,9 @@ func TestWorkspaceTaskDetailsPreservesMultipleSessionResults(t *testing.T) {
 	require.NotNil(t, data["session_results"])
 	rows := data["session_results"].([]map[string]any)
 	require.Len(t, rows, 2)
-	require.Equal(t, "implementer", rows[0]["profile_id"])
-	require.Equal(t, "reviewer", rows[1]["profile_id"])
+	// Newest session first, so the bounded result keeps the latest work.
+	require.Equal(t, "reviewer", rows[0]["profile_id"])
+	require.Equal(t, "implementer", rows[1]["profile_id"])
 }
 
 func TestAssistantRoutingAdapterRejectsNonDeliveryMode(t *testing.T) {
