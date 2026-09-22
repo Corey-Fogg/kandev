@@ -1,5 +1,5 @@
 {
-  "status": "prepared_awaiting_named_candidate_cutover_instruction",
+  "status": "deployed",
   "version": "0.95.0-orchestration.20260922.shabc82422f83a4",
   "source_commit": "bc82422f83a4f78b2b90097701260a2674baa2d3",
   "base_commit": "f92877b4be2724c0bfa1f1cdbdd35edd68a24fa6",
@@ -47,6 +47,21 @@
     "full repository lint: blocked by an existing type-check error in the untouched lifecycle SSH test"
   ],
   "rehearsal_scope": "SQLite database only; no live data or service mutation. Workspace directories, attachments and external configuration were not copied.",
-  "live_service_changed": false,
-  "live_database_changed": false
+  "deployment": {
+    "date": "2026-09-22",
+    "service_active": true,
+    "health": "ok",
+    "features": {
+      "auth": true,
+      "orchestration": true,
+      "office": false
+    },
+    "cold_backup": "Local private copy of Kandev data, service unit/drop-ins and prior candidate bundle; full manifest verification passed",
+    "live_sqlite_integrity": "ok",
+    "smoke": ["public health endpoint reports candidate version", "web root returns HTTP 200"],
+    "active_runs_at_cutover": 0,
+    "worker_processes_stopped": 4
+  },
+  "live_service_changed": true,
+  "live_database_changed": true
 }
