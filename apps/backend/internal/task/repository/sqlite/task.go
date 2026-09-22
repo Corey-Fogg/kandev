@@ -4827,6 +4827,11 @@ func (r *Repository) RestoreTaskMessageRollbackIfSessionState(
 	if err != nil {
 		return false, err
 	}
+	if task.State == v1.TaskStateCompleted {
+		if err := guardManagedParentCompletion(ctx, tx, r.db, task.ID); err != nil {
+			return false, err
+		}
+	}
 	// See updateTaskTx's comment: stamped after the transactional lock, not
 	// before BeginTx, so occurred_at reflects true commit-serialization order
 	// under concurrent Postgres callers.
