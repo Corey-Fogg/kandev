@@ -105,6 +105,11 @@ permission to observe/coordinate/export context within the owner's existing acce
 - **AC-ORCHESTRATION-ASSISTANT-004.4:** Mutations outside inspect shall use stable
   operation identities; lost acknowledgements shall remain unknown until native
   evidence resolves them. Uncertain external effects shall not be blindly retried.
+- **AC-ORCHESTRATION-ASSISTANT-004.5:** A supported Claude ACP profile shall be
+  eligible for restricted assistant execution with any model and effort value
+  supported by that provider, without changing the assistant's managed broker or
+  inspection restrictions. Other profile overrides shall remain rejected unless
+  separately qualified as safe.
 
 ### REQ-ORCHESTRATION-ASSISTANT-005: Actionable attention and recovery
 

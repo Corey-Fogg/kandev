@@ -42,6 +42,12 @@ this policy. Managed command validation and protocol version detection also
 apply on restart. Existing unrestricted runtimes cannot be promoted in place.
 Native resume and steering require the current run and retained session policy.
 
+The selected Claude model and provider-supported `effort` value are inference
+controls, not tool-authority controls. The qualified assistant path may apply
+these two settings from the selected profile while all broker, host-operation,
+tool and executor restrictions remain fixed. No other arbitrary profile config
+option is implicitly qualified by this exception.
+
 Inspection may read authorized records and write conversation/objective/audit
 receipts. It cannot mutate delivery tasks, repositories, external services,
 credential descriptors, memory, or plugin settings. Design/execute permits
