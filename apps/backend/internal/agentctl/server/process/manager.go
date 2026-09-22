@@ -1466,6 +1466,7 @@ func (m *Manager) buildAdapterConfig() error {
 	// Workspace account configuration remains valid without a private binding.
 	if m.cfg.AssistantRestricted() || (m.cfg.BrokerRestricted() && m.cfg.AgentType == "claude-acp") {
 		m.adapterCfg.ToolPolicy = config.AssistantToolPolicy
+		m.adapterCfg.ToolPolicyVersion = config.ClaudeACPCommandVersion(m.cfg.AgentArgs)
 	}
 
 	// Configure one-shot mode when a continue command is provided.

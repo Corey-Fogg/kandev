@@ -942,6 +942,9 @@ const (
 	envKeyKandevWakeReason     = "KANDEV_WAKE_REASON"
 	envKeyKandevWakeCommentID  = "KANDEV_WAKE_COMMENT_ID"
 	envKeyKandevWakePayload    = "KANDEV_WAKE_PAYLOAD_JSON"
+	// envKeyKandevRuntimeAPIPrefix routes the remote agentctl CLI to the
+	// runtime API that owns the run (Office or workspace orchestration).
+	envKeyKandevRuntimeAPIPrefix = "KANDEV_RUNTIME_API_PREFIX"
 )
 
 var sshRemoteAgentCredentialEnvKeys = []string{
@@ -974,6 +977,7 @@ var sshRemoteAgentRuntimeEnvKeys = []string{
 	envKeyKandevWakeReason,
 	envKeyKandevWakeCommentID,
 	envKeyKandevWakePayload,
+	envKeyKandevRuntimeAPIPrefix,
 }
 
 // sshRemoteAgentEnv builds the env map sent to the remote agent instance. Each
@@ -990,13 +994,6 @@ func sshRemoteAgentEnv(req *ExecutorCreateRequest) map[string]string {
 		return nil
 	}
 	env := make(map[string]string)
-	if req.Env["KANDEV_RUN_TOKEN"] != "" {
-		for _, key := range sshManagedEnvKeys {
-			if value := req.Env[key]; value != "" {
-				env[key] = value
-			}
-		}
-	}
 	for _, key := range sshRemoteAgentCredentialEnvKeys {
 		if val := req.Env[key]; val != "" {
 			env[key] = val

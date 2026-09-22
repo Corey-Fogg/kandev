@@ -4,6 +4,7 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/kandev/kandev/internal/agent/runtimeauth"
 	"github.com/kandev/kandev/internal/auth/authn"
@@ -19,6 +20,8 @@ import (
 	"time"
 	"unicode/utf8"
 )
+
+var errOrchestrationDisabled = errors.New("orchestration feature disabled")
 
 type Tasks interface {
 	GetTask(context.Context, string) (*taskmodels.Task, error)
@@ -112,6 +115,15 @@ func (s *Service) Process(ctx context.Context, run *runmodels.Run) (bool, error)
 	role, err := s.Repo.OrchestratorRoleID(ctx, run.AgentProfileID)
 	if err != nil || role == "" {
 		return false, err
+	}
+	if !s.AssistantEnabled {
+		// The feature flag is the kill-switch: a registered orchestrator's run
+		// is settled here rather than launched or handed to another runtime.
+		_ = s.Runs.RecordFailure(ctx, run.ID, errOrchestrationDisabled.Error())
+		if _, err := s.Runs.FinishRun(ctx, run.ID, statusFailed, nil); err != nil {
+			return true, err
+		}
+		return true, errOrchestrationDisabled
 	}
 	if run.RetryCount > 0 && s.RecoveryStarting != nil {
 		s.RecoveryStarting(ctx, run.SessionID)

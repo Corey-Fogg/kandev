@@ -171,23 +171,27 @@ export function ChatActivityTabs({
         </TabsList>
         <TabsContent value="chat">
           <ApprovalActionBar task={task} />
-          <TaskChat
-            taskId={task.id}
-            workspaceId={task.workspaceId}
-            statusSummary={task.statusSummary}
-            repositories={task.repositories}
-            comments={comments}
-            timeline={timeline}
-            sessions={sessions}
-            decisions={task.decisions}
-            reviewers={task.reviewers}
-            approvers={task.approvers}
-            scrollParent={scrollParent}
-            readOnly={readOnly}
-            onCommentsChanged={onCommentsChanged}
-            taskTitle={task.title}
-            taskDescription={task.description}
-          />
+          <CommentTransportContext.Provider value={createComment}>
+            <ChatIdentityContext.Provider value={identities}>
+              <TaskChat
+                taskId={task.id}
+                workspaceId={task.workspaceId}
+                statusSummary={task.statusSummary}
+                repositories={task.repositories}
+                comments={comments}
+                timeline={timeline}
+                sessions={sessions}
+                decisions={task.decisions}
+                reviewers={task.reviewers}
+                approvers={task.approvers}
+                scrollParent={scrollParent}
+                readOnly={readOnly}
+                onCommentsChanged={onCommentsChanged}
+                taskTitle={task.title}
+                taskDescription={task.description}
+              />
+            </ChatIdentityContext.Provider>
+          </CommentTransportContext.Provider>
         </TabsContent>
         <TabsContent value="activity">
           <TaskActivity taskId={task.id} entries={activity} />

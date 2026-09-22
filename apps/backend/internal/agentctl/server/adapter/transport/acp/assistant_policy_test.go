@@ -12,8 +12,9 @@ import (
 func TestAssistantReadOnlyAdapterNewAndResume(t *testing.T) {
 	a, capture := newSessionRequestCaptureAdapter(t, acpsdk.McpCapabilities{})
 	a.cfg.ToolPolicy = "claude-broker-v1"
+	a.cfg.ToolPolicyVersion = "0.76.0"
 	a.agentID = "claude-acp"
-	a.agentInfo = &AgentInfo{Name: "@agentclientprotocol/claude-agent-acp", Version: "0.75.1"}
+	a.agentInfo = &AgentInfo{Name: "@agentclientprotocol/claude-agent-acp", Version: "0.76.0"}
 	servers := []types.McpServer{{Name: "kandev_assistant", Command: "/owned/agentctl", Args: []string{"kandev", "assistant-mcp"}}, {Name: "untrusted", Command: "mutate"}}
 	_, err := a.NewSession(context.Background(), servers)
 	require.ErrorContains(t, err, "attachment")
@@ -42,4 +43,28 @@ func TestAssistantReadOnlyAdapterRejectsUnprovenVersion(t *testing.T) {
 	a.agentInfo = &AgentInfo{Version: "0.75.2"}
 	_, err := a.NewSession(context.Background(), nil)
 	require.ErrorContains(t, err, "unsupported")
+}
+
+func TestAssistantAdapterRequiresHandshakeToMatchLaunchedVersion(t *testing.T) {
+	servers := []types.McpServer{{Name: "kandev_assistant", Command: "/owned/agentctl", Args: []string{"kandev", "assistant-mcp"}}}
+	for _, row := range []struct {
+		launched, reported string
+		ok                 bool
+	}{
+		{"0.76.0", "0.76.0", true},
+		{"0.76.0", "0.75.1", false},
+		{"", "0.76.0", false},
+	} {
+		a, _ := newSessionRequestCaptureAdapter(t, acpsdk.McpCapabilities{})
+		a.cfg.ToolPolicy = "claude-broker-v1"
+		a.cfg.ToolPolicyVersion = row.launched
+		a.agentID = "claude-acp"
+		a.agentInfo = &AgentInfo{Name: "@agentclientprotocol/claude-agent-acp", Version: row.reported}
+		_, err := a.NewSession(context.Background(), servers)
+		if row.ok {
+			require.NoError(t, err, "%+v", row)
+		} else {
+			require.ErrorContains(t, err, "unsupported", "%+v", row)
+		}
+	}
 }

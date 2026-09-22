@@ -154,9 +154,6 @@ func (r *Repository) initSchema() error {
 	if err := r.createExtensionTables(); err != nil {
 		return err
 	}
-	if err := r.createOrchestrationTables(); err != nil {
-		return err
-	}
 	if err := r.runMigrations(); err != nil {
 		return fmt.Errorf("required office migration: %w", err)
 	}

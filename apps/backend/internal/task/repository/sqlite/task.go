@@ -132,8 +132,8 @@ func taskScanColumnSQL(alias string, useExpressions bool) string {
 // when the task is owned by office: either it has a non-empty project_id
 // (explicit office task) or its workflow matches the workspace's
 // office_workflow_id (the canonical "office workflow"). Kanban tasks live
-// in other workflows and have no project. The built-in Routine workflow is
-// also Office-owned even when its task has no project.
+// in any other workflow and have no project. Orchestration conversation tasks
+// run through the same managed-run path, so they are classified with Office.
 func isFromOfficeProjection(alias string) string {
 	if alias == "" {
 		alias = defaultTaskAlias
@@ -147,10 +147,21 @@ func isFromOfficeProjection(alias string) string {
 			  AND COALESCE(w.office_workflow_id, '') != ''
 			  AND w.office_workflow_id = ` + alias + `.workflow_id
 		)
-		OR EXISTS (
+	)`
+}
+
+// deliveryExclusionFilter hides Office tasks and system routine-workflow tasks
+// from workspace delivery listings. Routine tasks stay ordinary Kanban tasks
+// everywhere else; only the delivery overview omits them. The subquery keeps
+// the predicate independent of the outer query's table alias.
+func deliveryExclusionFilter() string {
+	return ` AND id NOT IN (
+		SELECT dt.id FROM tasks dt
+		WHERE ` + isFromOfficeProjection("dt") + `
+		   OR EXISTS (
 			SELECT 1 FROM workflows ow
-			WHERE ow.id = ` + alias + `.workflow_id
-			  AND ow.workspace_id = ` + alias + `.workspace_id
+			WHERE ow.id = dt.workflow_id
+			  AND ow.workspace_id = dt.workspace_id
 			  AND ow.is_system = 1 AND ow.workflow_template_id = 'routine'
 		)
 	)`
@@ -3431,7 +3442,7 @@ func (r *Repository) listWorkspaceTasks(ctx context.Context, workspaceID, workfl
 	// see them.
 	filter += andNotAutomationOrigin
 	if excludeOffice {
-		filter += " AND NOT " + isFromOfficeProjection("tasks")
+		filter += deliveryExclusionFilter()
 	}
 
 	if onlyArchived {

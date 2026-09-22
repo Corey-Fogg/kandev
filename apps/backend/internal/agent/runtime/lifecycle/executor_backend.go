@@ -716,10 +716,6 @@ type ExecutorInstance struct {
 	// ReleaseRuntimeInventory is carried into manager-owned post-create rollback
 	// paths. It must run only after exact runtime cleanup succeeds.
 	ReleaseRuntimeInventory func(context.Context) error
-
-	// PrepareAgentEnv translates per-run settings for a live remote instance.
-	// It is retained in memory only and runs before configuring a subprocess.
-	PrepareAgentEnv func(map[string]string) error
 }
 
 // ToAgentExecution converts a ExecutorInstance to an AgentExecution.
@@ -770,7 +766,6 @@ func (ri *ExecutorInstance) ToAgentExecution(req *ExecutorCreateRequest) *AgentE
 		standaloneInstanceID: ri.StandaloneInstanceID,
 		standalonePort:       ri.StandalonePort,
 		historyEnabled:       historyEnabled,
-		prepareAgentEnv:      ri.PrepareAgentEnv,
 		promptDoneCh:         make(chan PromptCompletionSignal, 1),
 	}
 	execution.setRuntimeEnvironment(req.Env)

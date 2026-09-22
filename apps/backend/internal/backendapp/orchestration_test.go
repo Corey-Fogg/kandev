@@ -36,9 +36,11 @@ func TestOrchestrationFlagGuardsRuntimeAndLegacyRoutes(t *testing.T) {
 			t.Fatalf("flag %v: %v %v", enabled, allowed, e)
 		}
 	}
-	legacy, e := orchestrationRunGuard(config.FeaturesConfig{Orchestration: true}, repo)(ctx, "legacy")
-	if e != nil || legacy {
-		t.Fatalf("legacy Office run enabled by orchestration: %v %v", legacy, e)
+	for _, features := range []config.FeaturesConfig{{}, {Orchestration: true}, {Office: true}} {
+		legacy, e := orchestrationRunGuard(features, repo)(ctx, "legacy")
+		if e != nil || !legacy {
+			t.Fatalf("unowned non-orchestrator run must keep upstream behavior under %+v: %v %v", features, legacy, e)
+		}
 	}
 	channel, err := repo.EnsureAgentConversation(ctx, a)
 	if err != nil {
