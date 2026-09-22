@@ -1,8 +1,8 @@
 # 0.95.0 Orchestrator candidate
 
-Status: prepared for the private deployment review; the running service has not
-been changed. This is a custom candidate based on the exact v0.95.0 release, not
-an upstream stable release artifact.
+Status: deployed to the private service on 2026-09-22. This is a custom
+candidate based on the exact v0.95.0 release, not an upstream stable release
+artifact.
 
 | Review item | Candidate |
 | --- | --- |
@@ -15,7 +15,9 @@ an upstream stable release artifact.
 | Feature smoke | Orchestrator on; Office off; synthetic network-isolated startup passed |
 | Private database rehearsal | SQLite online backup, migration/replay, restart and integrity checks passed in network-isolated copies |
 | Rollback rehearsal | Exact running 0.94.0 bundle started against a separate pre-candidate database copy |
-| Live service | Still on its existing 0.94.0 candidate |
+| Live service | Running this candidate; `/health` reports `ok` and this exact version |
+| Live data | Existing database retained; SQLite integrity check passed after startup |
+| Rollback | Cold local copy of data, service configuration/drop-ins and old bundle verified |
 
 The four implementation commits are separate: Claude model/effort profile
 support, the managed-parent completion guard, required-store startup ordering,
@@ -31,13 +33,20 @@ packages reports zero issues. The environment had no PostgreSQL test DSN, so
 PostgreSQL conformance was not run. Browser tests were not run because this
 candidate changes backend behavior only.
 
-The private-data rehearsal copied the SQLite database through SQLite's Online
-Backup API and left live records and service untouched. It did not copy
-workspace directories, attachments, or external configuration. The final live
-change window still needs the runbook's cold, verified backup of all required
-data/config and service state. The receipt describes exactly what was tested;
-it does not claim PostgreSQL, browser, provider, or attachment coverage.
+The live service was stopped before the cold copy. The copy includes the local
+Kandev data tree (database, attachments, repositories/workspaces, and plugins),
+service unit/drop-ins, and the exact previous bundle. The backup manifest was
+verified against every copied file; the database, service configuration and old
+executable hashes were also checked directly. SQLite integrity passed both
+before cutover (on the copy) and after candidate startup (live). No task, session,
+or run rows were changed by the deployment. Four existing worker processes were
+stopped with the service; their sessions were waiting for input or still marked
+created, with no queued/running runs in the queue at cutover.
 
-The live cutover is pending the runbook's explicit instruction for this named
-candidate. See the [dogfood runbook](../../plans/orchestration-delivery/dogfood-runbook.md)
-for the final backup, quiesce, service switch, smoke and rollback sequence.
+The candidate started with authentication and Orchestrator enabled and Office
+disabled. The public health endpoint returned `ok` and the candidate version,
+and the web root returned HTTP 200. The deployment receipt does not claim
+PostgreSQL, browser, or provider coverage.
+
+See the [dogfood runbook](../../plans/orchestration-delivery/dogfood-runbook.md)
+for the cutover and rollback procedure.
