@@ -245,6 +245,7 @@ func TestTaskEventBroadcaster_NoDuplicateSubscriptions(t *testing.T) {
 		events.GitHubTaskPRDeleted,
 		events.GitLabTaskMRUpdated,
 		events.GitLabTaskMRDeleted,
+		events.TaskPreviewFeedbackChanged,
 	} {
 		subject := subject
 		t.Run(subject, func(t *testing.T) {
