@@ -116,6 +116,13 @@ func provideRepositories(ctx context.Context, cfg *config.Config, log *logger.Lo
 		return nil, nil, nil, err
 	}
 	cleanups = append(cleanups, supportCleanups...)
+	if err := checkStartupContext(ctx, "orchestration repository"); err != nil {
+		return nil, nil, nil, err
+	}
+	orchestrationRepo := orchestrationstore.New(writer, reader)
+	if err := recordRequiredStore(tracker, "orchestration", orchestrationRepo.Migrate()); err != nil {
+		return nil, nil, nil, fmt.Errorf("orchestration repo: %w", err)
+	}
 	if err := checkStartupContext(ctx, "office repository"); err != nil {
 		return nil, nil, nil, err
 	}
@@ -124,7 +131,6 @@ func provideRepositories(ctx context.Context, cfg *config.Config, log *logger.Lo
 		return nil, nil, nil, fmt.Errorf("office repo: %w", err)
 	}
 	cleanups = append(cleanups, officeCleanup)
-	orchestrationRepo := orchestrationstore.New(writer, reader)
 	if err := checkStartupContext(ctx, "terminal repositories"); err != nil {
 		return nil, nil, nil, err
 	}
