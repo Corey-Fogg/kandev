@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { IconPlus } from "@tabler/icons-react";
 import { Button } from "@kandev/ui/button";
 import { useAppStore } from "@/components/state-provider";
@@ -9,12 +9,11 @@ import { useRoutingPreview } from "@/hooks/domains/office/use-routing-preview";
 import { useWorkspaceRouting } from "@/hooks/domains/office/use-workspace-routing";
 import type { AgentProfile } from "@/lib/state/slices/office/types";
 import { AgentCard } from "./components/agent-card";
-import { useRouter } from "@/lib/routing/client-router";
-import { workspaceSettingsHref } from "@/lib/settings/workspace-settings-tabs";
 import { EmptyState } from "../components/shared/empty-state";
 import { PageHeader } from "../components/shared/page-header";
 import { useTranslation } from "react-i18next";
 import { controlSizingClassName } from "@kandev/ui/control-sizing";
+import { CreateAgentDialog } from "./components/create-agent-dialog";
 
 type AgentsPageClientProps = {
   initialAgents: AgentProfile[];
@@ -26,10 +25,7 @@ export function AgentsPageClient({ initialAgents, initialWorkspaceId }: AgentsPa
   const agents = useAppStore(selectOfficeAgentProfiles);
   const setOfficeAgentProfiles = useAppStore((s) => s.setOfficeAgentProfiles);
   const workspaceId = useAppStore((s) => s.workspaces.activeId);
-  const router = useRouter();
-  const openSetup = () => {
-    if (workspaceId) router.push(workspaceSettingsHref(workspaceId, "agents"));
-  };
+  const [showCreate, setShowCreate] = useState(false);
   // Mounting these hooks fetches workspace routing config + preview once;
   // every agent card reads the resolved preview from the store.
   useWorkspaceRouting(workspaceId);
@@ -89,6 +85,7 @@ export function AgentsPageClient({ initialAgents, initialWorkspaceId }: AgentsPa
           ))}
         </div>
       )}
+      <CreateAgentDialog open={showCreate} onOpenChange={setShowCreate} />
     </div>
   );
 }
