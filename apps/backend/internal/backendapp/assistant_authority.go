@@ -126,7 +126,10 @@ func assistantProfileCompatibility(profile *settings.AgentProfile) string {
 			return "unsupported_profile_flags"
 		}
 	}
-	if profile.Mode != "" && profile.Mode != "default" {
+	// Claude profiles may use the normal ACP auto mode as well as the
+	// default mode. Both are supported by the orchestration broker; rejecting
+	// auto here made an otherwise valid coordinator unable to create tasks.
+	if profile.Mode != "" && profile.Mode != "default" && profile.Mode != "auto" {
 		return "unsupported_profile_mode"
 	}
 
