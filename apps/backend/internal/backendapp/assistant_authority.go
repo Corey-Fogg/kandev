@@ -113,8 +113,13 @@ func (a assistantAuthorityReader) authorityExecutor(ctx context.Context, id stri
 }
 
 func assistantProfileCompatibility(profile *settings.AgentProfile) string {
-	if profile.CommandPrefix != "" || len(profile.ConfigOptions) != 0 || len(profile.EnvVars) != 0 || profile.AutoFallback || profile.FallbackModel != "" {
+	if profile.CommandPrefix != "" || len(profile.EnvVars) != 0 || profile.AutoFallback || profile.FallbackModel != "" {
 		return "unsupported_profile_overrides"
+	}
+	for option := range profile.ConfigOptions {
+		if option != "effort" {
+			return "unsupported_profile_overrides"
+		}
 	}
 	for _, flag := range profile.CLIFlags {
 		if flag.Enabled {

@@ -42,13 +42,18 @@ func TestAssistantAuthorityOwnerProfileAndExecutor(t *testing.T) {
 	binding := models.AssistantBinding{OwnerUserID: "owner", WorkspaceID: "ws-1"}
 	first, err := reader.ResolveAssistantAuthority(ctx, binding, "profile", "local")
 	require.NoError(t, err)
-	require.Empty(t, first.UnsupportedReason)
+	p.profile.Model = "claude-sonnet-4-5"
+	p.profile.ConfigOptions = map[string]string{"effort": "high"}
+	updated, err := reader.ResolveAssistantAuthority(ctx, binding, "profile", "local")
+	require.NoError(t, err)
+	require.Equal(t, first.UnsupportedReason, updated.UnsupportedReason)
+	require.NotEqual(t, first.Revision, updated.Revision)
 	_, err = reader.ResolveAssistantAuthority(context.Background(), binding, "profile", "local")
 	require.Error(t, err)
 	p.profile.EnvVars = []settings.ProfileEnvVar{{Key: "TOKEN", Value: "SYNTHETIC_ENV_CANARY"}}
 	changed, err := reader.ResolveAssistantAuthority(ctx, binding, "profile", "local")
 	require.NoError(t, err)
-	require.NotEqual(t, first.Revision, changed.Revision)
+	require.NotEqual(t, updated.Revision, changed.Revision)
 	require.NotEmpty(t, changed.UnsupportedReason)
 	data, err := json.Marshal(changed)
 	require.NoError(t, err)
@@ -106,4 +111,18 @@ func TestAssistantReadOnlyCanonicalProviderIdentity(t *testing.T) {
 			require.Equal(t, row.supported, result == "", result)
 		})
 	}
+}
+
+func TestAssistantClaudeProfileSupportsModelAndEffort(t *testing.T) {
+	agent := &settings.Agent{ID: "claude-acp", Name: "claude-acp"}
+	executor := &taskmodels.Executor{Type: taskmodels.ExecutorTypeLocal, Status: taskmodels.ExecutorStatusActive}
+	preset := &taskmodels.ExecutorProfile{}
+	profile := &settings.AgentProfile{Model: "claude-sonnet-4-5", ConfigOptions: map[string]string{"effort": "high"}}
+
+	require.Empty(t, assistantRestrictionCompatibility(agent, profile, executor, preset, "0.75.1"))
+
+	profile.ConfigOptions = map[string]string{"unsupported-option": "value"}
+	require.Equal(t, "unsupported_profile_overrides", assistantRestrictionCompatibility(agent, profile, executor, preset, "0.75.1"))
+	profile.ConfigOptions = map[string]string{"effort": "high", "unsupported-option": "value"}
+	require.Equal(t, "unsupported_profile_overrides", assistantRestrictionCompatibility(agent, profile, executor, preset, "0.75.1"))
 }

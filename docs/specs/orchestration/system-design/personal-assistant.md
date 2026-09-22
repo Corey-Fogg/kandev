@@ -171,6 +171,17 @@ the managed broker, with built-ins/settings/hooks and other attachments disabled
 Unsupported profiles fail admission. Read/receipt effects are the only inspect
 allowlist; no plugin annotation is accepted as enforcement evidence.
 
+Model selection and effort are inference controls, not authority grants. For the
+qualified Claude ACP path, pass the profile's supported model selection and its
+provider-supported `effort` config option through session configuration while
+keeping the managed command, empty built-in tool set, strict single broker
+attachment, disabled hooks/settings/plugins, and host-operation denials fixed.
+Do not turn the general config-options object into an allowlist: only the model
+and effort controls are in scope, and CLI flags, environment overrides,
+fallbacks, custom commands, and other unqualified options remain rejected.
+Recompute the authority fingerprint when model/effort changes so resumed
+sessions cannot use stale configuration.
+
 ## Attention projection
 
 Use a new Orchestration-owned attention record keyed by binding, source identity
