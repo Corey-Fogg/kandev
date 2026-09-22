@@ -39,6 +39,7 @@ import {
 } from "@/components/plugins/plugin-error-boundary";
 import { PluginPageFrame } from "@/components/plugins/plugin-page";
 import { safeDecodePathSegment } from "@/lib/routing/path";
+import { readTaskId } from "./spa-routing";
 import {
   mapWorkspaceItem,
   mapWorkflowItem,
@@ -66,6 +67,9 @@ import { NeedsYouInboxRoute } from "./needs-you-inbox-route";
 import { AuthRouteRedirect, RouteLoading } from "./spa-route-chrome";
 import { NEEDS_YOU_INBOX_HREF } from "@/lib/navigation/needs-you-inbox-destination";
 import { generateUUID } from "@/lib/utils";
+import { AssistantPage } from "@/app/assistant/assistant-page";
+import { CoordinatorPage } from "@/app/coordinator/coordinator-page";
+import { OrchestrationConversationRoute } from "@/app/settings/orchestration/conversation-route";
 
 const OfficeRoutes = lazy(() =>
   import("./office-routes").then((mod) => ({ default: mod.OfficeRoutes })),

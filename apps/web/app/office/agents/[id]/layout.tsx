@@ -17,6 +17,7 @@ import { AgentRouteStrip } from "./components/agent-route-strip";
 import { AgentRecoveryControl } from "./components/agent-recovery-control";
 import { isRoutineFiring } from "../../lib/routine-status";
 import { Trans, useTranslation } from "react-i18next";
+import { OpenConversationButton } from "./components/open-conversation-button";
 
 type AgentDetailLayoutProps = {
   children: ReactNode;
