@@ -23,6 +23,17 @@ their current owners and authorization checks.
 | `REQ-TASKS-COMPLETION-002` | Explicit resume, Follow-up ownership, Cleanup and races, User interface |
 | `REQ-TASKS-COMPLETION-003` | Workspace admission, Workspace runtime continuity, Workspace failure feedback |
 
+## Orchestration-managed parent completion
+
+Task-state persistence is the enforcement boundary for
+AC-TASKS-COMPLETION-001.14. Every state transition path that writes
+`COMPLETED` checks, in the same transaction, whether the target task has
+`orchestration_managed: true` metadata and an unsettled direct child. Archived
+and ephemeral children are excluded; `COMPLETED`, `FAILED`, and `CANCELLED`
+are terminal. Reject the transition with the first blocking child ID and state.
+Unmanaged parent tasks retain existing behavior. No child is automatically
+closed, cancelled, restarted, or otherwise changed by this guard.
+
 ## Step contract
 
 Use `CompleteTaskOnEnter bool` and `complete_task_on_enter` in JSON, YAML, and

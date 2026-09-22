@@ -1217,6 +1217,11 @@ func (r *Repository) updateTaskTx(ctx context.Context, tx *sql.Tx, task *models.
 		// ladder over every other case (design's error-mapping table).
 		return "", 0, fmt.Errorf("%w: %s", ErrTaskNotFound, task.ID)
 	}
+	if task.State == v1.TaskStateCompleted {
+		if err := guardManagedParentCompletion(ctx, tx, r.db, task.ID); err != nil {
+			return "", 0, err
+		}
+	}
 	if err := r.applyPreservedPositionInTx(ctx, tx, task, preservePosition); err != nil {
 		return "", 0, err
 	}
@@ -4612,7 +4617,17 @@ func (r *Repository) CountOpenWatcherCreatedTasks(ctx context.Context, metadataK
 
 // UpdateTaskState updates the state of a task
 func (r *Repository) UpdateTaskState(ctx context.Context, id string, state v1.TaskState) error {
-	result, err := r.db.ExecContext(ctx, r.db.Rebind(`UPDATE tasks SET state = ?, updated_at = ? WHERE id = ?`), state, time.Now().UTC(), id)
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if state == v1.TaskStateCompleted {
+		if err := guardManagedParentCompletion(ctx, tx, r.db, id); err != nil {
+			return err
+		}
+	}
+	result, err := tx.ExecContext(ctx, r.db.Rebind(`UPDATE tasks SET state = ?, updated_at = ? WHERE id = ?`), state, time.Now().UTC(), id)
 	if err != nil {
 		return err
 	}
@@ -4621,7 +4636,37 @@ func (r *Repository) UpdateTaskState(ctx context.Context, id string, state v1.Ta
 	if rows == 0 {
 		return fmt.Errorf("%w: %s", ErrTaskNotFound, id)
 	}
-	return nil
+	return tx.Commit()
+}
+
+// guardManagedParentCompletion rejects completion while an Orchestrator-owned
+// parent has child work that has not reached a terminal state. Keep this check
+// in the same transaction as the state write so every task-state entry point
+// enforces the invariant.
+func guardManagedParentCompletion(ctx context.Context, tx *sql.Tx, db *sqlx.DB, taskID string) error {
+	managedExpr := dialect.JSONExtract(db.DriverName(), "parent.metadata", "orchestration_managed")
+	var managedValue any = true
+	if dialect.IsPostgres(db.DriverName()) {
+		managedValue = "true"
+	}
+	query := fmt.Sprintf(`
+		SELECT child.id, child.state
+		FROM tasks parent JOIN tasks child ON child.parent_id = parent.id
+		WHERE parent.id = ? AND parent.state <> ? AND %s = ?
+		  AND child.archived_at IS NULL AND child.is_ephemeral = ?
+		  AND child.state NOT IN (?, ?, ?)
+		LIMIT 1`, managedExpr)
+	var childID string
+	var childState v1.TaskState
+	err := tx.QueryRowContext(ctx, db.Rebind(query), taskID, v1.TaskStateCompleted, managedValue, dialect.BoolToInt(false),
+		v1.TaskStateCompleted, v1.TaskStateFailed, v1.TaskStateCancelled).Scan(&childID, &childState)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return fmt.Errorf("cannot complete orchestration-managed parent %s while child task %s is %s", taskID, childID, childState)
 }
 
 // UpdateTaskStateIfSessionState atomically ties a task-state write to the
@@ -4709,6 +4754,11 @@ func (r *Repository) tryUpdateTaskStateIfSessionState(
 	}
 	if oldState == v1.TaskStateCompleted && state == v1.TaskStateInProgress {
 		return oldState, false, false, nil
+	}
+	if state == v1.TaskStateCompleted && oldState != v1.TaskStateCompleted {
+		if err := guardManagedParentCompletion(ctx, tx, r.db, taskID); err != nil {
+			return oldState, false, false, err
+		}
 	}
 	if archivedAt.Valid || currentSessionState != expectedSessionState ||
 		(requirePrimary && !currentSessionIsPrimary) {
@@ -4868,6 +4918,11 @@ func (r *Repository) UpdateTaskStateIfCurrentIn(
 	if !taskStateInSet(currentState, allowed) {
 		return currentState, false, nil
 	}
+	if state == v1.TaskStateCompleted && currentState != v1.TaskStateCompleted {
+		if err := guardManagedParentCompletion(ctx, tx, r.db, id); err != nil {
+			return currentState, false, err
+		}
+	}
 
 	result, err := tx.ExecContext(ctx, r.db.Rebind(`
 		UPDATE tasks SET state = ?, updated_at = ?
@@ -4968,6 +5023,11 @@ func (r *Repository) tryUpdateTaskStateIfNotArchived(
 	}
 	if archivedAt.Valid {
 		return currentState, false, false, nil
+	}
+	if state == v1.TaskStateCompleted && currentState != v1.TaskStateCompleted {
+		if err := guardManagedParentCompletion(ctx, tx, r.db, id); err != nil {
+			return currentState, false, false, err
+		}
 	}
 
 	result, err := tx.ExecContext(ctx, r.db.Rebind(`
