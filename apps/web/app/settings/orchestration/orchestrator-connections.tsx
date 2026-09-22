@@ -1,3 +1,4 @@
+import { linkToTask } from "@/lib/links";
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@kandev/ui/button";
@@ -37,7 +38,7 @@ export function OrchestratorTasks({ workspaceId, id }: { workspaceId: string; id
           <li key={task.id}>
             <Link
               className="underline"
-              href={`/t/${encodeURIComponent(task.id)}?workspaceId=${encodeURIComponent(workspaceId)}`}
+              href={linkToTask(task.id, { searchParams: new URLSearchParams({ workspaceId }) })}
             >
               {task.title}
             </Link>

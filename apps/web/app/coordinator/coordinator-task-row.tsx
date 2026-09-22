@@ -1,3 +1,4 @@
+import { linkToTask } from "@/lib/links";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "@/components/state-provider";
 import { statusSummaryActiveErrorPreview } from "@/lib/task-status-summary";
@@ -88,7 +89,7 @@ export function CoordinatorTaskRow({
       className="rounded-lg border bg-card shadow-sm"
     >
       <Link
-        href={`/t/${encodeURIComponent(task.id)}`}
+        href={linkToTask(task.id)}
         className="cursor-pointer block rounded-t-lg p-3 hover:bg-muted/50 focus-visible:outline-ring"
       >
         <div className="flex items-start gap-2">

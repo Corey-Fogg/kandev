@@ -297,5 +297,12 @@
   "pluginWebhookState_failed": "Failed",
   "pluginWebhookState_cancelled": "Cancelled",
   "pluginWebhookState_skipped": "Skipped",
-  "pluginWebhookState_ignored": "Ignored"
+  "pluginWebhookState_ignored": "Ignored",
+  "runTarget": "Run target",
+  "agentRunTarget": "Agent task",
+  "orchestratorUnavailable": "Orchestrator unavailable",
+  "orchestratorTargetHint": "Each run is sent to this orchestrator's conversation. The orchestrator uses its own execution profile.",
+  "manageOrchestrators": "Manage orchestrators",
+  "orchestratorDeliveryHint": "This run was delivered to an orchestrator conversation.",
+  "openOrchestratorChat": "Open orchestrator chat"
 }

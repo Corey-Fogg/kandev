@@ -1,7 +1,5 @@
 package sqlite
 
-import "github.com/kandev/kandev/internal/db/dialect"
-
 func (r *Repository) migrateFriction() error {
 	for _, statement := range []string{
 		`CREATE TABLE IF NOT EXISTS orchestration_friction (
@@ -23,7 +21,7 @@ func (r *Repository) migrateFriction() error {
  created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, prepared_at TIMESTAMP, resolved_at TIMESTAMP)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_orchestration_improvements_open ON orchestration_improvements(binding_id,fingerprint) WHERE state NOT IN ('resolved','rejected')`,
 	} {
-		if _, err := r.db.Exec(dialect.MustRenderSchema(r.db.DriverName(), statement)); err != nil {
+		if _, err := r.db.Exec(renderSchema(r.db.DriverName(), statement)); err != nil {
 			return err
 		}
 	}

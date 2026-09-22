@@ -1,3 +1,4 @@
+import { linkToTask } from "@/lib/links";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@kandev/ui/button";
@@ -72,7 +73,9 @@ function ImprovementCard({
       </p>
       {row.repair_task_id && (
         <Link
-          href={`/t/${encodeURIComponent(row.repair_task_id)}?workspaceId=${encodeURIComponent(row.workspace_id)}`}
+          href={linkToTask(row.repair_task_id, {
+            searchParams: new URLSearchParams({ workspaceId: row.workspace_id }),
+          })}
           className="inline-flex underline text-sm cursor-pointer max-md:min-h-11 items-center"
         >
           {t("orchestration:maintenanceOpenTask")}

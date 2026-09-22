@@ -68,7 +68,7 @@ func (s *Service) QueueNativeConversation(ctx context.Context, taskID string, tr
 		}
 		opID = fmt.Sprintf("%s:%x", opID, sha256.Sum256(identity))
 	}
-	_, err = s.QueueRun(ctx, fields.AssigneeAgentProfileID, reason, string(body), opID)
+	_, err = s.QueueDistinctRun(ctx, fields.AssigneeAgentProfileID, reason, string(body), opID)
 	return true, err
 }
 

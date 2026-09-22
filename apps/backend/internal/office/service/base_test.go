@@ -132,10 +132,6 @@ func newTestService(t *testing.T, overrides ...service.ServiceOptions) *service.
 	if err != nil {
 		t.Fatalf("new repo: %v", err)
 	}
-	// Production boot migrates the orchestration store before Office.
-	if err := repo.OrchestrationStore().Migrate(); err != nil {
-		t.Fatalf("orchestration store: %v", err)
-	}
 
 	log := logger.Default()
 
@@ -332,10 +328,6 @@ func newTestServiceWithConfig(t *testing.T) (*service.Service, string) {
 	repo, err := sqlite.NewWithDB(db, db, nil)
 	if err != nil {
 		t.Fatalf("new repo: %v", err)
-	}
-	// Production boot migrates the orchestration store before Office.
-	if err := repo.OrchestrationStore().Migrate(); err != nil {
-		t.Fatalf("orchestration store: %v", err)
 	}
 
 	log := logger.Default()

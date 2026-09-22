@@ -308,6 +308,7 @@ export function RunErrorEntry({
       <LegacyRunErrorEntry
         agentName={agentName}
         error={error}
+        isActive={error.isActive !== false}
         onRecover={recoverConversation}
         onRetry={() => void recoverConversation("resume")}
         onRestore={() => {}}

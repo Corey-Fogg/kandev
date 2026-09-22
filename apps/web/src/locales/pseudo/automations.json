@@ -297,5 +297,12 @@
   "pluginWebhookState_failed": "Ƒàĩĺēď",
   "pluginWebhookState_cancelled": "Ćàńćēĺĺēď",
   "pluginWebhookState_skipped": "Śķĩƥƥēď",
-  "pluginWebhookState_ignored": "Ĩĝńōŕēď"
+  "pluginWebhookState_ignored": "Ĩĝńōŕēď",
+  "runTarget": "Ŕũń ţàŕĝēţ",
+  "agentRunTarget": "Àĝēńţ ţàśķ",
+  "orchestratorUnavailable": "Ōŕćĥēśţŕàţōŕ ũńàvàĩĺàƀĺē",
+  "orchestratorTargetHint": "Ēàćĥ ŕũń ĩś śēńţ ţō ţĥĩś ōŕćĥēśţŕàţōŕ'ś ćōńvēŕśàţĩōń. Ţĥē ōŕćĥēśţŕàţōŕ ũśēś ĩţś ōŵń ēxēćũţĩōń ƥŕōƒĩĺē.",
+  "manageOrchestrators": "Ḿàńàĝē ōŕćĥēśţŕàţōŕś",
+  "orchestratorDeliveryHint": "Ţĥĩś ŕũń ŵàś ďēĺĩvēŕēď ţō àń ōŕćĥēśţŕàţōŕ ćōńvēŕśàţĩōń.",
+  "openOrchestratorChat": "Ōƥēń ōŕćĥēśţŕàţōŕ ćĥàţ"
 }

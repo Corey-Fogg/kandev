@@ -2327,5 +2327,6 @@
   "checkoutOptions.credentialsUnsupported": "Utilize credenciais Git geridas pelo Kandev para as opções avançadas de obtenção.",
   "toolPayloadRemovedAt": "Detalhes da ferramenta removidos em {{date}}.",
   "toolPayloadRemoved": "Detalhes da ferramenta removidos.",
-  "openTaskSwitcherFor": "Abrir seletor de tarefas: {{title}}"
+  "openTaskSwitcherFor": "Abrir seletor de tarefas: {{title}}",
+  "resizeCommentComposer": "Redimensionar o editor de comentários"
 }

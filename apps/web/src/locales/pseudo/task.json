@@ -2327,5 +2327,6 @@
   "checkoutOptions.credentialsUnsupported": "Ũśē Ķàńďēv-ḿàńàĝēď Ĝĩţ ćŕēďēńţĩàĺś ƒōŕ àďvàńćēď ćĥēćķōũţ ōƥţĩōńś.",
   "toolPayloadRemovedAt": "Ţōōĺ ďēţàĩĺś ŕēḿōvēď ōń {{date}}.",
   "toolPayloadRemoved": "Ţōōĺ ďēţàĩĺś ŕēḿōvēď.",
-  "openTaskSwitcherFor": "Ōƥēń ţàśķ śŵĩţćĥēŕ: {{title}}"
+  "openTaskSwitcherFor": "Ōƥēń ţàśķ śŵĩţćĥēŕ: {{title}}",
+  "resizeCommentComposer": "Ŕēśĩźē ćōḿḿēńţ ćōḿƥōśēŕ"
 }

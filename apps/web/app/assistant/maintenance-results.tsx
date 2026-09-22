@@ -1,3 +1,4 @@
+import { linkToTask } from "@/lib/links";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@kandev/ui/button";
@@ -46,7 +47,9 @@ export function MaintenanceEvidence({ binding, row }: ViewProps) {
               </p>
               <time dateTime={item.observed_at}>{new Date(item.observed_at).toLocaleString()}</time>{" "}
               <Link
-                href={`/t/${encodeURIComponent(item.task_id)}?workspaceId=${encodeURIComponent(row.workspace_id)}`}
+                href={linkToTask(item.task_id, {
+                  searchParams: new URLSearchParams({ workspaceId: row.workspace_id }),
+                })}
                 className="inline-flex underline cursor-pointer max-md:min-h-11 items-center"
               >
                 {t("orchestration:maintenanceAffectedTask")}

@@ -1,7 +1,5 @@
 package sqlite
 
-import "github.com/kandev/kandev/internal/db/dialect"
-
 func (r *Repository) migrateMaintenance() error {
 	for _, statement := range []string{
 		`CREATE TABLE IF NOT EXISTS orchestration_maintenance_grants (
@@ -21,7 +19,7 @@ func (r *Repository) migrateMaintenance() error {
  owner_user_id TEXT NOT NULL, state TEXT NOT NULL, evidence_json TEXT NOT NULL, created_at TIMESTAMP NOT NULL)`,
 		`CREATE INDEX IF NOT EXISTS idx_orchestration_friction_retention ON orchestration_friction(observed_at)`,
 	} {
-		if _, err := r.db.Exec(dialect.MustRenderSchema(r.db.DriverName(), statement)); err != nil {
+		if _, err := r.db.Exec(renderSchema(r.db.DriverName(), statement)); err != nil {
 			return err
 		}
 	}

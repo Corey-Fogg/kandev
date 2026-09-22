@@ -92,6 +92,7 @@
     "azure-devops",
     "workflow-sync",
     "office-config-sync",
-    "automation"
+    "automation",
+    "orchestration"
   ]
 }

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/kandev/kandev/internal/office/models"
 )
 
 // Native conversations retain their full comment history in the database, but
@@ -30,4 +32,12 @@ func clipConversationText(text string, limit int) string {
 		limit--
 	}
 	return text[:limit] + "\n[Excerpt; full content remains in the task conversation.]"
+}
+
+func (si *SchedulerIntegration) isNativeConversationRun(ctx context.Context, run *models.Run, taskID string) bool {
+	if run.Reason != RunReasonTaskComment || taskID == "" {
+		return false
+	}
+	native, err := si.svc.repo.IsNativeConversation(ctx, taskID)
+	return err == nil && native
 }

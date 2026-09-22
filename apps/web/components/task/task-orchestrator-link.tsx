@@ -8,6 +8,7 @@ import type { Task } from "@/lib/types/http";
 export const TaskOrchestrationContext = createContext<Task | null>(null);
 export function MobileTaskOrchestratorLink() {
   const task = useContext(TaskOrchestrationContext);
+  if (!task) return null;
   return <TaskOrchestratorLink task={task} compact />;
 }
 export function TaskOrchestratorLink({

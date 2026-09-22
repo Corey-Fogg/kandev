@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/kandev/kandev/internal/db/dialect"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,7 +26,7 @@ func (r *Repository) migrateObjectives() error {
 		role TEXT NOT NULL,context_ref TEXT NOT NULL DEFAULT '',operation_id TEXT NOT NULL,
 		PRIMARY KEY(objective_id,task_id,session_id,role))`,
 	} {
-		if _, err := r.db.Exec(dialect.MustRenderSchema(r.db.DriverName(), q)); err != nil {
+		if _, err := r.db.Exec(renderSchema(r.db.DriverName(), q)); err != nil {
 			return err
 		}
 	}

@@ -297,5 +297,12 @@
   "pluginWebhookState_failed": "失敗",
   "pluginWebhookState_cancelled": "キャンセル済み",
   "pluginWebhookState_skipped": "スキップ済み",
-  "pluginWebhookState_ignored": "無視済み"
+  "pluginWebhookState_ignored": "無視済み",
+  "runTarget": "実行先",
+  "agentRunTarget": "エージェントタスク",
+  "orchestratorUnavailable": "オーケストレーターを利用できません",
+  "orchestratorTargetHint": "各実行はこのオーケストレーターの会話に送信されます。オーケストレーターは独自の実行プロファイルを使用します。",
+  "manageOrchestrators": "オーケストレーターを管理",
+  "orchestratorDeliveryHint": "この実行はオーケストレーターの会話に配信されました。",
+  "openOrchestratorChat": "オーケストレーターのチャットを開く"
 }

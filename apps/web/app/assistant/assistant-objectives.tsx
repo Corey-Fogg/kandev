@@ -1,3 +1,4 @@
+import { linkToTask } from "@/lib/links";
 import { useTranslation } from "react-i18next";
 import Link from "@/components/routing/app-link";
 import type { AssistantBinding } from "@/lib/api/domains/assistant-api";
@@ -44,7 +45,10 @@ export function AssistantObjectives({
                           <Link
                             key={index}
                             className="inline-flex underline cursor-pointer text-xs max-md:min-h-11 items-center"
-                            href={`/tasks/${encodeURIComponent(e.task_id)}?sessionId=${encodeURIComponent(e.session_id ?? "")}`}
+                            href={linkToTask(
+                              e.task_id,
+                              e.session_id ? { sessionId: e.session_id } : undefined,
+                            )}
                           >
                             {t("orchestration:assistantEvidence")}
                           </Link>

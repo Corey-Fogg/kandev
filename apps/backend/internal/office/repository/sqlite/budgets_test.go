@@ -50,6 +50,11 @@ func newBudgetClaimsRepoWithFK(t *testing.T) (*sqlite.Repository, *sqlx.DB) {
 	)`); err != nil {
 		t.Fatalf("create tasks: %v", err)
 	}
+	// Orchestration tables cascade from agent_profiles and reference the
+	// task-package "workspaces" table, which must exist for the same reason.
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS workspaces (id TEXT PRIMARY KEY)`); err != nil {
+		t.Fatalf("create workspaces: %v", err)
+	}
 	repo, err := sqlite.NewWithDB(db, db, nil)
 	if err != nil {
 		t.Fatalf("new repo: %v", err)

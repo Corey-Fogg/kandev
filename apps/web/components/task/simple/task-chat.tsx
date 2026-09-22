@@ -351,7 +351,7 @@ function ComposerResizeHandle({
   onHeightChange: (height: number) => void;
 }) {
   const { t } = useTranslation();
-  const resizeStartRef = useRef<{ y: number; height: number }>();
+  const resizeStartRef = useRef<{ y: number; height: number } | undefined>(undefined);
   const handleResizeStart = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       event.preventDefault();

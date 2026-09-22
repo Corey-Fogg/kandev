@@ -13,7 +13,7 @@ func TestDelegatedTaskRetainsAccountProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc := createTestServiceWithScheduler(repo, newMockStepGetter(), newMockTaskRepo(), &mockAgentManager{})
-	if got := svc.resolveEffectiveAgentProfile(ctx, "delegated", "", "personal-profile"); got != "work-profile" {
+	if got, err := svc.resolveEffectiveAgentProfile(ctx, "delegated", "", "personal-profile"); err != nil || got != "work-profile" {
 		t.Fatalf("delegation must retain work account, got %q", got)
 	}
 }

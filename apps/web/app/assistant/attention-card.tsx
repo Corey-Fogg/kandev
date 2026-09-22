@@ -1,3 +1,4 @@
+import { linkToTask } from "@/lib/links";
 import { useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import Link from "@/components/routing/app-link";
@@ -126,7 +127,7 @@ export function AttentionCard({
       )}
       <Link
         className="inline-flex items-center underline text-sm cursor-pointer max-md:min-h-11"
-        href={`/tasks/${encodeURIComponent(row.task_id)}?sessionId=${encodeURIComponent(row.session_id)}`}
+        href={linkToTask(row.task_id, { sessionId: row.session_id })}
       >
         {t("orchestration:assistantOpenTask")}
       </Link>

@@ -239,6 +239,9 @@ func (s *Store) initSchema() error {
 	if err := migrate.Err(); err != nil {
 		return fmt.Errorf("required automation migration: %w", err)
 	}
+	if err := s.migrateOrchestratorTargets(); err != nil {
+		return fmt.Errorf("required automation migration: %w", err)
+	}
 	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS automation_webhook_receipts_due ON automation_webhook_receipts(state,next_attempt_at,created_at,id)`); err != nil {
 		return err
 	}
@@ -1224,8 +1227,8 @@ func (s *Store) CreateRun(ctx context.Context, r *AutomationRun) error {
 		INSERT INTO automation_runs (conversation_task_id, id, automation_id, trigger_id, trigger_type, task_id, status,
 			dedup_key, trigger_data, error_message, session_id, turn_id, thread_action, thread_reason,
 			display_title, dedup_reason, repository_reason, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`),
-		r.ID, r.AutomationID, r.TriggerID, r.TriggerType, r.TaskID, r.Status,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`),
+		r.ConversationTaskID, r.ID, r.AutomationID, r.TriggerID, r.TriggerType, r.TaskID, r.Status,
 		r.DedupKey, r.TriggerDataJSON, r.ErrorMessage, r.SessionID, r.TurnID,
 		r.ThreadAction, r.ThreadReason, r.DisplayTitle, r.DedupReason, r.RepositoryReason, r.CreatedAt)
 	return err

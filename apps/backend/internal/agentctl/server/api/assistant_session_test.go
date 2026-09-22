@@ -63,7 +63,8 @@ func TestAssistantSessionLifecycleAttachesOnlyManagedBroker(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, []types.McpServer{{Name: "kandev_assistant", Type: "stdio", Command: executable,
 					Args: []string{"kandev", "assistant-mcp"},
-					Env:  map[string]string{"KANDEV_API_KEY": "synthetic-broker-token", "KANDEV_RUN_ID": "example-run"}}}, servers)
+					Env: map[string]string{"KANDEV_API_KEY": "synthetic-broker-token", "KANDEV_RUN_ID": "example-run",
+						"KANDEV_ORCHESTRATOR_SCOPE": "private"}}}, servers)
 			})
 		}
 	}

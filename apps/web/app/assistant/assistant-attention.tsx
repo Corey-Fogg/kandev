@@ -1,3 +1,4 @@
+import { linkToTask } from "@/lib/links";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@kandev/ui/button";
@@ -61,7 +62,7 @@ export function AssistantAttentionPanel({
                 </Button>
               ) : (
                 <Link
-                  href={`/tasks/${encodeURIComponent(row.task_id)}?sessionId=${encodeURIComponent(row.session_id)}`}
+                  href={linkToTask(row.task_id, { sessionId: row.session_id })}
                   className="inline-flex items-center text-sm underline cursor-pointer max-md:min-h-11"
                 >
                   {t("orchestration:assistantOpenTask")}

@@ -1,7 +1,5 @@
 package sqlite
 
-import "github.com/kandev/kandev/internal/db/dialect"
-
 func (r *Repository) migrateAttention() error {
 	for _, q := range []string{
 		`CREATE TABLE IF NOT EXISTS orchestration_attention (
@@ -19,7 +17,7 @@ func (r *Repository) migrateAttention() error {
  source_revision TEXT NOT NULL,revision INTEGER NOT NULL,state TEXT NOT NULL,
  UNIQUE(attention_id,source_revision))`,
 	} {
-		if _, err := r.db.Exec(dialect.MustRenderSchema(r.db.DriverName(), q)); err != nil {
+		if _, err := r.db.Exec(renderSchema(r.db.DriverName(), q)); err != nil {
 			return err
 		}
 	}

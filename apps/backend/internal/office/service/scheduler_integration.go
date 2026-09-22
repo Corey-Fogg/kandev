@@ -1353,11 +1353,3 @@ func (si *SchedulerIntegration) ProcessRun(ctx context.Context, run *models.Run)
 
 // PrepareDispatch lifts Office routing backoff before the core claim loop.
 func (si *SchedulerIntegration) PrepareDispatch(ctx context.Context) { si.liftParkedRoutingRuns(ctx) }
-
-func (si *SchedulerIntegration) isNativeConversationRun(ctx context.Context, run *models.Run, taskID string) bool {
-	if run.Reason != RunReasonTaskComment || taskID == "" {
-		return false
-	}
-	native, err := si.svc.repo.IsNativeConversation(ctx, taskID)
-	return err == nil && native
-}

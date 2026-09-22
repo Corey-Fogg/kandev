@@ -1,7 +1,5 @@
 package sqlite
 
-import "github.com/kandev/kandev/internal/db/dialect"
-
 func (r *Repository) migrateWorkspaceGrants() error {
 	for _, statement := range []string{
 		`CREATE TABLE IF NOT EXISTS orchestration_workspace_grants (
@@ -25,7 +23,7 @@ func (r *Repository) migrateWorkspaceGrants() error {
  UNIQUE(binding_id,conversation_id,workspace_id,receiver_profile_id,receiver_profile_revision,authority_revision,kind))`,
 		`CREATE INDEX IF NOT EXISTS idx_orchestration_workspace_exports_page ON orchestration_workspace_exports(binding_id,conversation_id,id)`,
 	} {
-		if _, err := r.db.Exec(dialect.MustRenderSchema(r.db.DriverName(), statement)); err != nil {
+		if _, err := r.db.Exec(renderSchema(r.db.DriverName(), statement)); err != nil {
 			return err
 		}
 	}

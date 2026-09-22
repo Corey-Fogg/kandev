@@ -601,6 +601,9 @@ func (s *Service) UpdateAutomation(ctx context.Context, id string, req *UpdateAu
 	if err := s.authorizeUpdatedReferences(ctx, id, req); err != nil {
 		return nil, err
 	}
+	if err := s.validateUpdatedTarget(ctx, id, req); err != nil {
+		return nil, err
+	}
 	unlock := s.automationRunLock(id)
 	defer unlock()
 	existing, err := s.store.GetAutomation(ctx, id)

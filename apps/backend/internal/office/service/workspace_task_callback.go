@@ -33,7 +33,7 @@ func (s *Service) queueWorkspaceTaskCallback(ctx context.Context, chiefID, conve
 	// committed transition. Serialize the queue's check-and-insert in this host.
 	s.workspaceCallbackMu.Lock()
 	defer s.workspaceCallbackMu.Unlock()
-	_, err := s.QueueRun(ctx, chiefID, RunReasonWorkspaceTaskCallback, payload, key)
+	_, err := s.QueueDistinctRun(ctx, chiefID, RunReasonWorkspaceTaskCallback, payload, key)
 	return err
 }
 

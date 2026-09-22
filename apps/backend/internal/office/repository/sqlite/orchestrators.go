@@ -11,6 +11,12 @@ import (
 func (r *Repository) OrchestrationStore() *orchestrationstore.Repository {
 	return orchestrationstore.New(r.db, r.ro)
 }
+
+// createOrchestrationTables keeps Office queries that exclude registered
+// orchestrators valid when the Office store is opened on its own. Backend boot
+// already migrated this schema as its own required store; the call is a no-op
+// replay there.
+func (r *Repository) createOrchestrationTables() error { return r.OrchestrationStore().Migrate() }
 func (r *Repository) ListOrchestratorRoles(ctx context.Context) ([]orchestrationmodels.OrchestratorRole, error) {
 	return r.OrchestrationStore().ListOrchestratorRoles(ctx)
 }

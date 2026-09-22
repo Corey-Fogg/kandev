@@ -34,12 +34,12 @@ func TestAutomationDispatchesOnceWithoutOwningConversation(t *testing.T) {
 	svc.SetOrchestratorTarget(target)
 	a, err := svc.CreateAutomation(ctx, &CreateAutomationRequest{WorkspaceID: "ws", Name: "Daily review", OrchestratorID: "chief", Prompt: "Find PRs assigned to me"})
 	require.NoError(t, err)
-	result, err := svc.FireTrigger(ctx, a.ID, "", TriggerTypeScheduled, nil, "day:1")
+	result, err := svc.FireTrigger(ctx, a.ID, "", TriggerTypeScheduled, nil, DedupKey("day:1"))
 	require.NoError(t, err)
 	require.False(t, result.Skipped)
 	require.NotEmpty(t, result.RunID)
 	admittedRunID := result.RunID
-	result, err = svc.FireTrigger(ctx, a.ID, "", TriggerTypeScheduled, nil, "day:1")
+	result, err = svc.FireTrigger(ctx, a.ID, "", TriggerTypeScheduled, nil, DedupKey("day:1"))
 	require.NoError(t, err)
 	require.True(t, result.Skipped)
 	require.Equal(t, 1, target.calls)
@@ -56,7 +56,7 @@ func TestAutomationDispatchesOnceWithoutOwningConversation(t *testing.T) {
 	require.NoError(t, svc.DeleteRun(ctx, runs[0].ID))
 	require.Empty(t, deleter.deleted)
 	target.fail = true
-	_, err = svc.FireTrigger(ctx, a.ID, "", TriggerTypeScheduled, nil, "day:2")
+	_, err = svc.FireTrigger(ctx, a.ID, "", TriggerTypeScheduled, nil, DedupKey("day:2"))
 	require.ErrorContains(t, err, "paused")
 	runs, err = svc.ListRuns(ctx, a.ID, 10)
 	require.NoError(t, err)

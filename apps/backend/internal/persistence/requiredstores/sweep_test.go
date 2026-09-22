@@ -33,8 +33,9 @@ func TestCatalogSweepAssignmentIsCompleteAndNonOverlapping(t *testing.T) {
 	if total := repositories + services; total != len(catalog) {
 		t.Fatalf("sweep-claimed entries = %d, want %d (every catalog entry claimed exactly once)", total, len(catalog))
 	}
-	if repositories != 19 {
-		t.Errorf("stores.repositories claims %d catalog entries, want 19", repositories)
+	// 19 upstream stores plus the runs and orchestration stores.
+	if repositories != 21 {
+		t.Errorf("stores.repositories claims %d catalog entries, want 21", repositories)
 	}
 	if services != 22 {
 		t.Errorf("stores.services claims %d catalog entries, want 22", services)

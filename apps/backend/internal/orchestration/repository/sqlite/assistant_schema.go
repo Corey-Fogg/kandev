@@ -2,7 +2,6 @@ package sqlite
 
 import (
 	"github.com/kandev/kandev/internal/db"
-	"github.com/kandev/kandev/internal/db/dialect"
 )
 
 func (r *Repository) migrateAssistantStorage() error {
@@ -31,7 +30,7 @@ func (r *Repository) migrateAssistantStorage() error {
 			response_json TEXT NOT NULL DEFAULT '{}', http_status INTEGER NOT NULL DEFAULT 0,
 			created_at TIMESTAMP NOT NULL,updated_at TIMESTAMP NOT NULL,UNIQUE(binding_id,operation_id))`,
 	} {
-		if _, err := r.db.Exec(dialect.MustRenderSchema(r.db.DriverName(), q)); err != nil {
+		if _, err := r.db.Exec(renderSchema(r.db.DriverName(), q)); err != nil {
 			return err
 		}
 	}
