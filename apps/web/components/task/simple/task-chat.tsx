@@ -418,8 +418,9 @@ function ChatInput({ taskId, taskTitle, taskDescription, onSubmitted }: ChatInpu
           }}
           onPaste={handlePaste}
           placeholder={t("task:addAComment")}
-          rows={2}
-          className="w-full bg-transparent px-3 py-2 text-sm outline-none resize-none"
+          rows={3}
+          aria-label={t("task:addAComment")}
+          className="w-full min-h-16 max-h-80 bg-transparent px-3 py-2 text-sm outline-none resize-y"
         />
         <CommentComposerFooter
           fileInputRef={fileInputRef}
