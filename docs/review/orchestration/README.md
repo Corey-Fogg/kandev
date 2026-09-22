@@ -80,6 +80,11 @@ Those feature tests are separate from operational qualification below.
 
 ## Qualified candidate and prepared live pilot
 
+The newer [0.95.0 candidate review](candidate-095-qualification.md) and its
+[artifact receipt](candidate-095-receipt.json) supersede the 0.94.0 qualification
+for current code. It is prepared but not installed; PostgreSQL, browser and
+attachment coverage remain outside this candidate's checks.
+
 The [candidate qualification](candidate-qualification.md) and
 [artifact receipt](candidate-receipt.json) identify the complete immutable Linux
 candidate and its matching refreshed media. The [private-data rehearsal](migration-rehearsal.md)
