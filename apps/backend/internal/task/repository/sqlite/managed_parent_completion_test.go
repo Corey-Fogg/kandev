@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kandev/kandev/internal/task/models"
 	"github.com/kandev/kandev/pkg/api/v1"
 )
 
@@ -37,6 +38,27 @@ func TestManagedParentCannotCompleteWithUnfinishedChildren(t *testing.T) {
 	}
 	if err := repo.UpdateTaskState(ctx, "managed-parent", v1.TaskStateCompleted); err != nil {
 		t.Fatalf("complete parent after child: %v", err)
+	}
+}
+
+func TestManagedParentRollbackCannotRestoreCompletionWithUnfinishedChild(t *testing.T) {
+	repo := newRepoForHealTests(t)
+	ctx := context.Background()
+	insertTask(t, repo.db, "rollback-parent")
+	insertTask(t, repo.db, "rollback-child")
+	if _, err := repo.db.Exec(`UPDATE tasks SET metadata = '{"orchestration_managed":true}' WHERE id = ?`, "rollback-parent"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.db.Exec(`UPDATE tasks SET parent_id = ? WHERE id = ?`, "rollback-parent", "rollback-child"); err != nil {
+		t.Fatal(err)
+	}
+	insertSession(t, repo, "rollback-session", "rollback-parent", string(models.TaskSessionStateRunning))
+
+	_, err := repo.RestoreTaskMessageRollbackIfSessionState(ctx, &models.Task{
+		ID: "rollback-parent", State: v1.TaskStateCompleted,
+	}, "rollback-session", models.TaskSessionStateRunning)
+	if err == nil || !strings.Contains(err.Error(), "rollback-child") {
+		t.Fatalf("restore rollback error = %v, want unfinished child guard", err)
 	}
 }
 
