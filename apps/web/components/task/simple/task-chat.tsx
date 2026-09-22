@@ -343,12 +343,61 @@ function CommentComposerFooter({
   );
 }
 
+function ComposerResizeHandle({
+  height,
+  onHeightChange,
+}: {
+  height: number;
+  onHeightChange: (height: number) => void;
+}) {
+  const { t } = useTranslation();
+  const resizeStartRef = useRef<{ y: number; height: number }>();
+  const handleResizeStart = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      resizeStartRef.current = { y: event.clientY, height };
+    },
+    [height],
+  );
+  const handleResizeMove = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const start = resizeStartRef.current;
+      if (!start) return;
+      onHeightChange(Math.min(420, Math.max(96, start.height + start.y - event.clientY)));
+    },
+    [onHeightChange],
+  );
+  const handleResizeEnd = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    resizeStartRef.current = undefined;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }, []);
+
+  return (
+    <div
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label={t("task:resizeCommentComposer", "Resize comment composer")}
+      className="group flex h-4 cursor-row-resize touch-none items-center justify-center"
+      onPointerDown={handleResizeStart}
+      onPointerMove={handleResizeMove}
+      onPointerUp={handleResizeEnd}
+      onPointerCancel={handleResizeEnd}
+    >
+      <span className="h-1 w-16 rounded-full bg-border transition-colors group-hover:bg-primary group-active:bg-primary" />
+    </div>
+  );
+}
+
 function ChatInput({ taskId, taskTitle, taskDescription, onSubmitted }: ChatInputProps) {
   const createComment = useContext(CommentTransportContext);
   const { t } = useTranslation();
   const drafts = useContext(CommentDraftContext);
   const [input, setInput] = useState(() => drafts?.get(taskId) ?? "");
   const [submitting, setSubmitting] = useState(false);
+  const [composerHeight, setComposerHeight] = useState(128);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputValueRef = useRef(input);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -404,8 +453,12 @@ function ChatInput({ taskId, taskTitle, taskDescription, onSubmitted }: ChatInpu
   }, [enhancePrompt, promptDelivery, t]);
 
   return (
-    <div className="mt-4 pt-4 border-t border-border">
-      <div className="rounded-md border bg-muted/30 focus-within:ring-1 focus-within:ring-ring">
+    <div className="mt-4 pt-2 border-t border-border">
+      <ComposerResizeHandle height={composerHeight} onHeightChange={setComposerHeight} />
+      <div
+        className="flex flex-col rounded-md border bg-muted/30 focus-within:ring-1 focus-within:ring-ring"
+        style={{ height: composerHeight }}
+      >
         <textarea
           ref={textareaRef}
           value={input}
@@ -420,7 +473,7 @@ function ChatInput({ taskId, taskTitle, taskDescription, onSubmitted }: ChatInpu
           placeholder={t("task:addAComment")}
           rows={3}
           aria-label={t("task:addAComment")}
-          className="w-full min-h-16 max-h-80 bg-transparent px-3 py-2 text-sm outline-none resize-y"
+          className="min-h-0 flex-1 w-full bg-transparent px-3 py-2 text-sm outline-none resize-none"
         />
         <CommentComposerFooter
           fileInputRef={fileInputRef}
