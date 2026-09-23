@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kandev/kandev/internal/agent/runtimeauth"
 	"github.com/kandev/kandev/internal/orchestration/models"
+	taskservice "github.com/kandev/kandev/internal/task/service"
 	"net/http"
 	"strconv"
 )
@@ -324,6 +325,12 @@ func (h *Handler) createTask(c *gin.Context) {
 		fail(c, fmt.Errorf("use a workspace workflow, not an Office project"))
 		return
 	}
+	// Validation failures are definite rejections, so reject before the
+	// operation is recorded; an unknown outcome would stop the conversation.
+	if err := taskservice.ValidateTaskTitle(req.Title); err != nil {
+		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{errorResponseKey: err.Error()})
+		return
+	}
 	if req.ExecutionMode != "" && req.ExecutionMode != executionModeExecute && req.ExecutionMode != executionModeDesign {
 		c.AbortWithStatusJSON(422, gin.H{errorResponseKey: "answer and inspect stay in the assistant conversation"})
 		return
@@ -360,6 +367,12 @@ func (h *Handler) manageTask(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		fail(c, err)
 		return
+	}
+	if req.Title != nil {
+		if err := taskservice.ValidateTaskTitle(*req.Title); err != nil {
+			c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{errorResponseKey: err.Error()})
+			return
+		}
 	}
 	req.DirectProfile = true
 	req.WorkspaceID = claims.WorkspaceID
