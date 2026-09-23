@@ -83,7 +83,7 @@ documents in this directory. No editable legacy source remains.
 - [Agents](../agents/README.md): execution profiles used by coordinators and
   delegated tasks.
 - [Workspaces](../workspaces/README.md): the scope of every coordinator call.
-- [Integrations](../integrations/README.md): issue trackers used by planned
+- [Integrations](../integrations/README.md): issue trackers used by
   tracker write-back and intake deduplication.
 
 Related decisions:

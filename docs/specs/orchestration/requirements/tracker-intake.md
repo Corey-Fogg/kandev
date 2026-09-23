@@ -1,5 +1,5 @@
 ---
-status: draft
+status: active
 system: orchestration
 created: 2026-09-23
 owners:
@@ -13,8 +13,7 @@ owners:
 Work often starts as a Jira or Linear issue. The same issue can reach a
 workspace through an integration watch, an automation and a coordinator
 conversation. Each path must converge on one task, and the coordinator must be
-able to report progress back on the issue it is working from. This document is
-a draft: the behavior is planned and not yet accepted.
+able to report progress back on the issue it is working from.
 
 Orchestration owns the coordinator broker operations. The
 [integrations system](../../integrations/README.md) owns the tracker clients,

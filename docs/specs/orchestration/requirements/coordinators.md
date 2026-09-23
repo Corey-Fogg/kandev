@@ -125,11 +125,12 @@ repeating effects.
 
 - **AC-ORCHESTRATION-COORDINATOR-004.1:** Every coordinator session shall
   receive the Kandev broker as its only MCP server. Plugin tools, profile MCP
-  servers and Kandev's shell tool shall not be attached, whichever provider the
-  execution profile uses.
-- **AC-ORCHESTRATION-COORDINATOR-004.2:** When a coordinator runs on Claude, the
-  session shall also disable provider built-in tools and allow only the
-  broker's tools.
+  servers and Kandev's shell tool shall not be attached.
+- **AC-ORCHESTRATION-COORDINATOR-004.2:** A coordinator shall run only on a
+  provider whose built-in tools can be disabled. On Claude the session shall
+  disable provider built-in tools and allow only the broker's tools. Assigning
+  an execution profile on another provider shall be rejected, and the runtime
+  shall refuse to start such a session.
 - **AC-ORCHESTRATION-COORDINATOR-004.3:** Every broker call shall be authorized
   by a runtime credential bound to the assignment, its workspace, the current
   run and the current session. A credential from a finished run, another

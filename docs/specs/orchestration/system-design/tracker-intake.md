@@ -1,5 +1,5 @@
 ---
-status: draft
+status: current
 system: orchestration
 requirements:
   - REQ-ORCHESTRATION-TRACKER-001
@@ -10,7 +10,7 @@ requirements:
 
 ## Purpose and boundaries
 
-This draft design adds tracker write-back and cross-path intake deduplication
+This design adds tracker write-back and cross-path intake deduplication
 to the coordinator broker. The Jira and Linear clients, their per-workspace
 credentials and the issue metadata that watches write stay in
 `internal/integrations`, as described in that package's `AGENTS.md`.

@@ -28,5 +28,5 @@ children are settled terminal outcomes and remain visible to users.
 
 ## Verification
 
-Run the focused and full task SQLite repository tests, the assistant authority
-tests, and documentation catalog/spec validation.
+Run the focused and full task SQLite repository tests, the orchestration
+runtime tests, and documentation catalog/spec validation.
