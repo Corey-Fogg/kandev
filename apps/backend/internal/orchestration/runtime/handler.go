@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/kandev/kandev/internal/agent/runtimeauth"
 	"github.com/kandev/kandev/internal/orchestration/models"
-	taskservice "github.com/kandev/kandev/internal/task/service"
 )
 
 const (
@@ -283,20 +283,20 @@ func (h *Handler) createTask(c *gin.Context) {
 		fail(c, fmt.Errorf("use a workspace workflow, not an Office project"))
 		return
 	}
-	if err := taskservice.ValidateTaskTitle(req.Title); err != nil {
-		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{errorResponseKey: err.Error()})
-		return
+	title, truncated := fitTaskTitle(req.Title)
+	if truncated {
+		req.Description = "Full title: " + strings.TrimSpace(req.Title) + "\n\n" + req.Description
 	}
 	if req.ExecutionMode != "" && req.ExecutionMode != executionModeExecute && req.ExecutionMode != executionModeDesign {
 		c.AbortWithStatusJSON(422, gin.H{errorResponseKey: "execution_mode must be design or execute"})
 		return
 	}
-	id, err := h.Service.Manager.CreateWorkspaceTask(c.Request.Context(), models.WorkspaceTaskSpec{WorkspaceID: claims.WorkspaceID, ChiefID: claims.AgentProfileID, WorkflowID: req.WorkflowID, WorkflowStepID: req.WorkflowStepID, ExecutionMode: req.ExecutionMode, RepositoryID: req.RepositoryID, AssigneeID: req.AssigneeID, Title: req.Title, Description: req.Description, ExternalID: req.ExternalID, ParentID: req.ParentID})
+	id, err := h.Service.Manager.CreateWorkspaceTask(c.Request.Context(), models.WorkspaceTaskSpec{WorkspaceID: claims.WorkspaceID, ChiefID: claims.AgentProfileID, WorkflowID: req.WorkflowID, WorkflowStepID: req.WorkflowStepID, ExecutionMode: req.ExecutionMode, RepositoryID: req.RepositoryID, AssigneeID: req.AssigneeID, Title: title, Description: req.Description, ExternalID: req.ExternalID, ParentID: req.ParentID})
 	if err != nil {
 		fail(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"id": id})
+	c.JSON(http.StatusCreated, gin.H{"id": id, "title": title, titleTruncatedKey: truncated})
 }
 func (h *Handler) manageTask(c *gin.Context) {
 	claims, ok := h.caller(c)
@@ -308,17 +308,21 @@ func (h *Handler) manageTask(c *gin.Context) {
 		fail(c, err)
 		return
 	}
+	truncated := false
 	if req.Title != nil {
-		if err := taskservice.ValidateTaskTitle(*req.Title); err != nil {
-			c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{errorResponseKey: err.Error()})
-			return
-		}
+		var title string
+		title, truncated = fitTaskTitle(*req.Title)
+		req.Title = &title
 	}
 	req.WorkspaceID = claims.WorkspaceID
 	req.ChiefID = claims.AgentProfileID
 	req.TaskID = c.Param("id")
 	if err := h.Service.Manager.ManageWorkspaceTask(c.Request.Context(), req); err != nil {
 		fail(c, err)
+		return
+	}
+	if truncated {
+		c.JSON(http.StatusOK, gin.H{"ok": true, "title": *req.Title, titleTruncatedKey: true})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})

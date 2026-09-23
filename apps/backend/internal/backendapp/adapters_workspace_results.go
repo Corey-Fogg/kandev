@@ -120,7 +120,11 @@ func (a *taskCreatorAdapter) messageWorkspaceTask(ctx context.Context, task *mod
 	if strings.TrimSpace(command.Prompt) == "" {
 		return fmt.Errorf("prompt is required")
 	}
-	session, err := a.taskSvc.GetTaskSession(ctx, command.SessionID)
+	sessionID, err := a.messageSessionID(ctx, task.ID, command.SessionID)
+	if err != nil {
+		return err
+	}
+	session, err := a.taskSvc.GetTaskSession(ctx, sessionID)
 	if err != nil || session.TaskID != task.ID {
 		return fmt.Errorf("session must belong to this task")
 	}
@@ -133,6 +137,28 @@ func (a *taskCreatorAdapter) messageWorkspaceTask(ctx context.Context, task *mod
 	// Delivery returns at worker acceptance; the worker's reply reaches the
 	// coordinator as a task update, never through this call.
 	return pluginsTaskMessengerAdapter{tasks: a.taskSvc, orch: a.orch}.promptWithResume(ctx, task.ID, session.ID, command.Prompt)
+}
+
+// messageSessionID returns the requested session, or the task's most recently
+// updated session when none is named.
+func (a *taskCreatorAdapter) messageSessionID(ctx context.Context, taskID, requested string) (string, error) {
+	if requested != "" {
+		return requested, nil
+	}
+	sessions, err := a.taskSvc.ListTaskSessions(ctx, taskID)
+	if err != nil {
+		return "", err
+	}
+	var latest *models.TaskSession
+	for _, session := range sessions {
+		if latest == nil || session.UpdatedAt.After(latest.UpdatedAt) {
+			latest = session
+		}
+	}
+	if latest == nil {
+		return "", fmt.Errorf("task has no session to message; use start")
+	}
+	return latest.ID, nil
 }
 
 // WorkspaceTaskSummaries pages the workspace's delivery tasks, most recently

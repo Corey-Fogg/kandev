@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -37,23 +38,101 @@ func runOrchestratorMCP() int {
 func newOrchestratorMCP(client *kandevClient) *server.MCPServer {
 	s := server.NewMCPServer(config.BrokerMCPServerName, "1.0.0", server.WithToolCapabilities(false))
 	for _, definition := range models.WorkspaceBrokerTools() {
-		options := []mcp.ToolOption{mcp.WithDescription(definition.Description), mcp.WithObject("query", mcp.Description("Optional query parameters."))}
-		if strings.Contains(definition.Path, ":id") {
-			options = append(options, mcp.WithString("id", mcp.Required()))
-		}
-		switch definition.Method {
-		case http.MethodGet:
-			options = append(options, mcp.WithReadOnlyHintAnnotation(true))
-		case http.MethodDelete:
-			options = append(options, mcp.WithDestructiveHintAnnotation(true))
-		default:
-			options = append(options, mcp.WithObject("request", mcp.Required(), mcp.Description("Native request body. Runtime authorization is checked by Kandev.")))
-		}
-		s.AddTool(mcp.NewTool(definition.Name, options...), func(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		s.AddTool(mcp.NewTool(definition.Name, brokerToolOptions(definition)...), func(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if definition.Batch {
+				if ids, ok := request.GetArguments()["ids"]; ok {
+					return callOrchestratorBatch(client, definition, ids, request.GetArguments())
+				}
+			}
 			return callOrchestratorBroker(client, definition, request.GetArguments())
 		})
 	}
 	return s
+}
+
+// brokerToolOptions publishes each tool's typed query and request schema.
+func brokerToolOptions(definition models.WorkspaceBrokerTool) []mcp.ToolOption {
+	options := []mcp.ToolOption{mcp.WithDescription(definition.Description)}
+	if definition.Query != nil {
+		options = append(options, mcp.WithObject("query", mcp.Description("Optional query parameters."), mcp.Properties(definition.Query)))
+	}
+	if strings.Contains(definition.Path, ":id") {
+		if definition.Batch {
+			options = append(options,
+				mcp.WithString("id", mcp.Description("Task id. Omit when ids is given.")),
+				mcp.WithArray("ids", mcp.Description("Task ids to apply the same request to."), mcp.WithStringItems(), mcp.MaxItems(models.BrokerBatchLimit)))
+		} else {
+			options = append(options, mcp.WithString("id", mcp.Required()))
+		}
+	}
+	switch definition.Method {
+	case http.MethodGet:
+		options = append(options, mcp.WithReadOnlyHintAnnotation(true))
+	case http.MethodDelete:
+		options = append(options, mcp.WithDestructiveHintAnnotation(true))
+	default:
+		request := []mcp.PropertyOption{mcp.Required(), mcp.Description("Request body.")}
+		if definition.Request != nil {
+			request = append(request, mcp.Properties(definition.Request))
+		}
+		if len(definition.RequestRequired) > 0 {
+			request = append(request, requiredProperties(definition.RequestRequired))
+		}
+		options = append(options, mcp.WithObject("request", request...))
+	}
+	return options
+}
+
+func requiredProperties(names []string) mcp.PropertyOption {
+	return func(schema map[string]any) {
+		schema["required"] = names
+	}
+}
+
+// callOrchestratorBatch applies one request to each task in ids through the
+// single-task endpoint, so every change is authorized on its own, and reports
+// a result per task.
+func callOrchestratorBatch(client *kandevClient, definition models.WorkspaceBrokerTool, raw any, args map[string]any) (*mcp.CallToolResult, error) {
+	values, ok := raw.([]any)
+	if !ok || len(values) == 0 || len(values) > models.BrokerBatchLimit {
+		return mcp.NewToolResultError(fmt.Sprintf("ids must list 1 to %d task ids", models.BrokerBatchLimit)), nil
+	}
+	if definition.Name == "manage_task" {
+		request, _ := args["request"].(map[string]any)
+		if action, _ := request["action"].(string); !models.BatchActions[action] {
+			return mcp.NewToolResultError("ids supports move, archive, adopt, assign, start and stop; call other actions per task"), nil
+		}
+	}
+	results := make([]map[string]any, 0, len(values))
+	failed := 0
+	for _, value := range values {
+		id, _ := value.(string)
+		single := map[string]any{"id": id, "request": args["request"]}
+		result, _ := callOrchestratorBroker(client, definition, single)
+		row := map[string]any{"id": id, "ok": !result.IsError}
+		if text := brokerResultText(result); result.IsError {
+			failed++
+			row["error"] = text
+		}
+		results = append(results, row)
+	}
+	data, err := json.Marshal(map[string]any{"results": results, "failed": failed})
+	if err != nil {
+		return nil, err
+	}
+	if failed == len(values) {
+		return mcp.NewToolResultError(string(data)), nil
+	}
+	return mcp.NewToolResultText(string(data)), nil
+}
+
+func brokerResultText(result *mcp.CallToolResult) string {
+	for _, content := range result.Content {
+		if text, ok := content.(mcp.TextContent); ok {
+			return text.Text
+		}
+	}
+	return ""
 }
 
 func callOrchestratorBroker(client *kandevClient, definition models.WorkspaceBrokerTool, args map[string]any) (*mcp.CallToolResult, error) {
