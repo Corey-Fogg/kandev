@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+
+	"github.com/kandev/kandev/internal/agentctl/server/config"
 )
 
 // Shared subcommand literals so goconst doesn't flag duplicates across
@@ -27,6 +29,8 @@ func runKandevCLI(args []string) int {
 		return 1
 	}
 	switch args[0] {
+	case config.BrokerMCPSubcommand:
+		return runOrchestratorMCP()
 	case "task":
 		// Singular `task` group (get/update/create) stays for back
 		// compat with skills authored before the plural rollout.

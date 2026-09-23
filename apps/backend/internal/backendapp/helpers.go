@@ -68,6 +68,7 @@ import (
 	officesqlite "github.com/kandev/kandev/internal/office/repository/sqlite"
 	"github.com/kandev/kandev/internal/office/retention"
 	officetestharness "github.com/kandev/kandev/internal/office/testharness"
+	orchestrationstore "github.com/kandev/kandev/internal/orchestration/repository/sqlite"
 	"github.com/kandev/kandev/internal/orchestrator"
 	"github.com/kandev/kandev/internal/org"
 	"github.com/kandev/kandev/internal/orgunit"
@@ -688,6 +689,7 @@ type routeParams struct {
 	taskSvc                       *taskservice.Service
 	taskRepo                      *sqliterepo.Repository
 	officeRepo                    *officesqlite.Repository
+	orchestrationRepo             *orchestrationstore.Repository
 	analyticsRepo                 analyticsrepository.Repository
 	orchestratorSvc               *orchestrator.Service
 	lifecycleMgr                  *lifecycle.Manager
@@ -769,6 +771,11 @@ func registerRoutes(p routeParams) {
 		p.orchestratorSvc.HandleClarificationPrimaryAnswered,
 		p.log,
 	)
+	if p.services.Orchestration != nil {
+		if manager, ok := p.services.Orchestration.Manager.(*workspaceAdminAdapter); ok {
+			manager.clarifications = clarificationResolver
+		}
+	}
 
 	// Wire pending clarification requests into the office inbox.
 	if p.services.OfficeSvcs != nil && p.services.OfficeSvcs.Dashboard != nil {
@@ -1596,7 +1603,7 @@ func registerSecondaryRoutes(
 		automationSvc = p.services.Automation.Service
 	}
 	registerE2EResetRoutes(
-		p.router, p.taskRepo, p.taskSvc, automationSvc, p.services.GitHub, p.services.GitLab, p.eventBus, p.log,
+		p.router, p.dbPool.Writer(), p.taskRepo, p.taskSvc, automationSvc, p.services.GitHub, p.services.GitLab, p.eventBus, p.log,
 	)
 	registerE2EStartupPageFixtureRoute(p.router, p.log)
 
@@ -1619,9 +1626,11 @@ func registerSecondaryRoutes(
 		p.log.Info("E2E mock routes enabled at /api/v1/_test/* — DO NOT enable in production")
 	}
 
+	registerOrchestration(p)
+
 	// Register office routes
 	if p.services.OfficeSvcs != nil {
-		mountOfficeRoutes(p.router, p.services.OfficeSvcs, p.authSvc, p.taskSvc, p.officeRepo, handoffSvc, p.log)
+		mountOfficeRoutes(p.router, p.services.OfficeSvcs, p.authSvc, p.taskSvc, p.officeRepo, handoffSvc, p.log, orchestrationCompatibilityGate(p))
 		p.log.Debug("Registered Office handlers (HTTP)")
 	}
 }

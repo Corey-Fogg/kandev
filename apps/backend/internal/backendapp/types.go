@@ -27,6 +27,8 @@ import (
 	officesqlite "github.com/kandev/kandev/internal/office/repository/sqlite"
 	"github.com/kandev/kandev/internal/office/retention"
 	officeservice "github.com/kandev/kandev/internal/office/service"
+	orchestrationstore "github.com/kandev/kandev/internal/orchestration/repository/sqlite"
+	orchestrationruntime "github.com/kandev/kandev/internal/orchestration/runtime"
 	"github.com/kandev/kandev/internal/org"
 	"github.com/kandev/kandev/internal/orgunit"
 	"github.com/kandev/kandev/internal/persistence/requiredstores"
@@ -34,6 +36,7 @@ import (
 	promptservice "github.com/kandev/kandev/internal/prompts/service"
 	promptstore "github.com/kandev/kandev/internal/prompts/store"
 	quickterminalrepository "github.com/kandev/kandev/internal/quickterminal/repository"
+	runstore "github.com/kandev/kandev/internal/runs/repository/sqlite"
 	"github.com/kandev/kandev/internal/runtimeflags"
 	"github.com/kandev/kandev/internal/secrets"
 	"github.com/kandev/kandev/internal/sentry"
@@ -69,6 +72,8 @@ type Repositories struct {
 	Workflow      *workflowrepository.Repository
 	Secrets       secrets.SecretStore
 	Office        *officesqlite.Repository
+	Orchestration *orchestrationstore.Repository
+	Runs          *runstore.Repository
 	Terminal      *terminalrepo.Repository
 	QuickTerminal *quickterminalrepository.Repository
 	RuntimeFlags  *runtimeflags.SQLiteStore
@@ -79,6 +84,7 @@ type Repositories struct {
 }
 
 type Services struct {
+	Orchestration            *orchestrationruntime.Service
 	ManagedRuntimeSelections managedruntime.SelectionStore
 	DynamicProfileResolver   *agentruntime.ProfileExecutionResolver
 	DynamicBindingResolver   *dynamicruntime.CredentialBindingResolver

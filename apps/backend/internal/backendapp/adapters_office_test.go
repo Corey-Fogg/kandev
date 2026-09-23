@@ -18,6 +18,8 @@ import (
 	"github.com/kandev/kandev/internal/task/repository"
 	tasksqlite "github.com/kandev/kandev/internal/task/repository/sqlite"
 	taskservice "github.com/kandev/kandev/internal/task/service"
+	wfmodels "github.com/kandev/kandev/internal/workflow/models"
+	workflowrepo "github.com/kandev/kandev/internal/workflow/repository"
 	"github.com/kandev/kandev/internal/worktree"
 )
 
@@ -291,5 +293,25 @@ func newOfficeTaskAdapterHarness(t *testing.T) (*taskCreatorAdapter, *taskservic
 		t.Fatalf("ensure office workflow: %v", err)
 	}
 	taskSvc.SetStartStepResolver(&adapterStartStepResolver{repo: repo})
-	return &taskCreatorAdapter{taskSvc: taskSvc}, taskSvc
+	workflow, err := workflowrepo.NewWithDB(database, database, log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	taskSvc.SetWorkflowStepGetter(&workflowTestSteps{Repository: workflow})
+	return &taskCreatorAdapter{taskSvc: taskSvc, taskRepo: repo, workflow: workflow}, taskSvc
+}
+
+type workflowTestSteps struct{ *workflowrepo.Repository }
+
+func (s *workflowTestSteps) GetNextStepByPosition(ctx context.Context, id string, position int) (*wfmodels.WorkflowStep, error) {
+	rows, err := s.ListStepsByWorkflow(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	for _, step := range rows {
+		if step.Position > position {
+			return step, nil
+		}
+	}
+	return nil, nil
 }

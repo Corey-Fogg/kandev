@@ -112,6 +112,7 @@ import (
 	v1 "github.com/kandev/kandev/pkg/api/v1"
 
 	// Runs queue (Phase 3 of task-model-unification)
+	rundispatcher "github.com/kandev/kandev/internal/runs/dispatcher"
 	runsscheduler "github.com/kandev/kandev/internal/runs/scheduler"
 	runsservice "github.com/kandev/kandev/internal/runs/service"
 	schedulercron "github.com/kandev/kandev/internal/scheduler/cron"
@@ -724,6 +725,10 @@ func startAgentInfrastructure(
 		log.Error("Failed to initialize orchestrator", zap.Error(err))
 		return false
 	}
+	// The HTTP orchestration handlers depend on the runtime facade. Construct
+	// it immediately after the core orchestrator so route registration sees a
+	// non-nil service when the Orchestration feature is enabled.
+	services.Orchestration = newOrchestrationRuntime(cfg, repos, services, orchestratorSvc, eventBus, log)
 	services.Task.SetWorkflowMovePreflight(orchestratorSvc)
 	orchestratorSvc.SetAgentctlBinaryPath(agentctlBinaryPath)
 	// The checker is populated by lifecycleMgr.Start below before the
@@ -1098,26 +1103,32 @@ func startGatewayAndServe(
 	handler, server, listeners := bootstrap.handler, bootstrap.server, bootstrap.listeners
 	bindListeners := func() error { return ctx.Err() }
 
+	// Defer trigger producers until both task and conversation consumers are ready.
+	var startAutomationConsumers, startGitHubConsumer func()
 	if err := startOrchestratorAndAutomationConsumers(
 		bindListeners,
 		func() error { return orchestratorSvc.Start(ctx) },
 		func() {
-			if services.Automation == nil {
-				return
+			startAutomationConsumers = func() {
+				if services.Automation == nil {
+					return
+				}
+				services.Automation.Start(ctx)
+				addCleanup(func() error { services.Automation.Stop(); return nil })
+				log.Info("Automation scheduler and evaluator started")
 			}
-			services.Automation.Start(ctx)
-			addCleanup(func() error { services.Automation.Stop(); return nil })
-			log.Info("Automation scheduler and evaluator started")
 		},
 		func() {
-			if services.GitHub == nil {
-				return
+			startGitHubConsumer = func() {
+				if services.GitHub == nil {
+					return
+				}
+				ghPoller := githubpkg.NewPoller(services.GitHub, eventBus, log)
+				ghPoller.SetTaskBranchProvider(orchestratorSvc)
+				ghPoller.Start(ctx)
+				addCleanup(func() error { ghPoller.Stop(); return nil })
+				log.Info("GitHub poller started")
 			}
-			ghPoller := githubpkg.NewPoller(services.GitHub, eventBus, log)
-			ghPoller.SetTaskBranchProvider(orchestratorSvc)
-			ghPoller.Start(ctx)
-			addCleanup(func() error { ghPoller.Stop(); return nil })
-			log.Info("GitHub poller started")
 		},
 	); err != nil {
 		if shouldLogStartupOrchestratorError(err) {
@@ -1166,6 +1177,10 @@ func startGatewayAndServe(
 		closeBoundListeners(server, listeners, log)
 		return false
 	}
+	if !startOrchestrationRuntime(ctx, cfg, services, orchestratorSvc, repos, eventBus, addCleanup, log) {
+		closeBoundListeners(server, listeners, log)
+		return false
+	}
 	scheduling := startSchedulingRuntime(
 		ctx, repos, services, eventBus, orchestratorSvc, runProcessorSvc, log,
 		runsscheduler.TickIntervalFromConfig(cfg.Office.SchedulerTickMs),
@@ -1189,6 +1204,8 @@ func startGatewayAndServe(
 		})
 		return restoreQuiesceErr
 	}
+	startAutomationConsumers()
+	startGitHubConsumer()
 
 	// Wire subscription usage provider into the office agents service so the
 	// /agents/:id/utilization endpoint can fetch live utilization data.
@@ -1832,9 +1849,12 @@ func startSchedulingRuntime(
 	// Wire the runs queue service so office.QueueRun delegates the
 	// insert + publish + signal to it (Phase 3 of task-model-unification).
 	runsSvc := runsservice.New(
-		repos.Office.RunsRepository(), eventBus, log, nil,
+		repos.Runs, eventBus, log, nil,
 	)
 	runProcessorSvc.SetRunsService(runsSvc)
+	if services.Orchestration != nil {
+		services.Orchestration.Queue = runsSvc
+	}
 	// Phase 4 (ADR-0004): wire the workflow engine's dependencies and a
 	// dispatcher so office event subscribers route through the engine
 	// unconditionally.
@@ -1854,8 +1874,32 @@ func startSchedulingRuntime(
 	}
 	// Start the runs scheduler (tick + signal listener). It drives
 	// orchScheduler.Tick on both periodic ticks and event-driven signals.
+	dispatcher := &rundispatcher.Dispatcher{Queue: repos.Runs, OnError: func(err error) { log.Error("run dispatch failed", zap.Error(err)) }}
+	if services.Orchestration != nil {
+		dispatcher.Handlers = append(dispatcher.Handlers, services.Orchestration.Process)
+	}
+	dispatcher.Handlers = append(dispatcher.Handlers, orchScheduler.ProcessRun)
+	orchestrationOn := services.Orchestration != nil && services.Orchestration.Enabled
+	dispatcher.Before = func(ctx context.Context) {
+		orchScheduler.PrepareDispatch(ctx)
+		if orchestrationOn {
+			if err := services.Orchestration.DispatchIntake(ctx); err != nil && ctx.Err() == nil {
+				log.Warn("orchestration intake recovery failed", zap.Error(err))
+			}
+		}
+	}
+	dispatcher.After = func(ctx context.Context) {
+		recoverStaleRuns(ctx, repos, orchestrationOn, log)
+		if orchestrationOn {
+			if err := services.Orchestration.FailUnboundRuns(ctx, time.Now().UTC()); err != nil && ctx.Err() == nil {
+				log.Warn("orchestration unbound run recovery failed", zap.Error(err))
+			}
+		}
+		orchScheduler.FinishDispatch(ctx)
+	}
+
 	runScheduler := runsscheduler.New(
-		orchScheduler, runsSvc.SubscribeSignal(),
+		dispatcher, runsSvc.SubscribeSignal(),
 		tickInterval, log,
 	)
 	runScheduler.Start(ctx)
@@ -2689,6 +2733,7 @@ func buildHTTPServer(
 		taskSvc:                       services.Task,
 		taskRepo:                      repos.Task,
 		officeRepo:                    repos.Office,
+		orchestrationRepo:             repos.Orchestration,
 		analyticsRepo:                 repos.Analytics,
 		orchestratorSvc:               orchestratorSvc,
 		lifecycleMgr:                  lifecycleMgr,

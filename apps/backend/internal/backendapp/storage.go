@@ -14,9 +14,11 @@ import (
 	"github.com/kandev/kandev/internal/common/config"
 	"github.com/kandev/kandev/internal/common/logger"
 	"github.com/kandev/kandev/internal/db"
+	orchestrationstore "github.com/kandev/kandev/internal/orchestration/repository/sqlite"
 	"github.com/kandev/kandev/internal/persistence"
 	"github.com/kandev/kandev/internal/persistence/requiredstores"
 	quickterminalrepository "github.com/kandev/kandev/internal/quickterminal/repository"
+	runstore "github.com/kandev/kandev/internal/runs/repository/sqlite"
 	"github.com/kandev/kandev/internal/secrets"
 	"github.com/kandev/kandev/internal/startup"
 	systemsettings "github.com/kandev/kandev/internal/system/settings"
@@ -83,6 +85,10 @@ func provideRepositories(ctx context.Context, cfg *config.Config, log *logger.Lo
 	if err := recordRequiredStore(ctx, tracker, "schema-meta", nil); err != nil {
 		return nil, nil, nil, err
 	}
+	runsRepo := runstore.NewWithDB(writer, reader)
+	if err := recordRequiredStore(ctx, tracker, "runs", runsRepo.Migrate()); err != nil {
+		return nil, nil, nil, fmt.Errorf("runs schema: %w", err)
+	}
 	if err := recordRequiredStore(ctx, tracker, "task", taskRepoErr); err != nil {
 		return nil, nil, nil, fmt.Errorf("task store: %w", err)
 	}
@@ -120,6 +126,13 @@ func provideRepositories(ctx context.Context, cfg *config.Config, log *logger.Lo
 		return nil, nil, nil, err
 	}
 	cleanups = append(cleanups, supportCleanups...)
+	if err := checkStartupContext(ctx, "orchestration repository"); err != nil {
+		return nil, nil, nil, err
+	}
+	orchestrationRepo := orchestrationstore.New(writer, reader)
+	if err := recordRequiredStore(ctx, tracker, "orchestration", orchestrationRepo.Migrate()); err != nil {
+		return nil, nil, nil, fmt.Errorf("orchestration repo: %w", err)
+	}
 	if err := checkStartupContext(ctx, "office repository"); err != nil {
 		return nil, nil, nil, err
 	}
@@ -128,6 +141,9 @@ func provideRepositories(ctx context.Context, cfg *config.Config, log *logger.Lo
 		return nil, nil, nil, fmt.Errorf("office repo: %w", err)
 	}
 	cleanups = append(cleanups, officeCleanup)
+	// Registered orchestrator personas belong to the orchestration runtime;
+	// Office neither lists them nor handles their task events.
+	officeRepo.SetExternalAgents(orchestrationRepo)
 	if err := checkStartupContext(ctx, "terminal repositories"); err != nil {
 		return nil, nil, nil, err
 	}
@@ -211,6 +227,8 @@ func provideRepositories(ctx context.Context, cfg *config.Config, log *logger.Lo
 		Workflow:       workflowRepo,
 		Secrets:        secretStore,
 		Office:         officeRepo,
+		Orchestration:  orchestrationRepo,
+		Runs:           runsRepo,
 		Terminal:       terminalRepoImpl,
 		QuickTerminal:  quickTerminalRepoImpl,
 		RuntimeFlags:   runtimeFlagsStore,

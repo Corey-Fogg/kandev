@@ -98,8 +98,9 @@ func TestProvideRepositoriesReportsStoresRepositoriesSweep(t *testing.T) {
 	if snap.Step.Total == nil || *snap.Step.Total != wantServicesTotal {
 		t.Fatalf("Step.Total = %v, want %d", snap.Step.Total, wantServicesTotal)
 	}
-	if wantRepositoriesTotal != 19 {
-		t.Fatalf("stores.repositories catalog total = %d, want 19 (sanity check on the fixture)", wantRepositoriesTotal)
+	// 19 upstream stores plus the runs and orchestration stores.
+	if wantRepositoriesTotal != 21 {
+		t.Fatalf("stores.repositories catalog total = %d, want 21 (sanity check on the fixture)", wantRepositoriesTotal)
 	}
 }
 

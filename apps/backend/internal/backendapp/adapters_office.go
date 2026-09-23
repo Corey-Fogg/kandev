@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	settingsmodels "github.com/kandev/kandev/internal/agent/settings/models"
 	"github.com/kandev/kandev/internal/github"
 	officeconfig "github.com/kandev/kandev/internal/office/config"
 	"github.com/kandev/kandev/internal/office/configloader"
@@ -17,10 +18,12 @@ import (
 	officeroutines "github.com/kandev/kandev/internal/office/routines"
 	officeservice "github.com/kandev/kandev/internal/office/service"
 	officewakeup "github.com/kandev/kandev/internal/office/wakeup"
+	"github.com/kandev/kandev/internal/orchestrator"
 	runsservice "github.com/kandev/kandev/internal/runs/service"
 	"github.com/kandev/kandev/internal/task/models"
 	tasksqlite "github.com/kandev/kandev/internal/task/repository/sqlite"
 	taskservice "github.com/kandev/kandev/internal/task/service"
+	workflowrepository "github.com/kandev/kandev/internal/workflow/repository"
 )
 
 type officeCommentWindowReader interface {
@@ -160,6 +163,16 @@ func (a *childTaskCreatorAdapter) CreateChildTask(
 // taskCreatorAdapter adapts the task service to the office TaskCreator interface.
 type taskCreatorAdapter struct {
 	taskSvc *taskservice.Service
+
+	// Orchestration delegated-task dependencies.
+	workflow *workflowrepository.Repository
+	orch     *orchestrator.Service
+	taskRepo *tasksqlite.Repository
+	profiles interface {
+		GetAgentProfile(context.Context, string) (*settingsmodels.AgentProfile, error)
+	}
+	clarifications clarificationBundleResolver
+	pullRequests   taskPullRequestLookup
 }
 
 func (a *taskCreatorAdapter) CreateOfficeTask(ctx context.Context, workspaceID, projectID, assigneeAgentID, title, description string) (string, error) {
