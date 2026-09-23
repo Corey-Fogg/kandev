@@ -7,7 +7,7 @@ type Conversation = Awaited<ReturnType<typeof openOrchestratorConversation>>;
 const conversations = new Map<string, Promise<Conversation>>();
 
 /** An assignment's conversation task is stable, so it is opened once per viewer. */
-export function openCoordinatorConversation(
+function openCoordinatorConversation(
   owner: string | undefined,
   workspaceId: string,
   orchestratorId: string,
