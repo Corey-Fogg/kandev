@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/kandev/kandev/internal/agent/settings/models"
+	"github.com/kandev/kandev/internal/auth/authn"
 )
 
 const (
@@ -26,6 +27,12 @@ func Middleware(auth TokenValidator, identities IdentityReader) gin.HandlerFunc 
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" || !strings.HasPrefix(header, "Bearer ") {
+			c.Next()
+			return
+		}
+		// A bearer the auth middleware already resolved to a user (a
+		// personal access token) is that user's request, not a runtime JWT.
+		if id, ok := authn.FromGin(c); ok && !id.Synthetic {
 			c.Next()
 			return
 		}
