@@ -81,6 +81,9 @@ func (a *taskCreatorAdapter) pendingWorkspaceQuestions(ctx context.Context, task
 }
 
 func (a *taskCreatorAdapter) controlWorkspacePermission(ctx context.Context, task *models.Task, command shared.WorkspaceTaskCommand) error {
+	if !delegatedTo(task, command.ChiefID) {
+		return fmt.Errorf("%s is limited to tasks delegated to this Orchestrator", command.Action)
+	}
 	if a.orch == nil {
 		return fmt.Errorf("orchestrator unavailable")
 	}
@@ -104,13 +107,20 @@ func (a *taskCreatorAdapter) controlWorkspacePermission(ctx context.Context, tas
 	return err
 }
 
+// delegatedTo reports whether the task was created or adopted by the calling
+// coordinator. Only those tasks accept its permission and question relay.
+func delegatedTo(task *models.Task, chiefID string) bool {
+	chief, _ := task.Metadata["orchestration_chief_id"].(string)
+	return chief != "" && chief == chiefID
+}
+
 // answerWorkspaceQuestion settles a pending clarification bundle of a task
 // delegated to the calling coordinator through the shared native resolver.
 func (a *taskCreatorAdapter) answerWorkspaceQuestion(ctx context.Context, task *models.Task, command shared.WorkspaceTaskCommand) error {
 	if a.clarifications == nil {
 		return fmt.Errorf("clarification resolver unavailable")
 	}
-	if chief, _ := task.Metadata["orchestration_chief_id"].(string); chief == "" || chief != command.ChiefID {
+	if !delegatedTo(task, command.ChiefID) {
 		return fmt.Errorf("answer_question is limited to tasks delegated to this Orchestrator")
 	}
 	if command.SessionID == "" || command.PendingID == "" {

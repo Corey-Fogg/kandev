@@ -67,3 +67,13 @@ func TestAnswerWorkspaceQuestionResolvesOnlyDelegatedPendingBundle(t *testing.T)
 	resolver.claimed = false
 	require.Error(t, adapter.answerWorkspaceQuestion(ctx, task, answer), "a lost claim is reported")
 }
+
+func TestWorkspacePermissionRelayIsLimitedToDelegatedTasks(t *testing.T) {
+	adapter, _ := newOfficeTaskAdapterHarness(t)
+	task := seedDelegatedQuestion(t, adapter, "chief")
+	for _, action := range []string{"session_mode", "resolve_permission"} {
+		command := shared.WorkspaceTaskCommand{Action: action, ChiefID: "other-chief", SessionID: "worker", Mode: "auto", RequestID: "request", PendingID: "pending", OptionID: "allow"}
+		err := adapter.controlWorkspacePermission(context.Background(), task, command)
+		require.ErrorContains(t, err, "limited to tasks delegated to this Orchestrator", action)
+	}
+}

@@ -76,7 +76,9 @@ message history. A request that is already answered, expired or replaced
 returns 409 and resolves nothing.
 
 `manage_task` action `resolve_permission` takes the exact `session_id`,
-`request_id`, `pending_id` and `option_id` from `task_permissions`. Only
+`request_id`, `pending_id` and `option_id` from `task_permissions`. Like
+`answer_question` and `session_mode`, it requires the task to be delegated to
+the calling assignment (created or adopted by it). Only
 `allow_once` and `reject_once` option kinds are accepted, so no persistent
 rule is created. The strict live-permission path revalidates the request
 against `agentctl`; a stale or replaced request returns a conflict.
