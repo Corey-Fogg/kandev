@@ -9,6 +9,7 @@ import (
 	shared "github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/task/models"
 	taskservice "github.com/kandev/kandev/internal/task/service"
+	workflowmodels "github.com/kandev/kandev/internal/workflow/models"
 )
 
 // CreateWorkspaceTask keeps delivery on the workspace's existing workflow engine.
@@ -91,7 +92,10 @@ func (a *taskCreatorAdapter) workspaceDeliveryWorkflow(ctx context.Context, work
 	return eligible[0].ID, nil
 }
 
-func (a *taskCreatorAdapter) WorkspaceCatalog(ctx context.Context, workspaceID string) (any, error) {
+// WorkspaceCatalog lists the workspace's delivery configuration. The compact
+// form carries only identifying fields; full adds complete repository and
+// step configuration for workspace administration.
+func (a *taskCreatorAdapter) WorkspaceCatalog(ctx context.Context, workspaceID string, full bool) (any, error) {
 	workflows, err := a.taskSvc.ListWorkflows(ctx, workspaceID, false)
 	if err != nil {
 		return nil, err
@@ -100,15 +104,20 @@ func (a *taskCreatorAdapter) WorkspaceCatalog(ctx context.Context, workspaceID s
 	if err != nil {
 		return nil, err
 	}
-	result := map[string]any{workspaceWorkflowsKey: workflows, workspaceRepositoriesKey: repositories}
+	var steps []*workflowmodels.WorkflowStep
 	if a.workflow != nil {
-		steps, err := a.workflow.ListStepsByWorkspaceID(ctx, workspaceID)
-		if err != nil {
+		if steps, err = a.workflow.ListStepsByWorkspaceID(ctx, workspaceID); err != nil {
 			return nil, err
 		}
-		result["workflow_steps"] = steps
 	}
-	return result, nil
+	if full {
+		result := map[string]any{workspaceWorkflowsKey: workflows, workspaceRepositoriesKey: repositories}
+		if a.workflow != nil {
+			result["workflow_steps"] = steps
+		}
+		return result, nil
+	}
+	return map[string]any{workspaceWorkflowsKey: compactWorkflows(workflows), workspaceRepositoriesKey: compactRepositories(repositories), "workflow_steps": compactSteps(steps)}, nil
 }
 
 func (a *taskCreatorAdapter) ManageWorkspaceTask(ctx context.Context, command shared.WorkspaceTaskCommand) error {

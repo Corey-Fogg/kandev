@@ -246,7 +246,7 @@ func writeTaskUpdates(text *strings.Builder, updates []taskUpdate) {
 			fmt.Fprintf(text, "  Latest reply: %s\n", u.LastMessage)
 		}
 	}
-	text.WriteString("Post only new information in this chat. Review is not completion; do not repeat an answered question or restart work. For a pending permission or question, call task_permissions, then resolve_permission or answer_question only when the user's instructions or memory already settle it; otherwise ask the user here and link the task. If a session stopped on a provider login or OAuth refresh error, call manage_task with action repair_session once, then report the outcome.\n")
+	text.WriteString("Post only new information in this chat.\n")
 }
 
 // updatesForPrompt is the ordered update list a turn renders.

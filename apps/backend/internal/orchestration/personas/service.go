@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	settings "github.com/kandev/kandev/internal/agent/settings/models"
-	"github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/orchestration/repository/sqlite"
 )
 
@@ -74,12 +73,6 @@ func (s *Service) UpdateAgentStatus(ctx context.Context, id string, status setti
 	a.Status = status
 	a.PauseReason = reason
 	return a, s.Profiles.UpdateAgentProfile(ctx, a)
-}
-func (s *Service) GetInstruction(ctx context.Context, id, filename string) (*models.InstructionFile, error) {
-	return s.Repo.GetInstruction(ctx, id, filename)
-}
-func (s *Service) UpsertInstruction(ctx context.Context, id, filename, content string, entry bool) error {
-	return s.Repo.UpsertInstruction(ctx, id, filename, content, entry)
 }
 func (s *Service) ConfigurePinnedProfile(ctx context.Context, a *settings.AgentProfile, id string) error {
 	source, err := s.Profiles.GetAgentProfile(ctx, id)

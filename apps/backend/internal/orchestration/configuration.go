@@ -7,7 +7,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/kandev/kandev/internal/orchestration/instructions"
 	"github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/orchestration/personas"
 )
@@ -140,8 +139,5 @@ func (h *Handler) update(c *gin.Context) {
 	c.JSON(http.StatusOK, row)
 }
 func (h *Handler) persistConfiguration(ctx context.Context, a *models.AgentInstance, req *configuration) error {
-	if err := h.Registry.RegisterOrchestrator(ctx, a.ID, a.WorkspaceID, req.RoleID); err != nil {
-		return err
-	}
-	return h.Agents.UpsertInstruction(ctx, a.ID, "AGENTS.md", instructions.Default, true)
+	return h.Registry.RegisterOrchestrator(ctx, a.ID, a.WorkspaceID, req.RoleID)
 }

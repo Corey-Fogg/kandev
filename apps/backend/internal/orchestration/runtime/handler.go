@@ -225,7 +225,7 @@ func (h *Handler) catalog(c *gin.Context) {
 	if !ok {
 		return
 	}
-	result, err := h.Service.Manager.WorkspaceCatalog(c.Request.Context(), claims.WorkspaceID)
+	result, err := h.Service.Manager.WorkspaceCatalog(c.Request.Context(), claims.WorkspaceID, c.Query("detail") == "full")
 	if err != nil {
 		fail(c, err)
 		return

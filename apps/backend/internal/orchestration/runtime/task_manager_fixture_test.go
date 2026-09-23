@@ -11,6 +11,8 @@ type fakeTaskManager struct {
 	creates  atomic.Int64
 	failure  error
 	lastSpec models.WorkspaceTaskSpec
+
+	directory models.WorkspaceDirectory
 }
 
 func (m *fakeTaskManager) CreateWorkspaceTask(_ context.Context, spec models.WorkspaceTaskSpec) (string, error) {
@@ -25,8 +27,11 @@ func (m *fakeTaskManager) ManageWorkspaceTask(context.Context, models.WorkspaceT
 func (m *fakeTaskManager) WorkspaceTaskDetails(context.Context, string, string) (any, error) {
 	return nil, nil
 }
-func (m *fakeTaskManager) WorkspaceCatalog(context.Context, string) (any, error) {
+func (m *fakeTaskManager) WorkspaceCatalog(context.Context, string, bool) (any, error) {
 	return nil, nil
+}
+func (m *fakeTaskManager) WorkspaceDirectory(context.Context, string) (models.WorkspaceDirectory, error) {
+	return m.directory, nil
 }
 func (m *fakeTaskManager) WorkspaceTaskSummaries(context.Context, string, int, int) ([]models.WorkspaceTaskSummary, bool, error) {
 	return []models.WorkspaceTaskSummary{}, false, nil

@@ -125,8 +125,8 @@ func (a *workspaceAdminAdapter) validateWorkspaceProfile(ctx context.Context, wo
 	return err
 }
 
-func (a *workspaceAdminAdapter) WorkspaceCatalog(ctx context.Context, workspace string) (any, error) {
-	result, err := a.taskCreatorAdapter.WorkspaceCatalog(ctx, workspace)
+func (a *workspaceAdminAdapter) WorkspaceCatalog(ctx context.Context, workspace string, full bool) (any, error) {
+	result, err := a.taskCreatorAdapter.WorkspaceCatalog(ctx, workspace, full)
 	if err != nil {
 		return nil, err
 	}
@@ -134,12 +134,15 @@ func (a *workspaceAdminAdapter) WorkspaceCatalog(ctx context.Context, workspace 
 	if err != nil {
 		return nil, err
 	}
+	catalog := result.(map[string]any)
+	catalog["workspace"] = ws
+	if !full {
+		return catalog, nil
+	}
 	templates, err := a.workflows.ListTemplates(ctx)
 	if err != nil {
 		return nil, err
 	}
-	catalog := result.(map[string]any)
-	catalog["workspace"] = ws
 	catalog["workflow_templates"] = templates
 	return catalog, nil
 }

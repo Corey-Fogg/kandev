@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/kandev/kandev/internal/agent/runtimeauth"
+	"github.com/kandev/kandev/internal/orchestration/instructions"
 	"github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/orchestration/personas"
 	store "github.com/kandev/kandev/internal/orchestration/repository/sqlite"
@@ -30,8 +31,9 @@ type Manager interface {
 	CreateWorkspaceTask(context.Context, models.WorkspaceTaskSpec) (string, error)
 	ManageWorkspaceTask(context.Context, models.WorkspaceTaskCommand) error
 	WorkspaceTaskDetails(context.Context, string, string) (any, error)
-	WorkspaceCatalog(context.Context, string) (any, error)
+	WorkspaceCatalog(context.Context, string, bool) (any, error)
 	WorkspaceTaskSummaries(context.Context, string, int, int) ([]models.WorkspaceTaskSummary, bool, error)
+	WorkspaceDirectory(context.Context, string) (models.WorkspaceDirectory, error)
 }
 type Launch struct {
 	OnSessionPrepared                                func(context.Context, string) error
@@ -188,23 +190,21 @@ func clip(value string, max int) string {
 	}
 	return value[:max] + "\n[Excerpt]"
 }
+
+// prompt assembles a coordinator turn. The product instructions always come
+// from the embedded default; the role carries workspace-specific policy.
 func (s *Service) prompt(ctx context.Context, a *models.AgentInstance, taskID string, payload map[string]any) (string, error) {
-	files, err := s.Repo.ListInstructions(ctx, a.ID)
-	if err != nil {
-		return "", err
-	}
 	var text strings.Builder
-	for _, f := range files {
-		if f.IsEntry && f.Filename != "ROLE.md" {
-			fmt.Fprintf(&text, "%s\n%s\n", f.Filename, f.Content)
-		}
-	}
+	text.WriteString(instructions.Default)
 	role, err := s.Repo.AssignedRole(ctx, a.ID)
 	if err != nil {
 		return "", err
 	}
-	fmt.Fprintf(&text, "Role: %s\n%s\n", role.Name, role.Instructions)
+	fmt.Fprintf(&text, "\nRole: %s\n%s\n", role.Name, role.Instructions)
 	fmt.Fprintf(&text, "\nWorkspace: %s\nPersona: %s\nConversation task: %s\nRouting context: %s\n", a.WorkspaceID, a.ID, taskID, models.DelegationContext(a))
+	if err := s.writeDirectory(ctx, &text, a.WorkspaceID); err != nil {
+		return "", err
+	}
 	memory, err := s.Repo.ListAgentMemory(ctx, a.ID)
 	if err != nil {
 		return "", err
@@ -234,13 +234,7 @@ func (s *Service) prompt(ctx context.Context, a *models.AgentInstance, taskID st
 		fmt.Fprintf(&text, "\nCurrent user message (comment_id=%s, intent_revision=%v): %s\n", comment.ID, payload[intentRevisionKey], comment.Body)
 	}
 	writeTaskUpdates(&text, updatesForPrompt(payload))
-	appendRuntimeToolGuidance(&text)
 	return text.String(), nil
-}
-
-func appendRuntimeToolGuidance(text *strings.Builder) {
-	text.WriteString("\nYou are the workspace Orchestrator. Use the supplied kandev_orchestrator MCP tools to carry out authorized requests: create, edit, assign, start, stop, message, move, archive and delete native tasks. Use workspace to discover workflow, repository and execution-profile IDs, task_details to inspect results, and capabilities for current controls. Shell, built-in provider tools, plugins and other MCP servers are unavailable. Every call rechecks live workspace authority. After an unknown outcome, inspect native evidence before retrying.\n")
-	text.WriteString("Your final reply appears in this conversation. Retrieve older comments only when needed.\n")
 }
 
 func (s *Service) executionSelection(ctx context.Context, a *models.AgentInstance) (string, string, error) {
