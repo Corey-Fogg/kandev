@@ -15,7 +15,6 @@ import {
 import Link from "@/components/routing/app-link";
 import { useRouter } from "@/lib/routing/client-router";
 import { useSettingsSaveContributor } from "@/components/settings/settings-save-provider";
-import { useKanbanOnboardingComplete } from "@/hooks/use-kanban-onboarding-complete";
 import { toast } from "@/lib/toast/sonner";
 import {
   useOrchestrationData,
@@ -47,7 +46,6 @@ export function OrchestratorEditor({ workspaceId, id }: { workspaceId: string; i
 }
 function EditorLoader({ workspaceId, id }: { workspaceId: string; id: string }) {
   const { t } = useTranslation();
-  const onboarded = useKanbanOnboardingComplete();
   const load = useCallback(async () => {
     const [roles, profiles, item] = await Promise.all([
       listOrchestratorRoles(),
@@ -57,8 +55,6 @@ function EditorLoader({ workspaceId, id }: { workspaceId: string; id: string }) 
     return { roles: roles.roles, profiles: profiles.profiles, item };
   }, [workspaceId, id]);
   const { data, error } = useOrchestrationData(load);
-  if (!onboarded && id === "new")
-    return <Link href="/?home=overview">{t("orchestration:completeKanbanFirst")}</Link>;
   if (error) return <p role="alert">{error}</p>;
   if (!data) return <p>{t("common:loading")}</p>;
   return <EditorForm workspaceId={workspaceId} {...data} />;
@@ -100,7 +96,7 @@ function useEditorForm({
   const save = async () => {
     const result = await saveOrchestrator(workspaceId, item?.id, value);
     setSaved(value);
-    notifyOrchestrationChanged();
+    notifyOrchestrationChanged(workspaceId);
     if (!item) router.replace(orchestratorHref(workspaceId, result.id));
   };
   useSettingsSaveContributor({
@@ -124,7 +120,7 @@ function useEditorForm({
   const remove = async () => {
     try {
       await deleteOrchestrator(workspaceId, item!.id);
-      notifyOrchestrationChanged();
+      notifyOrchestrationChanged(workspaceId);
       router.push(orchestratorsHref(workspaceId));
     } catch (e) {
       toast.error(String(e));

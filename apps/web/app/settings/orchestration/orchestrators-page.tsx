@@ -1,17 +1,12 @@
-import { AgentAvatar } from "@/components/shared/agent-avatar";
-import { useCallback } from "react";
+import { AgentAvatar } from "@/app/office/components/agent-avatar";
 import { useTranslation } from "react-i18next";
 import Link from "@/components/routing/app-link";
 import { Button } from "@kandev/ui/button";
 import { OpenOrchestratorConversation } from "./orchestrator-connections";
 import { toast } from "@/lib/toast/sonner";
-import { useKanbanOnboardingComplete } from "@/hooks/use-kanban-onboarding-complete";
+import { notifyOrchestrationChanged } from "@/hooks/domains/orchestration/use-orchestration-data";
+import { useWorkspaceOrchestrators } from "@/hooks/domains/orchestration/use-orchestrator-conversation";
 import {
-  useOrchestrationData,
-  notifyOrchestrationChanged,
-} from "@/hooks/domains/orchestration/use-orchestration-data";
-import {
-  listOrchestrators,
   orchestratorsHref,
   orchestratorHref,
   setOrchestratorStatus,
@@ -27,19 +22,14 @@ export function OrchestratorsPage({ workspaceId }: { workspaceId: string }) {
 }
 function OrchestratorList({ workspaceId }: { workspaceId: string }) {
   const { t } = useTranslation();
-  const onboarded = useKanbanOnboardingComplete();
-  const load = useCallback(() => listOrchestrators(workspaceId), [workspaceId]);
-  const { data, error } = useOrchestrationData(load);
+  const { data, error } = useWorkspaceOrchestrators(workspaceId);
   return (
     <section className="space-y-5" data-testid="workspace-orchestrators">
       <h2 className="text-xl font-semibold">{t("orchestration:orchestration")}</h2>
       <p className="text-sm text-muted-foreground">{t("orchestration:orchestratorsHint")}</p>
       <div className="flex flex-wrap gap-4">
-        <Link
-          className="underline"
-          href={onboarded ? `${orchestratorsHref(workspaceId)}/new` : "/?home=overview"}
-        >
-          {t(onboarded ? "orchestration:addOrchestrator" : "orchestration:completeKanbanFirst")}
+        <Link className="underline" href={`${orchestratorsHref(workspaceId)}/new`}>
+          {t("orchestration:addOrchestrator")}
         </Link>
         <Link className="underline" href="/settings/orchestration">
           {t("orchestration:manageRoles")}
@@ -68,7 +58,7 @@ function OrchestratorCard({ item }: { item: Orchestrator }) {
         item.id,
         item.status === "paused" ? "idle" : "paused",
       );
-      notifyOrchestrationChanged();
+      notifyOrchestrationChanged(item.workspace_id);
     } catch (e) {
       toast.error(String(e));
     }

@@ -4,7 +4,8 @@ import { Label } from "@kandev/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kandev/ui/select";
 import Link from "@/components/routing/app-link";
 import { useFeature } from "@/hooks/domains/features/use-feature";
-import { listOrchestrators, type Orchestrator } from "@/lib/api/domains/orchestration-api";
+import type { Orchestrator } from "@/lib/api/domains/orchestration-api";
+import { readWorkspaceOrchestrators } from "@/lib/orchestration/orchestrator-list-cache";
 
 export function OrchestratorTargetField({
   workspaceId,
@@ -24,7 +25,7 @@ export function OrchestratorTargetField({
     setItems([]);
     setError(undefined);
     if (enabled)
-      void listOrchestrators(workspaceId)
+      void readWorkspaceOrchestrators(workspaceId)
         .then((data) => {
           if (active) setItems(data.orchestrators);
         })
