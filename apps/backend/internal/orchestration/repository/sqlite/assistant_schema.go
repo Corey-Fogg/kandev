@@ -22,9 +22,9 @@ func (r *Repository) migrateIntake() error {
 	return nil
 }
 
-// migrateAssistantStorage creates the binding and operation tables that the
-// binding-keyed stores reference. Coordinator conversations never read a
-// binding, so a retained binding row has no effect on them.
+// migrateAssistantStorage creates the binding table that owner-scoped memory
+// reads. Coordinator conversations never read a binding, so a retained binding
+// row has no effect on them.
 func (r *Repository) migrateAssistantStorage() error {
 	for _, q := range []string{
 		`CREATE TABLE IF NOT EXISTS orchestration_assistant_bindings (
@@ -33,13 +33,6 @@ func (r *Repository) migrateAssistantStorage() error {
 			workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
 			conversation_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
 			version INTEGER NOT NULL, created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL)`,
-		`CREATE TABLE IF NOT EXISTS orchestration_operations (
-			id TEXT PRIMARY KEY, binding_id TEXT NOT NULL REFERENCES orchestration_assistant_bindings(id) ON DELETE CASCADE,
-			operation_id TEXT NOT NULL, conversation_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-			run_id TEXT NOT NULL, target TEXT NOT NULL, request_hash TEXT NOT NULL,
-			intent_revision INTEGER NOT NULL, binding_version INTEGER NOT NULL, state TEXT NOT NULL,
-			response_json TEXT NOT NULL DEFAULT '{}', http_status INTEGER NOT NULL DEFAULT 0,
-			created_at TIMESTAMP NOT NULL,updated_at TIMESTAMP NOT NULL,UNIQUE(binding_id,operation_id))`,
 	} {
 		if _, err := r.db.Exec(renderSchema(r.db.DriverName(), q)); err != nil {
 			return err

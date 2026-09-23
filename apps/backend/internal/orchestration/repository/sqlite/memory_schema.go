@@ -32,19 +32,5 @@ func (r *Repository) migrateMemoryContext() error {
 			}
 		}
 	}
-	_, err = tx.Exec(renderSchema(tx.DriverName(), `CREATE TABLE IF NOT EXISTS orchestration_context_packets (
-		id TEXT PRIMARY KEY,binding_id TEXT NOT NULL REFERENCES orchestration_assistant_bindings(id) ON DELETE CASCADE,
-		objective_id TEXT NOT NULL REFERENCES orchestration_objectives(id) ON DELETE CASCADE,
-		profile_id TEXT NOT NULL,content_json TEXT NOT NULL)`))
-	if err != nil {
-		return err
-	}
-	_, err = tx.Exec(renderSchema(tx.DriverName(), `CREATE TABLE IF NOT EXISTS orchestration_credential_descriptors (
-		binding_id TEXT NOT NULL REFERENCES orchestration_assistant_bindings(id) ON DELETE CASCADE,
-		id TEXT NOT NULL,revision INTEGER NOT NULL,content_json TEXT NOT NULL,forgotten INTEGER NOT NULL DEFAULT 0,
-		PRIMARY KEY(binding_id,id))`))
-	if err != nil {
-		return err
-	}
 	return tx.Commit()
 }

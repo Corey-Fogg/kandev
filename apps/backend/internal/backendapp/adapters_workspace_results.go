@@ -2,13 +2,14 @@ package backendapp
 
 import (
 	"context"
-	"encoding/json"
+	"unicode/utf8"
+
 	"fmt"
+	"github.com/kandev/kandev/internal/authz"
+	"github.com/kandev/kandev/internal/common/redaction"
 	shared "github.com/kandev/kandev/internal/orchestration/models"
-	"github.com/kandev/kandev/internal/orchestrator/dispatchcontext"
 	"github.com/kandev/kandev/internal/task/models"
 	taskservice "github.com/kandev/kandev/internal/task/service"
-	"github.com/kandev/kandev/internal/task/share"
 	"sort"
 	"strings"
 )
@@ -38,11 +39,6 @@ func (a *taskCreatorAdapter) WorkspaceTaskDetails(ctx context.Context, workspace
 		return nil, err
 	}
 	result := map[string]any{workspaceResultTaskKey: workspaceTaskDetailSummary(task), "sessions": workspaceSessionSummaries(sessions)}
-	completionErr := a.ValidateAssistantTaskCompletion(ctx, workspaceID, taskID)
-	result["completion_ready"] = completionErr == nil
-	if completionErr != nil {
-		result["completion_blocker"] = completionErr.Error()
-	}
 	if err := a.attachWorkspaceSessionResults(ctx, result, sessions); err != nil {
 		return nil, err
 	}
@@ -121,16 +117,9 @@ func (a *taskCreatorAdapter) messageWorkspaceTask(ctx context.Context, task *mod
 	if strings.TrimSpace(command.Prompt) == "" {
 		return fmt.Errorf("prompt is required")
 	}
-	command.Prompt = assistantDelegationPrompt(command.Prompt, command.DelegationReference)
 	session, err := a.taskSvc.GetTaskSession(ctx, command.SessionID)
 	if err != nil || session.TaskID != task.ID {
 		return fmt.Errorf("session must belong to this task")
-	}
-	if command.Packet != nil {
-		if command.Packet.ProfileID != session.AgentProfileID {
-			return fmt.Errorf("context account must match the target session")
-		}
-		ctx = dispatchcontext.WithReference(ctx, command.ContextRef)
 	}
 	pinned, _ := task.Metadata["orchestration_execution_profile_id"].(string)
 	managed, _ := task.Metadata["orchestration_managed"].(bool)
@@ -145,20 +134,37 @@ func (a *taskCreatorAdapter) messageWorkspaceTask(ctx context.Context, task *mod
 	return err
 }
 
-func assistantDelegationPrompt(prompt string, ref shared.DelegationReference) string {
-	if ref.ObjectiveID == "" {
-		return prompt
+// WorkspaceTaskSummaries pages the workspace's delivery tasks, most recently
+// updated first.
+func (a *taskCreatorAdapter) WorkspaceTaskSummaries(ctx context.Context, workspace string, page, limit int) ([]shared.WorkspaceTaskSummary, bool, error) {
+	if err := a.taskSvc.AuthorizeWorkspaceScope(ctx, workspace, authz.ScopeWorkspaceRead); err != nil {
+		return nil, false, err
 	}
-	var b strings.Builder
-	b.WriteString(share.NewRedactor().String(prompt))
-	if ref.Packet != nil {
-		raw, _ := json.Marshal(ref.Packet)
-		fmt.Fprintf(&b, "\n\n<assistant-context>\n%s\n</assistant-context>\n", raw)
+	if page < 1 || page > 100000 || limit < 1 || limit > 100 {
+		return nil, false, fmt.Errorf("invalid task page")
 	}
-	fmt.Fprintf(&b, "\n\nAssistant objective: %s (acceptance revision %d)\nSource comment: %s\nContext reference: %s\n", ref.ObjectiveID, ref.AcceptanceRevision, ref.SourceCommentID, ref.ContextRef)
-	for _, c := range ref.Acceptance {
-		fmt.Fprintf(&b, "- %s: %s\n", c.ID, c.Description)
+	tasks, total, err := a.taskSvc.ListDeliveryTasksByWorkspace(ctx, workspace, page, limit, "updated_at_desc")
+	if err != nil {
+		return nil, false, err
 	}
-	b.WriteString("Repository instructions and required design/review handoffs remain authoritative. A workflow entry selection does not waive them. Return evidence and unresolved decisions for these acceptance criteria.")
-	return b.String()
+	rows := []shared.WorkspaceTaskSummary{}
+	for _, task := range tasks {
+		rows = append(rows, workspaceTaskSummary(task))
+	}
+	return rows, page*limit < total, nil
+}
+
+func workspaceTaskSummary(task *models.Task) shared.WorkspaceTaskSummary {
+	return shared.WorkspaceTaskSummary{ID: task.ID, WorkspaceID: task.WorkspaceID, Title: workspaceExportText(task.Title, 300), State: string(task.State), WorkflowID: task.WorkflowID, WorkflowStepID: task.WorkflowStepID}
+}
+
+func workspaceExportText(value string, limit int) string {
+	value = redaction.NewRedactor().String(value)
+	if len(value) <= limit {
+		return value
+	}
+	for limit > 0 && !utf8.RuneStart(value[limit]) {
+		limit--
+	}
+	return value[:limit]
 }

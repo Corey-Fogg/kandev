@@ -9,7 +9,7 @@ import (
 )
 
 type workspaceAdministratorFake struct {
-	*assistantTaskManager
+	*fakeTaskManager
 	workspace string
 	calls     int
 }
@@ -22,7 +22,7 @@ func (m *workspaceAdministratorFake) ManageWorkspace(_ context.Context, workspac
 
 func TestWorkspaceAdministrationRequiresCurrentSignedScope(t *testing.T) {
 	s, _, task := newRuntime(t)
-	m := &workspaceAdministratorFake{assistantTaskManager: &assistantTaskManager{}}
+	m := &workspaceAdministratorFake{fakeTaskManager: &fakeTaskManager{}}
 	s.Manager = m
 	router, token, run := workspaceControlCaller(t, s, task)
 	body := map[string]any{"resource": "workspace", "action": "update", "configuration": map[string]string{"name": "Synthetic workspace"}}

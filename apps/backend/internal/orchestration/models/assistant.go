@@ -18,19 +18,6 @@ type AssistantBinding struct {
 	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
 }
 
-// AssistantAuthority is the immutable admission evidence captured by a run.
-// Revision fingerprints configuration without exposing configuration values.
-type AssistantAuthority struct {
-	BindingID         string `json:"binding_id"`
-	BindingVersion    int64  `json:"binding_version"`
-	IntentRevision    int64  `json:"intent_revision"`
-	Revision          string `json:"revision"`
-	Restriction       string `json:"restriction"`
-	UnsupportedReason string `json:"unsupported_reason,omitempty"`
-	ProfileID         string `json:"profile_id"`
-	ExecutorID        string `json:"executor_id"`
-}
-
 type Intake struct {
 	CommentID       string `db:"comment_id"`
 	TaskID          string `db:"task_id"`

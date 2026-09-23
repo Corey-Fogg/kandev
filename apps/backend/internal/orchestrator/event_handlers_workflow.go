@@ -20,7 +20,6 @@ import (
 	"github.com/kandev/kandev/internal/entityrefs"
 	"github.com/kandev/kandev/internal/events"
 	"github.com/kandev/kandev/internal/events/bus"
-	"github.com/kandev/kandev/internal/orchestrator/dispatchcontext"
 	"github.com/kandev/kandev/internal/orchestrator/executor"
 	"github.com/kandev/kandev/internal/orchestrator/messagequeue"
 	"github.com/kandev/kandev/internal/orchestrator/watcher"
@@ -5820,12 +5819,6 @@ func (s *Service) autoStartStepPrompt(
 	// Track the original message so terminal failure paths can restore it
 	// instead of dropping the user's prompt or attachments on the floor.
 	takenMsg, mergedPrompt, attachments, references, queuedHandoff := s.takeAndMergeHandoffMessage(ctx, sessionID, prompt)
-	if takenMsg != nil {
-		ctx = dispatchcontext.FromMetadata(ctx, takenMsg.Metadata)
-	}
-	if takenMsg != nil && !s.checkQueuedContext(ctx, takenMsg) {
-		return dispatchcontext.ErrStale
-	}
 	initialCreatePromptPassthrough := takenMsg != nil && initialCreatePromptPassthroughQueued(takenMsg.Metadata)
 	queueCtx := ctx
 	if initialCreatePromptPassthrough {

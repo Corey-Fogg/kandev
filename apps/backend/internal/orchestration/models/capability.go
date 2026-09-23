@@ -1,11 +1,6 @@
 package models
 
-import (
-	"encoding/json"
-	"errors"
-)
-
-var ErrCapabilityGeneration = errors.New("capability directory changed; restart pagination")
+import "encoding/json"
 
 // Capability is a projection of a native catalog, never its configuration.
 // Effect describes authority requirements; discovery grants no execution rights.
@@ -29,15 +24,8 @@ type Capability struct {
 	InspectAllowed bool            `json:"inspect_allowed"`
 }
 
-type CapabilityQuery struct {
-	OwnerID, WorkspaceID, ConversationID, SessionID, Kind string
-	After, Generation                                     string
-	Limit                                                 int
-}
-
 type CapabilityPage struct {
 	Entries    []Capability `json:"entries"`
 	Generation string       `json:"generation"`
-	After      string       `json:"-"`
 	NextCursor string       `json:"next_cursor"`
 }

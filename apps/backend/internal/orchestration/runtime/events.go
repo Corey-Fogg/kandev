@@ -11,7 +11,6 @@ import (
 	"github.com/kandev/kandev/internal/orchestration/models"
 	runmodels "github.com/kandev/kandev/internal/runs/models"
 	taskmodels "github.com/kandev/kandev/internal/task/models"
-	"time"
 )
 
 func decode(event *bus.Event) (map[string]any, error) {
@@ -24,20 +23,13 @@ func decode(event *bus.Event) (map[string]any, error) {
 	return data, err
 }
 func (s *Service) Subscribe(eb bus.EventBus) (func(), error) {
-	s.AttentionUpdated = func(ctx context.Context, id string, now time.Time) {
-		b, err := s.Repo.AssistantBindingByID(ctx, id)
-		if err != nil {
-			return
-		}
-		_ = eb.Publish(ctx, events.AssistantUpdated, bus.NewEvent(events.AssistantUpdated, "orchestration", map[string]any{"user_id": b.OwnerUserID, "binding_id": id, revisionResponseKey: now.Format(time.RFC3339Nano)}))
-	}
 	ids := []bus.Subscription{}
 	cleanup := func() {
 		for _, id := range ids {
 			_ = id.Unsubscribe()
 		}
 	}
-	for _, subject := range []string{events.TaskStateChanged, events.TaskMoved, events.AgentTurnMessageSaved, events.AgentCompleted, events.AgentStopped, events.AgentFailed, events.TaskSessionStateChanged, events.TaskSessionErrorChanged, events.TaskStatusSummaryUpdated, events.MessageAdded, events.MessageUpdated, events.ClarificationAnswered, events.ClarificationPrimaryAnswered, events.ClarificationCancelled, events.ClarificationStaleDismissed, events.BuildPermissionRequestWildcardSubject()} {
+	for _, subject := range []string{events.TaskStateChanged, events.TaskMoved, events.AgentTurnMessageSaved, events.AgentCompleted, events.AgentStopped, events.AgentFailed} {
 		id, err := eb.Subscribe(subject, s.onEvent)
 		if err != nil {
 			cleanup()
@@ -52,12 +44,9 @@ func (s *Service) onEvent(ctx context.Context, event *bus.Event) error {
 	if err != nil {
 		return err
 	}
-	taskID := s.attentionEventTask(ctx, data)
+	taskID := s.eventTask(ctx, data)
 	if taskID == "" {
 		return nil
-	}
-	if err := s.ReconcileAttentionTask(ctx, taskID); err != nil {
-		return err
 	}
 	if event.Type == events.TaskStateChanged || event.Type == events.TaskMoved {
 		return s.taskCallback(ctx, taskID)
@@ -177,7 +166,7 @@ func (s *Service) bridgeReply(ctx context.Context, event *bus.Event, data map[st
 
 }
 
-func (s *Service) attentionEventTask(ctx context.Context, data map[string]any) string {
+func (s *Service) eventTask(ctx context.Context, data map[string]any) string {
 	if task, _ := data[taskIDKey].(string); task != "" {
 		return task
 	}
@@ -193,10 +182,4 @@ func (s *Service) attentionEventTask(ctx context.Context, data map[string]any) s
 		return ""
 	}
 	return row.TaskID
-}
-
-func (s *Service) notifyAssistantUpdated(ctx context.Context, bindingID string) {
-	if s.AttentionUpdated != nil {
-		s.AttentionUpdated(ctx, bindingID, time.Now().UTC())
-	}
 }

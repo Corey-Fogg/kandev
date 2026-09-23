@@ -14,6 +14,11 @@ type MemoryScopeValidator interface {
 	ValidateAssistantMemoryEnvironment(context.Context, string, string) error
 }
 
+// ContextScopeValidator checks that a project scope names a repository of the workspace.
+type ContextScopeValidator interface {
+	ValidateAssistantContextScope(context.Context, string, models.ContextScope) error
+}
+
 func validMemoryScopeName(scope string) bool {
 	switch scope {
 	case authorTypeUser, scopeWorkspace, scopeProject, scopeEnvironment, scopeTask:
@@ -58,9 +63,18 @@ func canonicalMemoryScope(id, expected string) (string, error) {
 func (s *Service) validateResourceMemoryScope(ctx context.Context, workspace, scope, id string) error {
 	switch scope {
 	case scopeTask:
-		return s.validateContextScope(ctx, workspace, models.ContextScope{TaskID: id})
+		if s.Tasks == nil {
+			return fmt.Errorf("scope unavailable")
+		}
+		task, err := s.Tasks.GetTask(ctx, id)
+		if err != nil || task == nil || task.WorkspaceID != workspace {
+			return fmt.Errorf("scope unavailable")
+		}
+		return nil
 	case scopeProject:
-		return s.validateContextScope(ctx, workspace, models.ContextScope{ProjectID: id})
+		if validator, ok := s.Manager.(ContextScopeValidator); ok {
+			return validator.ValidateAssistantContextScope(ctx, workspace, models.ContextScope{ProjectID: id})
+		}
 	case scopeEnvironment:
 		if validator, ok := s.Manager.(MemoryScopeValidator); ok {
 			return validator.ValidateAssistantMemoryEnvironment(ctx, workspace, id)

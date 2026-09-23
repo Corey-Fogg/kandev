@@ -15,7 +15,6 @@ import (
 	taskmodels "github.com/kandev/kandev/internal/task/models"
 	"strings"
 	"sync"
-	"time"
 	"unicode/utf8"
 )
 
@@ -30,6 +29,7 @@ type Manager interface {
 	ManageWorkspaceTask(context.Context, models.WorkspaceTaskCommand) error
 	WorkspaceTaskDetails(context.Context, string, string) (any, error)
 	WorkspaceCatalog(context.Context, string) (any, error)
+	WorkspaceTaskSummaries(context.Context, string, int, int) ([]models.WorkspaceTaskSummary, bool, error)
 }
 type Launch struct {
 	OnSessionPrepared                                func(context.Context, string) error
@@ -40,33 +40,18 @@ type Service struct {
 	retiredExecutions       sync.Map
 	RecoveryStarting        func(context.Context, string)
 	FailureHandlerInstalled bool
-	Maintenance             MaintenanceSandbox
-	maintenanceMu           sync.Mutex
-	Inputs                  InputResolver
 	Enabled                 bool
-	Attention               AttentionReader
-	AttentionUpdated        func(context.Context, string, time.Time)
-	// OperationUnknown reports the cause of an operation whose outcome became
-	// unknown; the caller only sees operation_outcome_unknown.
-	OperationUnknown func(operationID, target string, cause error)
-	Now              func() time.Time
-	attentionMu      sync.Mutex
-	attentionAfter   string
-	attentionNext    time.Time
-	Repo             *store.Repository
-	Personas         *personas.Service
-	Runs             *runstore.Repository
-	Queue            *runservice.Service
-	Auth             *runtimeauth.AgentAuth
-	Tasks            Tasks
-	Manager          Manager
-	Credentials      CredentialHealthReader
-	Capabilities     CapabilityReader
-	Authority        AssistantAuthorityReader
-	Start            func(context.Context, Launch) error
-	UpdateStatus     func(context.Context, string, string, string) error
-	APIURL           string
-	mu               sync.Mutex
+	Repo                    *store.Repository
+	Personas                *personas.Service
+	Runs                    *runstore.Repository
+	Queue                   *runservice.Service
+	Auth                    *runtimeauth.AgentAuth
+	Tasks                   Tasks
+	Manager                 Manager
+	Start                   func(context.Context, Launch) error
+	UpdateStatus            func(context.Context, string, string, string) error
+	APIURL                  string
+	mu                      sync.Mutex
 }
 
 func (s *Service) QueueTurn(ctx context.Context, id, taskID, reason, key string, payload map[string]any) error {
@@ -146,9 +131,6 @@ func (s *Service) launch(ctx context.Context, run *runmodels.Run) error {
 	owner, ws, err := s.Repo.ConversationOwner(ctx, taskID)
 	if err != nil || owner != a.ID || ws != a.WorkspaceID {
 		return fmt.Errorf("run must belong to the coordinator conversation")
-	}
-	if err := s.validateAttentionWake(ctx, payload); err != nil {
-		return err
 	}
 	profile, executorID, err := s.executionSelection(ctx, a)
 	if err != nil {

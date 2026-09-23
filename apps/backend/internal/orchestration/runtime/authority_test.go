@@ -10,23 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type testAssistantAuthority struct {
-	revision    string
-	unavailable bool
-	beforeRead  func()
-}
-
-func (a *testAssistantAuthority) ResolveAssistantAuthority(context.Context, models.AssistantBinding, string, string) (models.AssistantAuthority, error) {
-	if a.beforeRead != nil {
-		a.beforeRead()
-	}
-	row := models.AssistantAuthority{Revision: a.revision, Restriction: "claude-broker-v1"}
-	if a.unavailable {
-		row.UnsupportedReason = "unsupported_profile"
-	}
-	return row, nil
-}
-
 func TestCoordinatorSessionRequiresBrokerPolicyAndClaimedRun(t *testing.T) {
 	s, db, task := newRuntime(t)
 	_, _, _ = workspaceControlCaller(t, s, task)

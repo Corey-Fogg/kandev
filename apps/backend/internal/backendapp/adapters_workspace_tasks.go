@@ -19,24 +19,10 @@ func (a *taskCreatorAdapter) CreateWorkspaceTask(ctx context.Context, spec share
 	if err != nil {
 		return "", err
 	}
-	if err := a.validateAssistantEntry(ctx, workflowID, spec); err != nil {
+	if err := a.validateWorkspaceEntry(ctx, workflowID, spec); err != nil {
 		return "", err
 	}
 	metadata := map[string]interface{}{"orchestration_chief_id": spec.ChiefID}
-	if spec.MaintenanceCandidateID != "" {
-		if _, err := a.ValidateMaintenanceScope(ctx, spec.WorkspaceID, shared.MaintenanceScope{RepositoryID: spec.RepositoryID, WorkflowID: workflowID, WorkflowStepID: spec.WorkflowStepID}); err != nil {
-			return "", err
-		}
-		metadata["orchestration_maintenance_candidate"] = spec.MaintenanceCandidateID
-	}
-	if spec.ObjectiveID != "" {
-		metadata["orchestration_objective_id"], metadata["orchestration_context_ref"] = spec.ObjectiveID, spec.ContextRef
-		metadata["orchestration_acceptance_revision"], metadata["orchestration_source_comment_id"] = spec.AcceptanceRevision, spec.SourceCommentID
-		metadata["orchestration_operation_id"] = spec.DispatchOperationID
-		if spec.Packet != nil {
-			metadata["orchestration_binding_id"] = spec.Packet.BindingID
-		}
-	}
 	if spec.DirectProfile {
 		metadata["orchestration_managed"] = true
 	}
@@ -44,14 +30,10 @@ func (a *taskCreatorAdapter) CreateWorkspaceTask(ctx context.Context, spec share
 	if err != nil {
 		return "", err
 	}
-	if _, err := attachAssistantTaskContext(&models.Task{WorkspaceID: spec.WorkspaceID, Description: spec.Description}, metadata, profileID, spec.DelegationReference); err != nil {
-		return "", err
-	}
 	req := &taskservice.CreateTaskRequest{
-		LocalPreparationOnly: spec.MaintenanceCandidateID != "",
-		PlanMode:             spec.ExecutionMode == "design",
-		WorkspaceID:          spec.WorkspaceID, WorkflowID: workflowID, WorkflowStepID: spec.WorkflowStepID,
-		Title: spec.Title, Description: assistantDelegationPrompt(spec.Description, spec.DelegationReference), ParentID: spec.ParentID,
+		PlanMode:    spec.ExecutionMode == "design",
+		WorkspaceID: spec.WorkspaceID, WorkflowID: workflowID, WorkflowStepID: spec.WorkflowStepID,
+		Title: spec.Title, Description: spec.Description, ParentID: spec.ParentID,
 		AssigneeAgentProfileID: profileID, Origin: models.TaskOriginAgentCreated, Metadata: metadata, ExternalID: spec.ExternalID,
 	}
 	if spec.RepositoryID != "" {
@@ -61,14 +43,33 @@ func (a *taskCreatorAdapter) CreateWorkspaceTask(ctx context.Context, spec share
 		}
 		req.Repositories = []taskservice.TaskRepositoryInput{{RepositoryID: spec.RepositoryID, BaseBranch: repository.DefaultBranch}}
 	}
-	if err := shared.CheckWorkspaceEffect(ctx); err != nil {
-		return "", err
-	}
 	result, err := a.taskSvc.CreateTask(ctx, req)
 	if err != nil {
 		return "", err
 	}
 	return result.Task.ID, nil
+}
+
+// validateWorkspaceEntry admits an explicit entry step only where the
+// selected workflow permits a task to start or be moved manually.
+func (a *taskCreatorAdapter) validateWorkspaceEntry(ctx context.Context, workflowID string, spec shared.WorkspaceTaskSpec) error {
+	if spec.ExecutionMode != "" && spec.ExecutionMode != "execute" && spec.ExecutionMode != "design" {
+		return fmt.Errorf("execution_mode must be design or execute")
+	}
+	if spec.WorkflowStepID == "" {
+		return nil
+	}
+	if a.workflow == nil {
+		return fmt.Errorf("workflow entry validation unavailable")
+	}
+	step, err := a.workflow.GetStep(ctx, spec.WorkflowStepID)
+	if err != nil || step.WorkflowID != workflowID {
+		return fmt.Errorf("entry step must belong to the selected workflow")
+	}
+	if !step.IsStartStep && !step.AllowManualMove {
+		return fmt.Errorf("workflow policy does not permit entry at this step")
+	}
+	return nil
 }
 
 func (a *taskCreatorAdapter) workspaceDeliveryWorkflow(ctx context.Context, workspaceID, selected string) (string, error) {
@@ -161,12 +162,6 @@ func (a *taskCreatorAdapter) ManageWorkspaceTask(ctx context.Context, command sh
 	}
 	if task.IsFromOffice || task.IsEphemeral {
 		return fmt.Errorf("select a Kanban delivery task")
-	}
-	if candidate, _ := task.Metadata["orchestration_maintenance_candidate"].(string); candidate != "" {
-		return fmt.Errorf("maintenance tasks require the closed Assistant repair controls")
-	}
-	if err := shared.CheckWorkspaceEffect(ctx); err != nil {
-		return err
 	}
 	return a.dispatchWorkspaceTask(ctx, task, command)
 }
@@ -265,17 +260,11 @@ func (a *taskCreatorAdapter) adoptWorkspaceTask(ctx context.Context, task *model
 		metadata = selected
 	}
 	metadata["orchestration_chief_id"] = command.ChiefID
-	if err := shared.CheckWorkspaceEffect(ctx); err != nil {
-		return err
-	}
 	_, err := a.taskSvc.UpdateTask(ctx, task.ID, &taskservice.UpdateTaskRequest{Metadata: metadata})
 	return err
 }
 
 func (a *taskCreatorAdapter) observeWorkspaceTask(ctx context.Context, taskID, chiefID string) error {
-	if err := shared.CheckWorkspaceEffect(ctx); err != nil {
-		return err
-	}
 	changed, err := a.taskRepo.SetTaskMetadataKeyIfNotArchived(ctx, taskID, "orchestration_chief_id", chiefID)
 	if err != nil {
 		return err

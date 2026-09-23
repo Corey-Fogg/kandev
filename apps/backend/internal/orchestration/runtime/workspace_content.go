@@ -20,10 +20,6 @@ func (h *Handler) taskPermissions(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if _, linked := c.Get(workspaceSelectionKey); linked {
-		c.AbortWithStatus(403)
-		return
-	}
 	reader, ok := h.Service.Manager.(workspacePermissionReader)
 	if !ok {
 		c.AbortWithStatus(503)
@@ -40,11 +36,6 @@ func (h *Handler) taskPermissions(c *gin.Context) {
 func (h *Handler) taskContent(c *gin.Context) {
 	claims, ok := h.caller(c)
 	if !ok {
-		return
-	}
-	// Linked workspace exports retain their separate grant contract.
-	if _, linked := c.Get(workspaceSelectionKey); linked {
-		c.AbortWithStatus(403)
 		return
 	}
 	reader, ok := h.Service.Manager.(workspaceContentReader)

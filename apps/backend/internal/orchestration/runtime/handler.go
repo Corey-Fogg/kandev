@@ -12,30 +12,21 @@ import (
 )
 
 const (
-	statusResolved       = "resolved"
-	revisionResponseKey  = "revision"
 	executionModeExecute = "execute"
 	taskIDKey            = "task_id"
+	workspaceIDKey       = "workspace_id"
 )
 
 const (
-	statusAcknowledged          = "acknowledged"
-	intentRevisionKey           = "intent_revision"
-	attentionKindQuestion       = "question"
-	attentionKindPermission     = "permission"
-	attentionKindAuthentication = "authentication"
-	attentionKindFailure        = "failure"
-	entriesKey                  = "entries"
-	statusActive                = "active"
-	authorTypeAgent             = "agent"
-	executionModeDesign         = "design"
-	errorResponseKey            = "error"
-	statusFailed                = "failed"
-	nextCursorKey               = "next_cursor"
-	healthUnavailable           = "unavailable"
-	statusUnknown               = "unknown"
-	authorTypeUser              = "user"
-	scopeWorkspace              = "workspace"
+	intentRevisionKey   = "intent_revision"
+	entriesKey          = "entries"
+	authorTypeAgent     = "agent"
+	executionModeDesign = "design"
+	errorResponseKey    = "error"
+	statusFailed        = "failed"
+	nextCursorKey       = "next_cursor"
+	authorTypeUser      = "user"
+	scopeWorkspace      = "workspace"
 )
 
 type Handler struct {
@@ -44,32 +35,13 @@ type Handler struct {
 }
 
 func RegisterRoutes(g *gin.RouterGroup, h *Handler) {
-	g.GET("/assistant/objectives", h.objectives)
-	h.registerMaintenanceRoutes(g)
-	h.registerWorkspaceGrantRoutes(g)
-	g.GET("/assistant/attention", h.attention)
-	g.GET("/assistant/attention/:id/input", h.attentionInput)
-	g.GET("/runtime/attention/:id/input", h.attentionInput)
-	g.POST("/assistant/attention/:id/resolve", h.resolveAttention)
-	g.POST("/runtime/attention/:id/answer", h.resolveAttention)
-	g.GET("/runtime/attention", h.attention)
-	g.GET("/assistant/capabilities", h.capabilities)
-	g.GET("/runtime/capabilities", h.capabilities)
+	g.GET("/runtime/capabilities", h.workspaceCapabilities)
 	g.GET("/runtime/memory", h.runtimeMemory)
 	g.GET("/assistant/memory", h.assistantMemory)
 	g.GET("/assistant/memory/:id", h.assistantMemory)
 	g.GET("/assistant/memory/:id/source", h.assistantMemorySource)
 	g.PUT("/assistant/memory/:id", h.editAssistantMemory)
 	g.DELETE("/assistant/memory/:id", h.forgetAssistantMemory)
-	g.GET("/assistant/credentials", h.credential)
-	g.GET("/assistant/credentials/:id", h.credential)
-	g.PUT("/assistant/credentials/:id", h.editCredential)
-	g.DELETE("/assistant/credentials/:id", h.forgetCredential)
-	g.GET("/runtime/objectives", h.objectives)
-	g.POST("/runtime/objectives", h.createObjective)
-	g.PATCH("/runtime/objectives/:id", h.updateObjective)
-	g.GET("/runtime/context/:id", h.contextPacket)
-	g.GET("/runtime/context/:id/memory", h.contextMemory)
 	g.GET("/tasks/:id", h.conversation)
 	g.GET("/tasks/:id/comments", h.comments)
 	g.POST("/tasks/:id/comments", h.comment)
@@ -127,7 +99,12 @@ func (h *Handler) authorizeCaller(c *gin.Context) (*runtimeauth.AgentClaims, boo
 	if !h.currentRunAuthority(c, claims, run.Payload) {
 		return nil, false
 	}
-	return h.resolveWorkspaceTarget(c, claims)
+	// A coordinator credential never reaches beyond its signed home workspace.
+	if workspace := c.Query(workspaceIDKey); workspace != "" && workspace != claims.WorkspaceID {
+		c.AbortWithStatus(http.StatusForbidden)
+		return nil, false
+	}
+	return claims, true
 }
 
 func (h *Handler) currentRunAuthority(c *gin.Context, claims *runtimeauth.AgentClaims, payload string) bool {
@@ -253,10 +230,6 @@ func (h *Handler) catalog(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if _, linked := c.Get(workspaceSelectionKey); linked {
-		h.workspaceDirectory(c, claims)
-		return
-	}
 	result, err := h.Service.Manager.WorkspaceCatalog(c.Request.Context(), claims.WorkspaceID)
 	if err != nil {
 		fail(c, err)
@@ -275,10 +248,6 @@ func (h *Handler) catalog(c *gin.Context) {
 func (h *Handler) details(c *gin.Context) {
 	claims, ok := h.caller(c)
 	if !ok {
-		return
-	}
-	if _, linked := c.Get(workspaceSelectionKey); linked {
-		h.workspaceTask(c, claims)
 		return
 	}
 	result, err := h.Service.Manager.WorkspaceTaskDetails(c.Request.Context(), claims.WorkspaceID, c.Param("id"))
@@ -300,9 +269,7 @@ func (h *Handler) createTask(c *gin.Context) {
 		return
 	}
 	var req struct {
-		ProjectID string `json:"project_id"`
-		models.OperationRequest
-		models.DelegationReference
+		ProjectID      string `json:"project_id"`
 		Title          string `json:"title"`
 		Description    string `json:"description"`
 		WorkflowID     string `json:"workflow_id"`
@@ -321,8 +288,6 @@ func (h *Handler) createTask(c *gin.Context) {
 		fail(c, fmt.Errorf("use a workspace workflow, not an Office project"))
 		return
 	}
-	// Validation failures are definite rejections, so reject before the
-	// operation is recorded; an unknown outcome would stop the conversation.
 	if err := taskservice.ValidateTaskTitle(req.Title); err != nil {
 		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{errorResponseKey: err.Error()})
 		return
@@ -331,25 +296,12 @@ func (h *Handler) createTask(c *gin.Context) {
 		c.AbortWithStatusJSON(422, gin.H{errorResponseKey: "execution_mode must be design or execute"})
 		return
 	}
-	h.performOperation(c, claims, req.OperationRequest, req, http.StatusCreated, func() (any, error) {
-		objective, err := h.delegationObjective(c, claims, req.ObjectiveID, req.ExecutionMode)
-		if err != nil {
-			return nil, rejectOperation(422, err.Error())
-		}
-		ref := delegationReference(objective, req.ContextRef, req.OperationID)
-		if err := h.attachDelegationContext(c, claims, objective, &ref); err != nil {
-			return nil, rejectOperation(422, err.Error())
-		}
-		req.AssigneeID, err = newTaskContextProfile(ref.Packet, req.RepositoryID, req.AssigneeID)
-		if err != nil {
-			return nil, err
-		}
-		id, err := h.Service.Manager.CreateWorkspaceTask(c.Request.Context(), models.WorkspaceTaskSpec{DelegationReference: ref, DirectProfile: true, WorkspaceID: claims.WorkspaceID, ChiefID: claims.AgentProfileID, WorkflowID: req.WorkflowID, WorkflowStepID: req.WorkflowStepID, ExecutionMode: req.ExecutionMode, RepositoryID: req.RepositoryID, AssigneeID: req.AssigneeID, Title: req.Title, Description: req.Description, ExternalID: req.ExternalID, ParentID: req.ParentID})
-		if err == nil && objective != nil {
-			err = h.Service.Repo.LinkObjectiveTask(c.Request.Context(), models.ObjectiveTask{ObjectiveID: objective.ID, TaskID: id, Role: "implementation", ContextRef: req.ContextRef, OperationID: req.OperationID})
-		}
-		return gin.H{"id": id}, err
-	})
+	id, err := h.Service.Manager.CreateWorkspaceTask(c.Request.Context(), models.WorkspaceTaskSpec{DirectProfile: true, WorkspaceID: claims.WorkspaceID, ChiefID: claims.AgentProfileID, WorkflowID: req.WorkflowID, WorkflowStepID: req.WorkflowStepID, ExecutionMode: req.ExecutionMode, RepositoryID: req.RepositoryID, AssigneeID: req.AssigneeID, Title: req.Title, Description: req.Description, ExternalID: req.ExternalID, ParentID: req.ParentID})
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"id": id})
 }
 func (h *Handler) manageTask(c *gin.Context) {
 	claims, ok := h.caller(c)
@@ -371,26 +323,11 @@ func (h *Handler) manageTask(c *gin.Context) {
 	req.WorkspaceID = claims.WorkspaceID
 	req.ChiefID = claims.AgentProfileID
 	req.TaskID = c.Param("id")
-	h.performOperation(c, claims, req.OperationRequest, req, http.StatusOK, func() (any, error) {
-		if err := h.rejectMaintenanceTaskControl(c, req.TaskID); err != nil {
-			return nil, err
-		}
-		objective, err := h.delegationObjective(c, claims, req.ObjectiveID, "")
-		if err != nil {
-			return nil, rejectOperation(422, err.Error())
-		}
-		req.DelegationReference = delegationReference(objective, req.ContextRef, req.OperationID)
-		if req.Action != "stop" {
-			if err := h.attachDelegationContext(c, claims, objective, &req.DelegationReference); err != nil {
-				return nil, rejectOperation(422, err.Error())
-			}
-		}
-		err = h.Service.Manager.ManageWorkspaceTask(c.Request.Context(), req)
-		if err == nil && objective != nil && req.Action != "delete" {
-			err = h.Service.Repo.LinkObjectiveTask(c.Request.Context(), models.ObjectiveTask{ObjectiveID: objective.ID, TaskID: req.TaskID, SessionID: req.SessionID, Role: "implementation", ContextRef: req.ContextRef, OperationID: req.OperationID})
-		}
-		return gin.H{"ok": true}, err
-	})
+	if err := h.Service.Manager.ManageWorkspaceTask(c.Request.Context(), req); err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 func (h *Handler) updateTask(c *gin.Context) {
 	claims, ok := h.caller(c)
@@ -399,18 +336,16 @@ func (h *Handler) updateTask(c *gin.Context) {
 	}
 	var req struct {
 		Status string `json:"status"`
-		models.OperationRequest
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		fail(c, err)
 		return
 	}
-	h.performOperation(c, claims, req.OperationRequest, req, http.StatusOK, func() (any, error) {
-		if err := h.rejectMaintenanceTaskControl(c, c.Param("id")); err != nil {
-			return nil, err
-		}
-		return gin.H{"ok": true}, h.Service.UpdateStatus(c.Request.Context(), claims.WorkspaceID, c.Param("id"), req.Status)
-	})
+	if err := h.Service.UpdateStatus(c.Request.Context(), claims.WorkspaceID, c.Param("id"), req.Status); err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 func (h *Handler) runtimeComment(c *gin.Context) {
 	claims, ok := h.caller(c)
@@ -477,25 +412,4 @@ func (h *Handler) runtimeTask(c *gin.Context) {
 		return
 	}
 	c.JSON(200, task)
-}
-
-func (h *Handler) registerMaintenanceRoutes(assistant *gin.RouterGroup) {
-	assistant.GET("/assistant/improvements", h.improvements)
-	assistant.GET("/assistant/maintenance-options", h.maintenanceOptions)
-	assistant.GET("/runtime/improvements", h.improvements)
-	assistant.GET("/assistant/improvements/:id", h.improvement)
-	assistant.GET("/runtime/improvements/:id", h.improvement)
-	assistant.GET("/assistant/improvements/:id/evidence", h.improvementEvidence)
-	assistant.GET("/runtime/improvements/:id/evidence", h.improvementEvidence)
-	assistant.PUT("/assistant/improvements/:id/grant", h.saveMaintenanceGrant)
-	assistant.DELETE("/assistant/improvements/:id/grant", h.revokeMaintenanceGrant)
-	assistant.POST("/assistant/improvements/:id/maintenance", h.maintenanceAction)
-	assistant.POST("/runtime/improvements/:id/maintenance", h.maintenanceAction)
-	assistant.GET("/assistant/improvements/:id/file", h.maintenanceFile)
-	assistant.GET("/runtime/improvements/:id/file", h.maintenanceFile)
-	assistant.GET("/assistant/improvements/:id/artifact", h.maintenanceArtifact)
-	assistant.GET("/runtime/improvements/:id/artifact", h.maintenanceArtifact)
-	assistant.POST("/assistant/improvements/:id/review", h.reviewImprovement)
-	assistant.POST("/assistant/improvements/:id/reconcile", h.reconcileMaintenance)
-	assistant.GET("/assistant/improvements/:id/successes", h.maintenanceSuccesses)
 }

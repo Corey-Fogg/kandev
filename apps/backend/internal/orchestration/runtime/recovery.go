@@ -56,12 +56,6 @@ func (h *Handler) retry(c *gin.Context) {
 // RecoverInterrupted runs before subscriptions and dispatch start. An interrupted
 // conversation must be explicitly retried, never replayed after an unknown external write.
 func (s *Service) RecoverInterrupted(ctx context.Context) error {
-	if err := s.Repo.RecoverOperations(ctx); err != nil {
-		return err
-	}
-	if err := s.Repo.RecoverMaintenance(ctx); err != nil {
-		return err
-	}
 	rows, err := s.Repo.InterruptedRuns(ctx)
 	if err != nil {
 		return err

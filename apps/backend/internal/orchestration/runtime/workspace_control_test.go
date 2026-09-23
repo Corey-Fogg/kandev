@@ -26,7 +26,7 @@ func workspaceControlCaller(t *testing.T, s *Service, task string) (*gin.Engine,
 
 func TestWorkspaceOrchestratorCreatesDeliveryWithoutPrivateSetup(t *testing.T) {
 	s, _, task := newRuntime(t)
-	manager := &assistantTaskManager{}
+	manager := &fakeTaskManager{}
 	s.Manager = manager
 	router, token, run := workspaceControlCaller(t, s, task)
 	response := runtimeRequest(t, router, "POST", "/api/v1/orchestration/runtime/tasks", token, run,
@@ -56,7 +56,7 @@ func TestWorkspaceOrchestratorDiscoveryWithoutPrivateSetup(t *testing.T) {
 }
 
 type workspaceCommandManager struct {
-	*assistantTaskManager
+	*fakeTaskManager
 	commands []models.WorkspaceTaskCommand
 }
 
@@ -66,7 +66,7 @@ func (m *workspaceCommandManager) ManageWorkspaceTask(_ context.Context, command
 }
 func TestWorkspaceControlUsesSignedScope(t *testing.T) {
 	s, _, task := newRuntime(t)
-	manager := &workspaceCommandManager{assistantTaskManager: &assistantTaskManager{}}
+	manager := &workspaceCommandManager{fakeTaskManager: &fakeTaskManager{}}
 	s.Manager = manager
 	router, token, run := workspaceControlCaller(t, s, task)
 	for _, action := range []string{"edit", "move", "assign", "adopt", "start", "stop", "message", "archive", "delete", "session_mode", "resolve_permission"} {

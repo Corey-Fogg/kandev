@@ -1,10 +1,20 @@
 package orchestration
 
 import (
-	"github.com/kandev/kandev/internal/orchestration/models"
+	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/kandev/kandev/internal/orchestration/models"
 )
+
+func orchestratorIcon(a *models.AgentInstance) string {
+	var settings struct {
+		Icon string `json:"orchestrator_icon"`
+	}
+	_ = json.Unmarshal([]byte(a.Settings), &settings)
+	return settings.Icon
+}
 
 func TestPersonaIconPreservesConfiguration(t *testing.T) {
 	a := &models.AgentInstance{Settings: `{"delegation_context":"Work profile"}`}

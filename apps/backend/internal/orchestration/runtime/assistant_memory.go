@@ -1,7 +1,10 @@
 package runtime
 
 import (
+	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -94,7 +97,6 @@ func (h *Handler) editAssistantMemory(c *gin.Context) {
 		c.AbortWithStatus(503)
 		return
 	}
-	h.Service.notifyAssistantUpdated(c.Request.Context(), b.ID)
 	c.JSON(200, saved)
 }
 
@@ -114,7 +116,6 @@ func (h *Handler) forgetAssistantMemory(c *gin.Context) {
 		memoryFailure(c, err)
 		return
 	}
-	h.Service.notifyAssistantUpdated(c.Request.Context(), b.ID)
 	c.JSON(200, gin.H{"forgotten": true})
 }
 
@@ -124,4 +125,18 @@ func memoryFailure(c *gin.Context, err error) {
 		return
 	}
 	c.AbortWithStatus(503)
+}
+
+func strictAssistantJSON(c *gin.Context, target any) bool {
+	decoder := json.NewDecoder(http.MaxBytesReader(c.Writer, c.Request.Body, 24*1024))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		c.AbortWithStatus(422)
+		return false
+	}
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		c.AbortWithStatus(422)
+		return false
+	}
+	return true
 }

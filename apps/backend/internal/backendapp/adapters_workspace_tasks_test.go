@@ -5,11 +5,9 @@ import (
 	"fmt"
 	settingsmodels "github.com/kandev/kandev/internal/agent/settings/models"
 	"github.com/kandev/kandev/internal/office/shared"
-	orchestrationmodels "github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/orchestrator"
 	"github.com/kandev/kandev/internal/task/models"
 	taskservice "github.com/kandev/kandev/internal/task/service"
-	"github.com/kandev/kandev/internal/task/statussummary"
 	wfmodels "github.com/kandev/kandev/internal/workflow/models"
 	"github.com/stretchr/testify/require"
 	"strings"
@@ -38,7 +36,7 @@ func TestWorkspaceTaskDetailsPreservesMultipleSessionResults(t *testing.T) {
 	require.Equal(t, "implementer", rows[1]["profile_id"])
 }
 
-func TestAssistantRoutingAdapterRejectsNonDeliveryMode(t *testing.T) {
+func TestWorkspaceRoutingRejectsNonDeliveryMode(t *testing.T) {
 	adapter, svc := newOfficeTaskAdapterHarness(t)
 	ctx := context.Background()
 	wf, err := svc.CreateWorkflow(ctx, &taskservice.CreateWorkflowRequest{WorkspaceID: "ws-1", Name: "Delivery"})
@@ -49,7 +47,7 @@ func TestAssistantRoutingAdapterRejectsNonDeliveryMode(t *testing.T) {
 	}
 }
 
-func TestAssistantRoutingUsesExplicitPermittedStepAndRetainsDefaults(t *testing.T) {
+func TestWorkspaceRoutingUsesExplicitPermittedStepAndRetainsDefaults(t *testing.T) {
 	adapter, svc := newOfficeTaskAdapterHarness(t)
 	ctx := context.Background()
 	wf, err := svc.CreateWorkflow(ctx, &taskservice.CreateWorkflowRequest{WorkspaceID: "ws-1", Name: "Delivery"})
@@ -61,13 +59,12 @@ func TestAssistantRoutingUsesExplicitPermittedStepAndRetainsDefaults(t *testing.
 	} {
 		require.NoError(t, adapter.workflow.CreateStep(ctx, step))
 	}
-	spec := shared.WorkspaceTaskSpec{WorkspaceID: "ws-1", WorkflowID: wf.ID, WorkflowStepID: "execute", Title: "Known change", ExecutionMode: "execute", DelegationReference: orchestrationmodels.DelegationReference{ObjectiveID: "goal", ContextRef: "packet", SourceCommentID: "source", AcceptanceRevision: 1, DispatchOperationID: "op"}}
+	spec := shared.WorkspaceTaskSpec{WorkspaceID: "ws-1", WorkflowID: wf.ID, WorkflowStepID: "execute", Title: "Known change", ExecutionMode: "execute"}
 	id, err := adapter.CreateWorkspaceTask(ctx, spec)
 	require.NoError(t, err)
 	task, err := svc.GetTask(ctx, id)
 	require.NoError(t, err)
 	require.Equal(t, "execute", task.WorkflowStepID)
-	require.Equal(t, "goal", task.Metadata["orchestration_objective_id"])
 	for _, step := range []string{"locked-review", "missing"} {
 		spec.WorkflowStepID = step
 		_, err = adapter.CreateWorkspaceTask(ctx, spec)
@@ -76,44 +73,6 @@ func TestAssistantRoutingUsesExplicitPermittedStepAndRetainsDefaults(t *testing.
 	start, err := adapter.workflow.GetStep(ctx, "requirements")
 	require.NoError(t, err)
 	require.True(t, start.IsStartStep)
-}
-
-func TestAssistantCompletionDetailsExposeUnfinishedSessions(t *testing.T) {
-	adapter, _ := newOfficeTaskAdapterHarness(t)
-	ctx := context.Background()
-	task := &models.Task{ID: "completion-check", WorkspaceID: "ws-1", Title: "Review is not completion", State: "REVIEW"}
-	require.NoError(t, adapter.taskRepo.CreateTask(ctx, task))
-	require.NoError(t, adapter.taskRepo.CreateTaskSession(ctx, &models.TaskSession{ID: "unfinished", TaskID: task.ID, State: models.TaskSessionStateRunning}))
-	result, err := adapter.WorkspaceTaskDetails(ctx, "ws-1", task.ID)
-	require.NoError(t, err)
-	data := result.(map[string]any)
-	require.Equal(t, false, data["completion_ready"])
-	require.Contains(t, data["completion_blocker"], "active")
-}
-
-func TestAssistantCompletionSettledTaskNeedsEvidenceButIsNotBusy(t *testing.T) {
-	adapter, svc := newOfficeTaskAdapterHarness(t)
-	adapter.orch = &orchestrator.Service{}
-	ctx := context.Background()
-	wf, err := svc.CreateWorkflow(ctx, &taskservice.CreateWorkflowRequest{WorkspaceID: "ws-1", Name: "Delivery"})
-	require.NoError(t, err)
-	require.NoError(t, adapter.workflow.CreateStep(ctx, &wfmodels.WorkflowStep{ID: "review-step", WorkflowID: wf.ID, Name: "Review"}))
-	task := &models.Task{ID: "settled", WorkspaceID: "ws-1", WorkflowID: wf.ID, WorkflowStepID: "review-step", Title: "Finished result", State: "REVIEW"}
-	require.NoError(t, adapter.taskRepo.CreateTask(ctx, task))
-	require.NoError(t, adapter.taskRepo.CreateTaskSession(ctx, &models.TaskSession{ID: "settled-session", TaskID: task.ID, State: models.TaskSessionStateCompleted}))
-	_, err = adapter.taskRepo.CompareAndUpdateTaskStatusSummary(ctx, &statussummary.StoredTaskStatusSummary{TaskID: task.ID, WorkspaceID: task.WorkspaceID, Summary: statussummary.TaskStatusSummary{Revision: 1}})
-	require.NoError(t, err)
-	result, err := adapter.WorkspaceTaskDetails(ctx, "ws-1", task.ID)
-	require.NoError(t, err)
-	data := result.(map[string]any)
-	require.Equal(t, true, data["completion_ready"], data["completion_blocker"])
-	participant, err := adapter.workflow.UpsertTaskParticipant(ctx, "review-step", task.ID, "reviewer", "review-profile")
-	require.NoError(t, err)
-	require.ErrorContains(t, adapter.ValidateAssistantTaskCompletion(ctx, "ws-1", task.ID), "approval is pending")
-	require.NoError(t, adapter.workflow.RecordStepDecision(ctx, &wfmodels.WorkflowStepDecision{TaskID: task.ID, StepID: "review-step", ParticipantID: participant, Decision: "approved"}))
-	require.NoError(t, adapter.ValidateAssistantTaskCompletion(ctx, "ws-1", task.ID))
-	require.NoError(t, adapter.taskRepo.CreateTaskReviewRun(ctx, &models.TaskReviewRun{ID: "failed-review", TaskID: task.ID, Status: models.ReviewRunFailed}))
-	require.ErrorContains(t, adapter.ValidateAssistantTaskCompletion(ctx, "ws-1", task.ID), "review failed")
 }
 
 type workspaceTestProfiles map[string]*settingsmodels.AgentProfile

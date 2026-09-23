@@ -46,15 +46,7 @@ func (h *Handler) runtimeMemory(c *gin.Context) {
 	if !valid {
 		return
 	}
-	if claims.Capabilities == workspaceCoordinatorAudience {
-		h.workspaceMemory(c, claims)
-		return
-	}
-	_, binding, ok := h.runtimeAssistant(c)
-	if !ok {
-		return
-	}
-	h.assistantMemoryPage(c, binding)
+	h.workspaceMemory(c, claims)
 }
 func (h *Handler) setMemory(c *gin.Context) {
 	claims, ok := h.caller(c)

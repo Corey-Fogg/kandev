@@ -55,9 +55,6 @@ func (a *workspaceAdminAdapter) ManageWorkspace(ctx context.Context, workspace s
 	if ws.IsImproveKandev() {
 		return nil, workflowservice.ErrWorkflowWorkspaceReadOnly
 	}
-	if err := shared.CheckWorkspaceEffect(ctx); err != nil {
-		return nil, err
-	}
 	switch command.Resource {
 	case adminWorkspace:
 		return a.updateWorkspaceConfiguration(ctx, workspace, command)

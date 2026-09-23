@@ -5,9 +5,9 @@ import (
 	"github.com/kandev/kandev/internal/task/models"
 )
 
-// DispatchGuard revalidates server-owned context immediately before native
-// launch/resume/prompt/steer. Nil preserves ordinary tasks' existing behavior.
-// It is configured once during startup, before dispatch begins.
+// DispatchGuard admits or rejects a native launch, resume, prompt, steer or
+// model switch immediately before it reaches the agent. Nil admits every
+// dispatch. It is configured once during startup, before dispatch begins.
 type DispatchGuard func(context.Context, *models.Task, *models.TaskSession, string) error
 
 func (e *Executor) SetDispatchGuard(guard DispatchGuard) { e.dispatchGuard = guard }

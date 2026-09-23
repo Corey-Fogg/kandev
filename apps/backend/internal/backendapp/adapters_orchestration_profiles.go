@@ -39,14 +39,7 @@ func (a *taskCreatorAdapter) assignDirectWorkspaceTask(ctx context.Context, task
 		return err
 	}
 	metadata["orchestration_chief_id"] = command.ChiefID
-	description, err := attachAssistantTaskContext(task, metadata, command.AssigneeID, command.DelegationReference)
-	if err != nil {
-		return err
-	}
-	if err = shared.CheckWorkspaceEffect(ctx); err != nil {
-		return err
-	}
-	_, err = a.taskSvc.UpdateTask(ctx, task.ID, &taskservice.UpdateTaskRequest{Metadata: metadata, Description: description})
+	_, err = a.taskSvc.UpdateTask(ctx, task.ID, &taskservice.UpdateTaskRequest{Metadata: metadata})
 	return err
 }
 func (a *taskCreatorAdapter) startAssignedWorkspaceTask(ctx context.Context, task *models.Task) error {

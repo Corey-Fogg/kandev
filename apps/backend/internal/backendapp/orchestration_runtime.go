@@ -8,8 +8,6 @@ import (
 	"github.com/kandev/kandev/internal/common/logger"
 	"github.com/kandev/kandev/internal/common/ports"
 	"github.com/kandev/kandev/internal/events/bus"
-	"github.com/kandev/kandev/internal/orchestration/maintenance"
-	orchestrationmodels "github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/orchestration/personas"
 	orchestrationruntime "github.com/kandev/kandev/internal/orchestration/runtime"
 	"github.com/kandev/kandev/internal/orchestrator"
@@ -18,7 +16,6 @@ import (
 	"github.com/kandev/kandev/internal/workflow/stepevents"
 	v1 "github.com/kandev/kandev/pkg/api/v1"
 	"go.uber.org/zap"
-	"path/filepath"
 	"strings"
 )
 
@@ -33,13 +30,9 @@ func newOrchestrationRuntime(cfg *config.Config, repos *Repositories, services *
 	runtime := &orchestrationruntime.Service{
 		FailureHandlerInstalled: true,
 		RecoveryStarting:        orch.ResolveManagedRecovery,
-		Maintenance:             maintenance.New(filepath.Join(cfg.ResolvedDataDir(), "orchestration-maintenance")),
 		Enabled:                 cfg.Features.Orchestration,
 		Repo:                    repos.Orchestration, Personas: personasSvc, Runs: repos.Runs,
 		Auth: runtimeauth.NewAgentAuth(""), Tasks: services.Task,
-		Credentials:  assistantCredentialReader{store: repos.Secrets},
-		Capabilities: newAssistantCapabilityReader(repos, services),
-		Authority:    assistantAuthorityReader{profiles: repos.AgentSettings, executors: repos.Task, versions: services.ManagedRuntimeSelections, authorize: services.Task.AuthorizeWorkspaceAccess},
 		Manager: &workspaceAdminAdapter{
 			taskCreatorAdapter: &taskCreatorAdapter{taskSvc: services.Task, profiles: repos.AgentSettings, orch: orch, taskRepo: repos.Task, workflow: repos.Workflow},
 			workflows:          services.Workflow, stepEvents: stepevents.NewPublisher(eventBus, "orchestration", log),
@@ -52,10 +45,6 @@ func newOrchestrationRuntime(cfg *config.Config, repos *Repositories, services *
 		UpdateStatus: func(ctx context.Context, ws, id, status string) error {
 			return updateOrchestratedStatus(ctx, services.Task, repos, ws, id, status)
 		},
-	}
-	runtime.OperationUnknown = func(operationID, target string, cause error) {
-		log.Warn("orchestration operation outcome unknown",
-			zap.String("operation_id", operationID), zap.String("target", target), zap.Error(cause))
 	}
 	orch.SetManagedFailureRecovery(runtime.HandleFailure, runtime.CancelRecovery)
 	return runtime
@@ -74,9 +63,6 @@ func updateOrchestratedStatus(ctx context.Context, tasks *taskservice.Service, r
 		if err := validateOrchestratedCompletion(ctx, repos, task.WorkflowStepID, id); err != nil {
 			return err
 		}
-	}
-	if err = orchestrationmodels.CheckWorkspaceEffect(ctx); err != nil {
-		return err
 	}
 	_, err = tasks.UpdateTask(ctx, id, &taskservice.UpdateTaskRequest{State: &state})
 	if err != nil {
@@ -132,6 +118,6 @@ func startOrchestrationRuntime(
 		return false
 	}
 	addCleanup(func() error { cleanup(); return nil })
-	wireAssistantDispatch(orch, services.Orchestration, services.Task, repos.Orchestration)
+	wireCoordinatorDispatch(orch, services.Orchestration, repos.Orchestration)
 	return true
 }

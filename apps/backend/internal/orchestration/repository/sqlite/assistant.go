@@ -18,3 +18,9 @@ func (r *Repository) AssistantBinding(ctx context.Context, owner string) (*model
 		WHERE b.owner_user_id=?`), owner)
 	return &row, err
 }
+
+func (r *Repository) AssistantForConversation(ctx context.Context, taskID string) (*models.AssistantBinding, error) {
+	var row models.AssistantBinding
+	err := r.db.GetContext(ctx, &row, r.db.Rebind(`SELECT `+bindingColumns+` FROM orchestration_assistant_bindings b WHERE b.conversation_id=?`), taskID)
+	return &row, err
+}

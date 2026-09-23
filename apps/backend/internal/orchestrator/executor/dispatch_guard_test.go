@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAssistantContextGuardCoversNativeDispatch(t *testing.T) {
+func TestDispatchGuardCoversNativeDispatch(t *testing.T) {
 	for _, path := range []string{"launch", "resume", "prompt", "steer", "pty"} {
 		t.Run(path, func(t *testing.T) {
 			repo := newMockRepository()
@@ -18,7 +18,7 @@ func TestAssistantContextGuardCoversNativeDispatch(t *testing.T) {
 			manager := &mockAgentManager{isPassthroughSessionFunc: func(context.Context, string) bool { return path == "pty" }}
 			manager.getExecutionIDForSessionFunc = func(context.Context, string) (string, error) { return "execution", nil }
 			e := newTestExecutor(t, manager, repo)
-			denied := errors.New("stale assistant context")
+			denied := errors.New("coordinator run required")
 			e.SetDispatchGuard(func(_ context.Context, task *models.Task, session *models.TaskSession, profile string) error {
 				require.Equal(t, "task-1", task.ID)
 				require.Equal(t, "sess-1", session.ID)

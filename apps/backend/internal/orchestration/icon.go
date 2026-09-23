@@ -6,13 +6,6 @@ import (
 	"github.com/kandev/kandev/internal/orchestration/models"
 )
 
-func orchestratorIcon(a *models.AgentInstance) string {
-	var settings struct {
-		Icon string `json:"orchestrator_icon"`
-	}
-	_ = json.Unmarshal([]byte(a.Settings), &settings)
-	return settings.Icon
-}
 func setOrchestratorIcon(a *models.AgentInstance, icon string) error {
 	switch icon {
 	case "", "💼", "🧭", "🤖", "🛠️", "🌱", "⭐":

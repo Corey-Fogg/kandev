@@ -16,7 +16,6 @@ import (
 	"github.com/kandev/kandev/internal/entityrefs"
 	"github.com/kandev/kandev/internal/events"
 	"github.com/kandev/kandev/internal/events/bus"
-	"github.com/kandev/kandev/internal/orchestrator/dispatchcontext"
 	"github.com/kandev/kandev/internal/orchestrator/executor"
 	"github.com/kandev/kandev/internal/orchestrator/messagequeue"
 	"github.com/kandev/kandev/internal/orchestrator/watcher"
@@ -1528,7 +1527,7 @@ func (s *Service) executeQueuedMessageWithReservation(
 	queuedMsg *messagequeue.QueuedMessage,
 	reservation *queuedDispatchReservation,
 ) {
-	promptCtx := dispatchcontext.FromMetadata(context.Background(), queuedMsg.Metadata)
+	promptCtx := context.Background() // Use a fresh context for async execution
 	reservedSessionID := queuedMsg.SessionID
 	if reservation == nil {
 		reservation = s.queuedDispatchReservationForEntry(reservedSessionID, queuedMsg.ID)
@@ -1546,9 +1545,6 @@ func (s *Service) executeQueuedMessageWithReservation(
 		promptCtx, callerSessionID, queuedMsg, reservation,
 	)
 	if handoffDone {
-		return
-	}
-	if !s.checkQueuedContext(promptCtx, queuedMsg) {
 		return
 	}
 

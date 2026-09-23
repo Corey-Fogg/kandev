@@ -9,7 +9,7 @@ import (
 )
 
 type workspaceInspectionManager struct {
-	*assistantTaskManager
+	*fakeTaskManager
 	workspace, task, session string
 	query                    models.WorkspaceContentQuery
 }
@@ -28,7 +28,7 @@ func (m *workspaceInspectionManager) WorkspaceTaskDetails(context.Context, strin
 
 func TestWorkspaceInspectionUsesSignedScopeAndRejectsExpiredRun(t *testing.T) {
 	s, _, task := newRuntime(t)
-	m := &workspaceInspectionManager{assistantTaskManager: &assistantTaskManager{}}
+	m := &workspaceInspectionManager{fakeTaskManager: &fakeTaskManager{}}
 	s.Manager = m
 	router, token, run := workspaceControlCaller(t, s, task)
 	response := runtimeRequest(t, router, "GET", "/api/v1/orchestration/runtime/tasks/target/content?workspace_id=foreign&session_id=session&message_id=message&offset=3000&limit=2000", token, run, nil)
