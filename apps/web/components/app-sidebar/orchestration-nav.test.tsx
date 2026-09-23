@@ -27,7 +27,7 @@ vi.mock("@/hooks/domains/orchestration/use-orchestrator-conversation", () => ({
 import { OrchestrationNav } from "./orchestration-nav";
 
 const GENERIC = "workspace-coordinator-link";
-const JEB = JEB;
+const JEB = "workspace-coordinator-link-jeb";
 
 const coordinated = (id: string, chief: string, pending?: string) => ({
   id,
