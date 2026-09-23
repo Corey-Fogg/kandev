@@ -1,0 +1,148 @@
+package runtime
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/require"
+
+	"github.com/kandev/kandev/internal/agent/runtimeauth"
+	"github.com/kandev/kandev/internal/orchestration/models"
+	taskmodels "github.com/kandev/kandev/internal/task/models"
+)
+
+func runtimeRequest(t *testing.T, router *gin.Engine, method, path, token, runID string, body any) *httptest.ResponseRecorder {
+	t.Helper()
+	raw, err := json.Marshal(body)
+	require.NoError(t, err)
+	request := httptest.NewRequest(method, path, bytes.NewReader(raw))
+	request.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		request.Header.Set("Authorization", "Bearer "+token)
+	}
+	if runID != "" {
+		request.Header.Set("X-Kandev-Run-Id", runID)
+	}
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	return response
+}
+func TestRuntimeAPIScopesWritesAndRevokesFinishedRuns(t *testing.T) {
+	s, _, task := newRuntime(t)
+	ctx := context.Background()
+	for id, ws := range map[string]string{task: "ws", "delivery": "ws", "foreign": "other"} {
+		s.Tasks.(*testTasks).tasks[id] = &taskmodels.Task{ID: id, WorkspaceID: ws}
+	}
+	require.NoError(t, s.QueueTurn(ctx, "chief", task, "task_comment", "request", nil))
+	run, err := s.Runs.ClaimNextEligibleRun(ctx)
+	require.NoError(t, err)
+	require.NoError(t, s.Runs.UpdateRunRuntimeSnapshot(ctx, run.ID, "workspace_coordinator", run.Payload, "session"))
+	token, err := s.Auth.MintRuntimeJWT("chief", task, "ws", run.ID, "session", "workspace_coordinator")
+	require.NoError(t, err)
+	router := gin.New()
+	RegisterRoutes(router.Group("/api/v1/orchestration", runtimeauth.Middleware(s.Auth, s.Personas)), &Handler{Service: s})
+	url := "/api/v1/orchestration/tasks/"
+	require.Equal(t, 403, runtimeRequest(t, router, "GET", "/api/v1/orchestration/runtime/workspace?workspace_id=other", token, "", nil).Code)
+	require.Equal(t, 404, runtimeRequest(t, router, "GET", url+"foreign", token, "", nil).Code)
+	require.Equal(t, 403, runtimeRequest(t, router, "POST", url+"delivery/comments", token, "", map[string]string{"body": "A note"}).Code)
+	require.Equal(t, 201, runtimeRequest(t, router, "POST", url+"delivery/comments", token, run.ID, map[string]string{"body": "A note", "author_id": "spoof"}).Code)
+	rows, err := s.Repo.ListComments(ctx, "delivery", 10)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.Equal(t, "chief", rows[0].AuthorID)
+	_, finishErr := s.Runs.FinishRun(ctx, run.ID, "finished", nil)
+	require.NoError(t, finishErr)
+	require.Equal(t, 403, runtimeRequest(t, router, "POST", url+"delivery/comments", token, run.ID, map[string]string{"body": "Another note"}).Code)
+	rows, err = s.Repo.ListComments(ctx, "delivery", 10)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+}
+func TestRetryQueuesOriginalIntentWithoutReusingCredentials(t *testing.T) {
+	s, _, task := newRuntime(t)
+	ctx := context.Background()
+	require.NoError(t, s.Repo.PutComment(ctx, &models.TaskComment{ID: "original", TaskID: task, AuthorID: "user", AuthorType: "user", Source: "user", Body: "Original request"}))
+	require.NoError(t, s.QueueTurn(ctx, "chief", task, "task_comment", "failed", map[string]any{"comment_id": "original"}))
+	first, err := s.Runs.ClaimNextEligibleRun(ctx)
+	require.NoError(t, err)
+	require.NoError(t, s.Runs.UpdateRunRuntimeSnapshot(ctx, first.ID, "workspace_coordinator", first.Payload, "session"))
+	_, finishErr := s.Runs.FinishRun(ctx, first.ID, "failed", nil)
+	require.NoError(t, finishErr)
+	router := gin.New()
+	RegisterRoutes(router.Group("/api/v1/orchestration"), &Handler{Service: s})
+	path := "/api/v1/orchestration/tasks/" + task + "/retry"
+	require.Equal(t, 202, runtimeRequest(t, router, "POST", path, "", "", map[string]string{"session_id": "session", "action": "resume"}).Code)
+	repeat := runtimeRequest(t, router, "POST", path, "", "", map[string]string{"session_id": "session", "action": "resume"})
+	require.Equal(t, 200, repeat.Code, "a repeated retry reports the retry already queued")
+	require.Contains(t, repeat.Body.String(), `"already_queued"`)
+	next, err := s.Runs.ClaimNextEligibleRun(ctx)
+	require.NoError(t, err)
+	require.NotEqual(t, first.ID, next.ID)
+	require.Equal(t, first.Payload, next.Payload)
+	s.Start = func(ctx context.Context, l Launch) error {
+		require.NoError(t, l.OnSessionPrepared(ctx, "session"))
+		claims, err := s.Auth.ValidateAgentJWT(l.Env["KANDEV_RUN_TOKEN"])
+		require.NoError(t, err)
+		require.Equal(t, next.ID, claims.RunID)
+		require.Equal(t, "session", claims.SessionID)
+		return nil
+	}
+	handled, err := s.Process(ctx, next)
+	require.NoError(t, err)
+	require.True(t, handled)
+}
+
+func TestConversationWritesRequireWorkspaceManageAccess(t *testing.T) {
+	s, _, task := newRuntime(t)
+	router := gin.New()
+	allow := func(context.Context, string) error { return nil }
+	deny := func(context.Context, string) error { return errors.New("forbidden") }
+	RegisterRoutes(router.Group("/api/v1/orchestration"), &Handler{Service: s, Authorize: allow, AuthorizeManage: deny})
+	url := "/api/v1/orchestration/tasks/" + task
+	require.Equal(t, 403, runtimeRequest(t, router, "POST", url+"/comments", "", "", map[string]string{"body": "Delete every workflow"}).Code,
+		"a reader cannot direct a coordinator that acts with workspace-manage authority")
+	require.Equal(t, 403, runtimeRequest(t, router, "POST", url+"/retry", "", "", map[string]string{"run_id": "run"}).Code)
+	require.NotEqual(t, 403, runtimeRequest(t, router, "GET", url+"/comments", "", "", nil).Code, "a reader can still read the conversation")
+}
+
+func TestRetryFollowsFailedRetriesAndUnboundTurns(t *testing.T) {
+	s, _, task := newRuntime(t)
+	ctx := context.Background()
+	require.NoError(t, s.Repo.PutComment(ctx, &models.TaskComment{ID: "original", TaskID: task, AuthorID: "user", AuthorType: "user", Source: "user", Body: "Original request"}))
+	require.NoError(t, s.QueueTurn(ctx, "chief", task, "task_comment", "failed", map[string]any{"comment_id": "original"}))
+	first, err := s.Runs.ClaimNextEligibleRun(ctx)
+	require.NoError(t, err)
+	require.NoError(t, s.Runs.UpdateRunRuntimeSnapshot(ctx, first.ID, "workspace_coordinator", first.Payload, "session"))
+	_, err = s.Runs.FinishRun(ctx, first.ID, "failed", nil)
+	require.NoError(t, err)
+	router := gin.New()
+	RegisterRoutes(router.Group("/api/v1/orchestration"), &Handler{Service: s})
+	path := "/api/v1/orchestration/tasks/" + task + "/retry"
+	bySession := map[string]string{"session_id": "session", "action": "resume"}
+	failUnbound := func() string {
+		t.Helper()
+		run, err := s.Runs.ClaimNextEligibleRun(ctx)
+		require.NoError(t, err)
+		_, err = s.Runs.FinishRun(ctx, run.ID, "failed", nil)
+		require.NoError(t, err)
+		return run.ID
+	}
+
+	require.Equal(t, 202, runtimeRequest(t, router, "POST", path, "", "", bySession).Code)
+	second := failUnbound()
+	result := runtimeRequest(t, router, "POST", path, "", "", bySession)
+	require.Equal(t, 202, result.Code, "a retry whose earlier retry failed before binding queues a new turn")
+	require.Contains(t, result.Body.String(), `"queued"`)
+	third := failUnbound()
+	require.NotEqual(t, second, third)
+
+	result = runtimeRequest(t, router, "POST", path, "", "", map[string]string{"run_id": third, "action": "resume"})
+	require.Equal(t, 202, result.Code, "a turn that never bound a session is retried by run id")
+	fourth, err := s.Runs.ClaimNextEligibleRun(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "retry:"+third, *fourth.IdempotencyKey)
+}

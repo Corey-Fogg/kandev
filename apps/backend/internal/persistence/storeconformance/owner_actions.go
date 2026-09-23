@@ -158,6 +158,8 @@ func buildOwnerBehaviors() map[string]ownerBehavior {
 		}},
 	}
 
+	behaviors["runs"] = ownerBehavior{actions: []apiAction{runsAction()}}
+	behaviors["orchestration"] = ownerBehavior{actions: []apiAction{orchestrationMemoryAction()}}
 	behaviors["office"] = ownerBehavior{actions: []apiAction{officeAction()}}
 	behaviors["terminal"] = ownerBehavior{actions: []apiAction{terminalAction()}}
 	behaviors["quick-terminal"] = ownerBehavior{actions: []apiAction{quickTerminalAction()}}
