@@ -99,11 +99,14 @@ func validateOrchestratedCompletion(ctx context.Context, repos *Repositories, st
 
 // startOrchestrationRuntime attaches the conversation runtime to the event bus
 // and its dependents before run dispatch starts. Interrupted conversation runs
-// are settled first so a restart never leaves a turn claimed forever.
+// are settled first so a restart never leaves a turn claimed forever. The
+// coordinator dispatch guard is installed whether or not the feature is on,
+// so a coordinator conversation never dispatches outside its broker session.
 func startOrchestrationRuntime(
-	ctx context.Context, cfg *config.Config, services *Services, orch *orchestrator.Service,
+	ctx context.Context, cfg *config.Config, services *Services, orch dispatchGuardSetter,
 	repos *Repositories, eventBus bus.EventBus, addCleanup func(func() error), log *logger.Logger,
 ) bool {
+	wireCoordinatorDispatch(orch, services.Orchestration, repos.Orchestration)
 	if services.Orchestration == nil || !cfg.Features.Orchestration {
 		return true
 	}
@@ -120,6 +123,5 @@ func startOrchestrationRuntime(
 		return false
 	}
 	addCleanup(func() error { cleanup(); return nil })
-	wireCoordinatorDispatch(orch, services.Orchestration, repos.Orchestration)
 	return true
 }

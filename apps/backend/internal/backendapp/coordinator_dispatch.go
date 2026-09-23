@@ -7,7 +7,6 @@ import (
 
 	orchstore "github.com/kandev/kandev/internal/orchestration/repository/sqlite"
 	orchestrationruntime "github.com/kandev/kandev/internal/orchestration/runtime"
-	"github.com/kandev/kandev/internal/orchestrator"
 	"github.com/kandev/kandev/internal/orchestrator/executor"
 	"github.com/kandev/kandev/internal/task/models"
 )
@@ -34,8 +33,12 @@ func coordinatorDispatchGuard(s *orchestrationruntime.Service, owners *orchstore
 	}
 }
 
+type dispatchGuardSetter interface {
+	SetDispatchGuard(executor.DispatchGuard)
+}
+
 // wireCoordinatorDispatch installs the coordinator conversation guard on every
 // native dispatch path.
-func wireCoordinatorDispatch(orch *orchestrator.Service, s *orchestrationruntime.Service, owners *orchstore.Repository) {
+func wireCoordinatorDispatch(orch dispatchGuardSetter, s *orchestrationruntime.Service, owners *orchstore.Repository) {
 	orch.SetDispatchGuard(coordinatorDispatchGuard(s, owners))
 }
