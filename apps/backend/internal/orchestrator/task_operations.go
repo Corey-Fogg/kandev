@@ -1447,7 +1447,7 @@ func (s *Service) startTask(ctx context.Context, taskID string, agentProfileID s
 		return nil, fmt.Errorf("failed to determine office task status: %w", err)
 	}
 	if isOfficeTask {
-		if err := validateOfficeLaunchEnv(taskID, env); err != nil {
+		if err := validateOfficeLaunchEnv(taskID, env, opts.McpProfile != nil && opts.McpProfile.IsBroker()); err != nil {
 			return nil, err
 		}
 	}
@@ -1950,15 +1950,18 @@ func (s *Service) lookupOfficeTask(ctx context.Context, taskID string) (bool, er
 	return dbTask != nil && dbTask.IsFromOffice, nil
 }
 
-func validateOfficeRuntimeEnv(env map[string]string) error {
+func validateOfficeRuntimeEnv(env map[string]string, brokerOnly bool) error {
 	required := []string{
-		"KANDEV_CLI",
 		"KANDEV_API_URL",
 		"KANDEV_API_KEY",
 		"KANDEV_AGENT_ID",
 		"KANDEV_WORKSPACE_ID",
 		"KANDEV_RUN_ID",
 		"KANDEV_TASK_ID",
+	}
+	// A broker-only launch has no shell, so it is never handed the Kandev CLI.
+	if !brokerOnly {
+		required = append([]string{"KANDEV_CLI"}, required...)
 	}
 	missing := make([]string, 0, len(required))
 	for _, key := range required {
@@ -1991,8 +1994,8 @@ var (
 // task being launched. StartTaskWithEnv is only wired to the internal Office
 // scheduler adapter; the task binding still prevents a complete context map
 // from being reused for a different task.
-func validateOfficeLaunchEnv(taskID string, env map[string]string) error {
-	if err := validateOfficeRuntimeEnv(env); err != nil {
+func validateOfficeLaunchEnv(taskID string, env map[string]string, brokerOnly bool) error {
+	if err := validateOfficeRuntimeEnv(env, brokerOnly); err != nil {
 		return err
 	}
 	if env["KANDEV_TASK_ID"] != taskID {

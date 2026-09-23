@@ -23,3 +23,16 @@ func TestApplyLaunchPromptContext_BrokerLaunchGetsNoKandevMCPContext(t *testing.
 	assert.NotContains(t, out, "_kandev")
 	assert.Contains(t, out, "Current user message: plan the release")
 }
+
+func TestValidateOfficeLaunchEnv_BrokerLaunchNeedsNoCLI(t *testing.T) {
+	env := map[string]string{
+		"KANDEV_API_URL":      "http://localhost:1",
+		"KANDEV_API_KEY":      "token",
+		"KANDEV_AGENT_ID":     "chief",
+		"KANDEV_WORKSPACE_ID": "ws",
+		"KANDEV_RUN_ID":       "run",
+		"KANDEV_TASK_ID":      "task",
+	}
+	assert.NoError(t, validateOfficeLaunchEnv("task", env, true), "a broker launch has no shell and carries no CLI")
+	assert.ErrorContains(t, validateOfficeLaunchEnv("task", env, false), "missing KANDEV_CLI")
+}
