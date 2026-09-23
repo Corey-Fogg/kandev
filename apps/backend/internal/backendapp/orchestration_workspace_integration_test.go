@@ -45,9 +45,11 @@ func TestWorkspaceBrokerNativeLifecycle(t *testing.T) {
 	}
 	response := call("tasks", map[string]any{"title": "Synthetic broker lifecycle", "workflow_id": wf.ID, "execution_mode": "execute"})
 	require.Equal(t, 201, response.Code, response.Body.String())
-	var created map[string]string
+	var created struct {
+		ID string `json:"id"`
+	}
 	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &created))
-	id := created["id"]
+	id := created.ID
 	require.NotEmpty(t, id)
 	path := "tasks/" + id + "/manage"
 	for _, body := range []map[string]any{
