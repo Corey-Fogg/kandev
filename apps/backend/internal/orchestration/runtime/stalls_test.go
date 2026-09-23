@@ -12,6 +12,7 @@ import (
 	"github.com/kandev/kandev/internal/events"
 	"github.com/kandev/kandev/internal/events/bus"
 	"github.com/kandev/kandev/internal/orchestration/models"
+	taskmodels "github.com/kandev/kandev/internal/task/models"
 	v1 "github.com/kandev/kandev/pkg/api/v1"
 )
 
@@ -94,4 +95,32 @@ func TestTaskUpdateCarriesSourceIssueAndPullRequest(t *testing.T) {
 	require.Contains(t, text.String(), "Stalled: no_progress after 10m0s")
 	require.Contains(t, text.String(), "Source issue: jira ABC-12 https://example.atlassian.net/browse/ABC-12")
 	require.Contains(t, text.String(), "Pull request: #7 merged https://github.com/example/repo/pull/7")
+}
+
+// A delegated session that stopped on a login refresh failure tells its
+// coordinator to call repair_session, even while the task stays in progress.
+func TestLoginRefreshFailureDigestAsksForRepairSession(t *testing.T) {
+	s, db, _ := newRuntime(t)
+	ctx := context.Background()
+	delegate(s, "delegated", v1.TaskStateInProgress)
+	s.Tasks.(*testTasks).sessions = []*taskmodels.TaskSession{{ID: "worker", TaskID: "delegated", State: taskmodels.TaskSessionStateFailed,
+		ErrorMessage: "Internal error: Failed to refresh OAuth token: *** Claude Code process is refreshing it or exited mid-refresh"}}
+	require.NoError(t, s.onEvent(ctx, bus.NewEvent(events.TaskStateChanged, "test", map[string]string{"task_id": "delegated"})))
+	ids := queuedCallbacks(t, db)
+	require.Len(t, ids, 1)
+	updates := queuedUpdates(t, s, ids[0])
+	require.Len(t, updates, 1)
+	require.True(t, updates[0].LoginFailure)
+	var text strings.Builder
+	writeTaskUpdates(&text, updates)
+	require.Contains(t, text.String(), "login refresh failure — call repair_session")
+
+	require.NoError(t, s.onEvent(ctx, bus.NewEvent(events.AgentStalled, "test", map[string]any{"task_id": "delegated", "session_id": "worker", "prompt_generation": 1})))
+	ids = queuedCallbacks(t, db)
+	stall := queuedUpdates(t, s, ids[len(ids)-1])
+	require.True(t, stall[len(stall)-1].LoginFailure, "the stall digest carries the hint too")
+
+	var plain strings.Builder
+	writeTaskUpdates(&plain, []taskUpdate{{TaskID: "other", Title: "Other", State: "FAILED", Error: "git push rejected"}})
+	require.NotContains(t, plain.String(), "repair_session")
 }

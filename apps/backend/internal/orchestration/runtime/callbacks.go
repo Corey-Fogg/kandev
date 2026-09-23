@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/kandev/kandev/internal/agent/credentiallock"
 	"github.com/kandev/kandev/internal/orchestration/models"
 	runmodels "github.com/kandev/kandev/internal/runs/models"
 	taskmodels "github.com/kandev/kandev/internal/task/models"
@@ -44,6 +45,9 @@ type taskUpdate struct {
 	// orphaned.
 	StallOutcome string `json:"stall_outcome,omitempty"`
 	StalledFor   string `json:"stalled_for,omitempty"`
+	// LoginFailure marks a session that stopped on a provider login refresh
+	// failure, which repair_session clears and resumes.
+	LoginFailure bool `json:"login_failure,omitempty"`
 }
 
 // actionable reports whether the update warrants a coordinator turn: the
@@ -53,7 +57,7 @@ func (u taskUpdate) actionable() bool {
 	case "REVIEW", "COMPLETED", "FAILED", "WAITING_FOR_INPUT", "BLOCKED":
 		return true
 	}
-	return u.PendingPermissions+u.PendingQuestions > 0 || u.StallOutcome != ""
+	return u.PendingPermissions+u.PendingQuestions > 0 || u.StallOutcome != "" || u.LoginFailure
 }
 
 // taskCallback wakes the delegating coordinator with the task's digest. An
@@ -129,6 +133,7 @@ func (s *Service) describeTask(ctx context.Context, task *taskmodels.Task) (task
 			update.Error = clip(agentErr.Code+": "+agentErr.Message, 300)
 			identity = append(identity, "error:"+agentErr.Stamp())
 		}
+		update.LoginFailure = loginFailure(update.Error, session.ErrorMessage)
 		text, err := s.lastAgentMessage(ctx, session.ID)
 		if err != nil {
 			return update, "", err
@@ -154,6 +159,17 @@ func (s *Service) describeTask(ctx context.Context, task *taskmodels.Task) (task
 		}
 	}
 	return update, fmt.Sprintf("%x", sha256.Sum256([]byte(strings.Join(identity, "\x00")))), nil
+}
+
+// loginFailure reports whether any of a session's recorded errors is a
+// provider login refresh failure.
+func loginFailure(messages ...string) bool {
+	for _, message := range messages {
+		if credentiallock.IsLoginFailure(message) {
+			return true
+		}
+	}
+	return false
 }
 
 func latestSession(sessions []*taskmodels.TaskSession) *taskmodels.TaskSession {
@@ -282,6 +298,9 @@ func writeTaskUpdates(text *strings.Builder, updates []taskUpdate) {
 		}
 		if u.Error != "" {
 			fmt.Fprintf(text, "  Error: %s\n", u.Error)
+		}
+		if u.LoginFailure {
+			text.WriteString("  Hint: login refresh failure — call repair_session.\n")
 		}
 		if u.LastMessage != "" {
 			fmt.Fprintf(text, "  Latest reply: %s\n", u.LastMessage)

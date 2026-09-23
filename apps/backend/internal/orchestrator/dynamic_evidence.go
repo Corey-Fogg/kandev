@@ -196,9 +196,23 @@ func (s *Service) observeProviderDiagnostic(
 	promptGeneration uint64,
 	message string,
 ) {
+	s.observeProviderDiagnosticFrom(sessionID, executionID, promptGeneration, "", message)
+}
+
+// observeProviderDiagnosticFrom classifies a diagnostic chunk with the rules of
+// the agent that emitted it. agentctl marks the chunk as a candidate using
+// those same provider rules, so classifying it provider-neutrally would miss
+// provider-only fingerprints (Claude's OAuth refresh contention) and record
+// the diagnostic as ordinary output, which blocks every automatic retry.
+func (s *Service) observeProviderDiagnosticFrom(
+	sessionID, executionID string,
+	promptGeneration uint64,
+	providerID, message string,
+) {
 	classified := routingerr.Classify(routingerr.Input{
-		Phase:  routingerr.PhasePromptSend,
-		Stderr: message,
+		Phase:      routingerr.PhasePromptSend,
+		ProviderID: providerID,
+		Stderr:     message,
 	})
 	if classified.Confidence != routingerr.ConfHigh || !classified.FallbackAllowed {
 		s.observePromptAttempt(sessionID, executionID, promptGeneration, true, false)
@@ -287,7 +301,7 @@ func (s *Service) withPromptAttemptEvidenceLocked(data watcher.AgentEventData) w
 		data.DynamicRouteAttempt = true
 	}
 	if lifecycleEvidenceKnown && lifecycleDiagnosticCandidate && !evidence.output && !evidence.effect {
-		s.observeLifecycleProviderDiagnosticLocked(evidence, lifecycleDiagnosticText)
+		s.observeLifecycleProviderDiagnosticLocked(evidence, data.AgentID, lifecycleDiagnosticText)
 	}
 	outputObserved := evidence.outputObservedLocked(data)
 	if lifecycleEvidenceKnown {
@@ -307,7 +321,7 @@ func (s *Service) withPromptAttemptEvidenceLocked(data watcher.AgentEventData) w
 // event may arrive after the terminal failure because those events use
 // separate subscriptions, so an absent or unclassifiable diagnostic fails
 // closed as ordinary output.
-func (s *Service) observeLifecycleProviderDiagnosticLocked(evidence *promptAttemptEvidence, message string) {
+func (s *Service) observeLifecycleProviderDiagnosticLocked(evidence *promptAttemptEvidence, providerID, message string) {
 	message = normalizeDiagnosticText(message)
 	if message == "" {
 		evidence.output = true
@@ -316,8 +330,9 @@ func (s *Service) observeLifecycleProviderDiagnosticLocked(evidence *promptAttem
 		return
 	}
 	classified := routingerr.Classify(routingerr.Input{
-		Phase:  routingerr.PhasePromptSend,
-		Stderr: message,
+		Phase:      routingerr.PhasePromptSend,
+		ProviderID: providerID,
+		Stderr:     message,
 	})
 	if classified.Confidence != routingerr.ConfHigh || !classified.FallbackAllowed {
 		evidence.output = true
@@ -363,8 +378,9 @@ func matchingProviderFailureCode(data watcher.AgentEventData) routingerr.Code {
 		return ""
 	}
 	return routingerr.Classify(routingerr.Input{
-		Phase:  routingerr.PhasePromptSend,
-		Stderr: message,
+		Phase:      routingerr.PhasePromptSend,
+		ProviderID: data.AgentID,
+		Stderr:     message,
 	}).Code
 }
 

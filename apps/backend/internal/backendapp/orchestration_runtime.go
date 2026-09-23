@@ -8,6 +8,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/kandev/kandev/internal/agent/credentiallock"
 	"github.com/kandev/kandev/internal/agent/runtimeauth"
 	"github.com/kandev/kandev/internal/common/config"
 	"github.com/kandev/kandev/internal/common/logger"
@@ -47,6 +48,9 @@ func newOrchestrationRuntime(cfg *config.Config, repos *Repositories, services *
 			_, err := orch.StartTaskWithRoute(ctx, launch.TaskID, launch.PersonaID, orchestrationLaunchContext(repos, launch), orchexecutor.RouteOverride{ExecutionProfileID: launch.ProfileID})
 			return err
 		},
+		ClearCredentialLock: func(ctx context.Context, profileID string) {
+			clearCoordinatorCredentialLock(ctx, repos.AgentSettings, profileID, log)
+		},
 		UpdateStatus: func(ctx context.Context, ws, id, status string) error {
 			return updateOrchestratedStatus(ctx, services.Task, repos, ws, id, status)
 		},
@@ -54,6 +58,21 @@ func newOrchestrationRuntime(cfg *config.Config, repos *Repositories, services *
 	orch.SetManagedFailureRecovery(runtime.HandleFailure, runtime.CancelRecovery)
 	return runtime
 }
+
+// clearCoordinatorCredentialLock removes a stale Claude login lock before a
+// coordinator launch. It is best effort: a lock it cannot clear leaves the
+// launch to fail and the automatic retry to try again.
+func clearCoordinatorCredentialLock(ctx context.Context, profiles credentiallock.ProfileReader, profileID string, log *logger.Logger) {
+	cleared, err := credentiallock.ClearForProfile(ctx, profiles, profileID)
+	if err != nil {
+		log.Warn("coordinator credential lock check failed", zap.String("profile_id", profileID), zap.Error(err))
+		return
+	}
+	if cleared {
+		log.Info("cleared stale coordinator credential lock", zap.String("profile_id", profileID))
+	}
+}
+
 func updateOrchestratedStatus(ctx context.Context, tasks *taskservice.Service, repos *Repositories, ws, id, status string) error {
 	task, err := tasks.GetTask(ctx, id)
 	// Conversation, Office and ephemeral tasks keep their own state

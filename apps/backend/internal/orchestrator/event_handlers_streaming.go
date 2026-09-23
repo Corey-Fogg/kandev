@@ -108,10 +108,11 @@ func (s *Service) handleAgentStreamEvent(ctx context.Context, payload *lifecycle
 		// immediately before the session/prompt RPC error. Track those chunks
 		// separately so the matching typed failure can still be safely routed.
 		if payload.Data.ProviderDiagnosticCandidate {
-			s.observeProviderDiagnostic(
+			s.observeProviderDiagnosticFrom(
 				payload.SessionID,
 				eventExecutionID,
 				payload.Data.PromptGeneration,
+				payload.AgentType,
 				payload.Data.Text,
 			)
 		} else {

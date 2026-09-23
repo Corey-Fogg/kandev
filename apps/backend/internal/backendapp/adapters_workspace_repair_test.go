@@ -7,7 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kandev/kandev/internal/agent/credentiallock"
 	settingsmodels "github.com/kandev/kandev/internal/agent/settings/models"
+	"github.com/kandev/kandev/internal/common/logger"
 	"github.com/kandev/kandev/internal/task/models"
 	"github.com/stretchr/testify/require"
 )
@@ -15,14 +17,14 @@ import (
 type repairProfiles struct{ dir string }
 
 func (p repairProfiles) GetAgentProfile(context.Context, string) (*settingsmodels.AgentProfile, error) {
-	return &settingsmodels.AgentProfile{EnvVars: []settingsmodels.ProfileEnvVar{{Key: claudeConfigDirEnv, Value: p.dir}}}, nil
+	return &settingsmodels.AgentProfile{EnvVars: []settingsmodels.ProfileEnvVar{{Key: credentiallock.ConfigDirEnv, Value: p.dir}}}, nil
 }
 
 func TestRepairClassifiesOnlyCredentialFailures(t *testing.T) {
-	require.True(t, isCredentialFailure("Internal error: Failed to refresh OAuth token: another Claude Code process is refreshing it"))
-	require.True(t, isCredentialFailure(`{"type":"authentication_error"}`))
-	require.False(t, isCredentialFailure("git push rejected"))
-	require.False(t, isCredentialFailure(""))
+	require.True(t, credentiallock.IsLoginFailure("Internal error: Failed to refresh OAuth token: another Claude Code process is refreshing it"))
+	require.True(t, credentiallock.IsLoginFailure(`{"type":"authentication_error"}`))
+	require.False(t, credentiallock.IsLoginFailure("git push rejected"))
+	require.False(t, credentiallock.IsLoginFailure(""))
 }
 
 func TestRepairClearsOnlyStaleEmptyCredentialLock(t *testing.T) {
@@ -37,7 +39,7 @@ func TestRepairClearsOnlyStaleEmptyCredentialLock(t *testing.T) {
 	require.NoError(t, adapter.clearStaleCredentialLock(ctx, session))
 	require.DirExists(t, lock, "a fresh lock may belong to a live refresh")
 
-	old := time.Now().Add(-2 * staleCredentialLockAge)
+	old := time.Now().Add(-2 * credentiallock.StaleAge)
 	require.NoError(t, os.WriteFile(filepath.Join(lock, "owner"), nil, 0o600))
 	require.NoError(t, os.Chtimes(lock, old, old))
 	require.NoError(t, adapter.clearStaleCredentialLock(ctx, session))
@@ -49,4 +51,21 @@ func TestRepairClearsOnlyStaleEmptyCredentialLock(t *testing.T) {
 	require.NoDirExists(t, lock)
 
 	require.NoError(t, adapter.clearStaleCredentialLock(ctx, session), "no lock is a no-op")
+}
+
+func TestCoordinatorLaunchClearsStaleCredentialLock(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), ".claude-personal")
+	lock := dir + ".lock"
+	log, err := logger.NewLogger(logger.LoggingConfig{Level: "error"})
+	require.NoError(t, err)
+	ctx := context.Background()
+
+	require.NoError(t, os.Mkdir(lock, 0o755))
+	clearCoordinatorCredentialLock(ctx, repairProfiles{dir: dir}, "personal", log)
+	require.DirExists(t, lock, "a fresh lock may belong to a live refresh")
+
+	old := time.Now().Add(-2 * credentiallock.StaleAge)
+	require.NoError(t, os.Chtimes(lock, old, old))
+	clearCoordinatorCredentialLock(ctx, repairProfiles{dir: dir}, "personal", log)
+	require.NoDirExists(t, lock)
 }

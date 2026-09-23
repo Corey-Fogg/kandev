@@ -54,9 +54,15 @@ type Service struct {
 	Tasks                   Tasks
 	Manager                 Manager
 	Start                   func(context.Context, Launch) error
-	UpdateStatus            func(context.Context, string, string, string) error
-	APIURL                  string
-	mu                      sync.Mutex
+	// ClearCredentialLock removes a stale provider login lock for an
+	// execution profile. It runs before every launch, first attempts and
+	// automatic retries alike, so a lock left by a process killed mid-refresh
+	// cannot fail every later turn. It must only remove an empty lock older
+	// than the provider's own stale age.
+	ClearCredentialLock func(context.Context, string)
+	UpdateStatus        func(context.Context, string, string, string) error
+	APIURL              string
+	mu                  sync.Mutex
 	// PullRequests returns the most relevant pull request per task id.
 	PullRequests func(context.Context, []string) (map[string]models.TaskPullRequest, error)
 	// SourceIssues writes back to the tracker issue a task was created from.
@@ -179,6 +185,7 @@ func (s *Service) launch(ctx context.Context, run *runmodels.Run) error {
 	if err != nil {
 		return err
 	}
+	s.clearCredentialLock(ctx, profile)
 	token, err := s.Auth.MintRuntimeJWT(a.ID, taskID, ws, run.ID, "", workspaceCoordinatorAudience)
 	if err != nil {
 		return err
@@ -194,6 +201,14 @@ func (s *Service) launch(ctx context.Context, run *runmodels.Run) error {
 	}
 	return s.Start(ctx, Launch{TaskID: taskID, PersonaID: a.ID, ProfileID: profile, ExecutorID: executorID, Prompt: prompt, Env: env,
 		OnSessionPrepared: s.bindRuntimeSession(run, a.ID, taskID, ws, env)})
+}
+
+// clearCredentialLock runs the injected stale-lock cleanup, when wired, for
+// the execution profile about to launch.
+func (s *Service) clearCredentialLock(ctx context.Context, profile string) {
+	if s.ClearCredentialLock != nil {
+		s.ClearCredentialLock(ctx, profile)
+	}
 }
 
 func (s *Service) bindRuntimeSession(run *runmodels.Run, persona, taskID, workspace string, env map[string]string) func(context.Context, string) error {
