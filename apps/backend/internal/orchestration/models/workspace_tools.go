@@ -27,6 +27,12 @@ const (
 	fieldSessionID    = "session_id"
 	fieldTitle        = "title"
 	fieldWorkflowID   = "workflow_id"
+
+	fieldAcceptanceCriteria = "acceptance_criteria"
+	fieldStatus             = "status"
+	schemaProperties        = "properties"
+	schemaRequired          = "required"
+	schemaMaxLength         = "maxLength"
 )
 
 // BrokerBatchLimit bounds the tasks one batched broker call may change.
@@ -65,8 +71,10 @@ func WorkspaceBrokerTools() []WorkspaceBrokerTool {
 		{Name: "forget", Description: "Delete one workspace memory entry by id.", Method: http.MethodDelete, Path: "/runtime/memory/:id"},
 		createTaskTool(),
 		manageTaskTool(),
-		{Name: "task_status", Description: "Set a task's status. Native completion gates apply. Use manage_task move to change its board column. Pass ids instead of id to update several tasks.", Method: http.MethodPost, Path: "/runtime/tasks/:id/status", Batch: true,
-			Request: map[string]any{"status": enumSchema("New status.", "todo", "in_progress", "in_review", "done")}, RequestRequired: []string{"status"}},
+		{Name: "task_proposals", Description: "List your task proposals awaiting or after the user's decision, newest first.", Method: http.MethodGet, Path: "/runtime/proposals",
+			Query: map[string]any{fieldStatus: enumSchema("pending lists undecided proposals; default all.", "pending", "all")}},
+		{Name: "task_status", Description: "Set a task's status. Native completion gates apply. Use manage_task move to change its board column. Pass ids instead of id to update several tasks. A task with acceptance criteria cannot be set done until verify_criteria recorded every criterion as met; the 409 lists the rest.", Method: http.MethodPost, Path: "/runtime/tasks/:id/status", Batch: true,
+			Request: map[string]any{fieldStatus: enumSchema("New status.", "todo", "in_progress", "in_review", "done")}, RequestRequired: []string{fieldStatus}},
 		{Name: "update_source_issue", Description: "Comment on or move the Jira or Linear issue a task was created from (the task's source in workspace_tasks). The issue comes from the task, never from arguments. Write only what the user asked for or what the role instructions require, once per outcome; never repeat a write after a lost response.", Method: http.MethodPost, Path: "/runtime/tasks/:id/source-issue",
 			Request: map[string]any{
 				"comment": boundedStringSchema("Comment to post on the issue.", SourceCommentMaxBytes),
@@ -79,7 +87,7 @@ func WorkspaceBrokerTools() []WorkspaceBrokerTool {
 
 // createTaskTool describes the create_task broker tool.
 func createTaskTool() WorkspaceBrokerTool {
-	return WorkspaceBrokerTool{Name: "create_task", Description: "Create a delegated workspace task. A title over 60 characters is shortened and kept in full at the top of the description. Select workflow_id when the workspace has several workflows. Pass source for work on a Jira or Linear issue: when the workspace already has a task for that issue, including one an issue watch created or an archived one, no task is created and the response is {id, duplicate: true, archived}. After an unknown outcome, read workspace_tasks before retrying.", Method: http.MethodPost, Path: "/runtime/tasks",
+	return WorkspaceBrokerTool{Name: "create_task", Description: "Create a delegated workspace task. A title over 60 characters is shortened and kept in full at the top of the description. Select workflow_id when the workspace has several workflows. Pass source for work on a Jira or Linear issue: when the workspace already has a task for that issue, including one an issue watch created or an archived one, no task is created and the response is {id, duplicate: true, archived}. After an unknown outcome, read workspace_tasks before retrying. When this orchestrator is set to ask before creating tasks, nothing is created: the response is 202 {proposal_id, status: pending} and the user approves, edits or dismisses it in chat; you are woken with the decision. Never re-submit a pending proposal; read task_proposals after an unknown outcome.", Method: http.MethodPost, Path: "/runtime/tasks",
 		Request: map[string]any{
 			fieldTitle:         stringSchema("Task title, ideally 60 characters or fewer."),
 			fieldDescription:   stringSchema("Goal, bounded requirements, context, boundaries and verification."),
@@ -93,21 +101,23 @@ func createTaskTool() WorkspaceBrokerTool {
 			"source": map[string]any{
 				schemaType:        schemaObject,
 				schemaDescription: "Tracker issue this task implements; enables branch naming and update_source_issue.",
-				"properties": map[string]any{
+				schemaProperties: map[string]any{
 					"tracker": enumSchema("Issue tracker.", TrackerJira, TrackerLinear),
 					fieldKey:  stringSchema("Issue key, such as ABC-123."),
 					"url":     stringSchema("Issue https URL."),
 				},
-				"required": []string{"tracker", fieldKey},
+				schemaRequired: []string{"tracker", fieldKey},
 			},
+			fieldAcceptanceCriteria: map[string]any{schemaType: "array", "maxItems": MaxAcceptanceCriteria, "items": map[string]any{schemaType: schemaString, schemaMaxLength: MaxCriterionTextRunes},
+				schemaDescription: "Short checkable outcomes. Record evidence for each with manage_task verify_criteria; task_status done is refused until all are met."},
 		}, RequestRequired: []string{"title"}}
 }
 
 // manageTaskTool describes the manage_task broker tool.
 func manageTaskTool() WorkspaceBrokerTool {
-	return WorkspaceBrokerTool{Name: "manage_task", Description: "Change a task. Actions: edit (title, description, priority, parent_id; empty parent_id unnests); move (workflow_step_id, optional workflow_id, position); assign (assignee); adopt; start; stop; message (prompt, optional session_id; returns once the worker accepts it); repair_session (optional session_id; resumes a session stopped by a provider login or OAuth refresh failure, refuses others); session_mode (session_id, mode; bypass modes are unavailable); resolve_permission (session_id, request_id, pending_id and an allow_once or reject_once option_id from task_permissions); answer_question (session_id, pending_id and answers for every question, or rejected with reject_reason), only when the user's instructions or memory settle it; session_mode, resolve_permission and answer_question apply only to tasks you created or adopted; archive; delete (native cleanup refuses unsafe worktree removal). Pass ids instead of id to move, archive, adopt, assign, start or stop several tasks. Read task_details after changes; never blindly retry an unknown outcome.", Method: http.MethodPost, Path: "/runtime/tasks/:id/manage", Batch: true,
+	return WorkspaceBrokerTool{Name: "manage_task", Description: "Change a task. Actions: edit (title, description, priority, parent_id; empty parent_id unnests); move (workflow_step_id, optional workflow_id, position); assign (assignee); adopt; start; stop; message (prompt, optional session_id; returns once the worker accepts it); repair_session (optional session_id; resumes a session stopped by a provider login or OAuth refresh failure, refuses others); session_mode (session_id, mode; bypass modes are unavailable); resolve_permission (session_id, request_id, pending_id and an allow_once or reject_once option_id from task_permissions); answer_question (session_id, pending_id and answers for every question, or rejected with reject_reason), only when the user's instructions or memory settle it; session_mode, resolve_permission and answer_question apply only to tasks you created or adopted; archive; delete (native cleanup refuses unsafe worktree removal). set_criteria (acceptance_criteria) replaces the task's acceptance criteria and resets each to unverified; verify_criteria (criteria) records whether each checked criterion is met with its evidence; both apply only to tasks you created or adopted. Pass ids instead of id to move, archive, adopt, assign, start or stop several tasks. Read task_details after changes; never blindly retry an unknown outcome.", Method: http.MethodPost, Path: "/runtime/tasks/:id/manage", Batch: true,
 		Request: map[string]any{
-			fieldAction:        enumSchema("Change to apply.", "edit", "move", "assign", "adopt", "start", "stop", "message", "repair_session", "session_mode", "resolve_permission", "answer_question", "archive", "delete"),
+			fieldAction:        enumSchema("Change to apply.", "edit", "move", "assign", "adopt", "start", "stop", "message", "repair_session", "session_mode", "resolve_permission", "answer_question", "set_criteria", "verify_criteria", "archive", "delete"),
 			fieldTitle:         stringSchema("edit: new title, 60 characters or fewer."),
 			fieldDescription:   stringSchema("edit: new description."),
 			"priority":         stringSchema("edit: new priority."),
@@ -124,15 +134,26 @@ func manageTaskTool() WorkspaceBrokerTool {
 			"option_id":        stringSchema("resolve_permission: an option id whose kind is allow_once or reject_once."),
 			"answers": arraySchema("answer_question: one answer per question.", map[string]any{
 				schemaType: "object",
-				"properties": map[string]any{
+				schemaProperties: map[string]any{
 					"question_id":      stringSchema("Question id."),
 					"selected_options": arraySchema("Selected option ids.", map[string]any{schemaType: schemaString}),
 					"custom_text":      stringSchema("Free-text answer."),
 				},
-				"required": []string{"question_id"},
+				schemaRequired: []string{"question_id"},
 			}),
 			"rejected":      map[string]any{schemaType: "boolean", schemaDescription: "answer_question: decline the questions."},
 			"reject_reason": stringSchema("answer_question: why the questions are declined."),
+			fieldAcceptanceCriteria: arraySchema("set_criteria: replacement list (≤10, each ≤300 characters); resets every criterion to unverified; empty clears.",
+				map[string]any{schemaType: schemaString, schemaMaxLength: MaxCriterionTextRunes}),
+			"criteria": arraySchema("verify_criteria: one entry per checked criterion.", map[string]any{
+				schemaType: schemaObject,
+				schemaProperties: map[string]any{
+					"id":       stringSchema("Criterion id, such as c1."),
+					"met":      map[string]any{schemaType: "boolean", schemaDescription: "Whether the evidence shows the criterion is met."},
+					"evidence": boundedStringSchema("What you checked and what it showed.", MaxCriterionEvidenceRunes),
+				},
+				schemaRequired: []string{"id", "met", "evidence"},
+			}),
 		}, RequestRequired: []string{"action"}}
 }
 
@@ -163,7 +184,7 @@ func stringSchema(description string) map[string]any {
 }
 
 func boundedStringSchema(description string, maxLength int) map[string]any {
-	return map[string]any{schemaType: schemaString, schemaDescription: description, "maxLength": maxLength}
+	return map[string]any{schemaType: schemaString, schemaDescription: description, schemaMaxLength: maxLength}
 }
 
 func integerSchema(description string) map[string]any {

@@ -7,7 +7,9 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
+	"github.com/kandev/kandev/internal/common/logger"
 	"github.com/kandev/kandev/internal/events"
 	"github.com/kandev/kandev/internal/events/bus"
 	"github.com/kandev/kandev/internal/orchestration/models"
@@ -54,6 +56,10 @@ func (s *Service) onEvent(ctx context.Context, event *bus.Event) error {
 	case events.AgentStalled, events.TaskStalled:
 		return s.stallCallback(ctx, event.Type, taskID, data)
 	case events.TaskStateChanged, events.TaskMoved:
+		// A tracker write-back failure never blocks the coordinator callback.
+		if err := s.observeSourceWriteBack(ctx, taskID); err != nil {
+			logger.Default().Warn("orchestration: source issue write-back failed", zap.String("task_id", taskID), zap.Error(err))
+		}
 		return s.taskCallback(ctx, taskID)
 	case events.SessionPendingActionChanged:
 		// A delegated session that starts waiting on a permission or question

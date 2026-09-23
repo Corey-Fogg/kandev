@@ -7,7 +7,11 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+
+	"github.com/kandev/kandev/internal/common/logger"
 	"github.com/kandev/kandev/internal/events"
+	"github.com/kandev/kandev/internal/orchestration/models"
 )
 
 // Stall outcomes a coordinator receives for a delegated task.
@@ -30,6 +34,7 @@ func (s *Service) stallCallback(ctx context.Context, subject, taskID string, dat
 	if outcome == "" {
 		return nil
 	}
+	s.recordStall(ctx, taskID, outcome, stalledFor, data)
 	update, _, err := s.describeTask(ctx, task)
 	if err != nil {
 		return err
@@ -72,4 +77,17 @@ func stallDetails(subject string, data map[string]any) (outcome, stalledFor, epi
 		return stallOrphaned, stalledFor, strings.Join(sessions, ",") + ":" + last
 	}
 	return "", "", ""
+}
+
+// recordStall stores the stall episode on the task so the Coordinator view
+// can show it, even while the coordinator is paused. It is best effort.
+func (s *Service) recordStall(ctx context.Context, taskID, outcome, stalledFor string, data map[string]any) {
+	if s.TaskMetadata == nil {
+		return
+	}
+	session, _ := data["session_id"].(string)
+	stall := models.TaskStall{Outcome: outcome, StalledFor: stalledFor, SessionID: session, DetectedAt: s.now()}
+	if _, err := s.TaskMetadata.SetTaskMetadata(ctx, taskID, models.MetaTaskStall, stall); err != nil {
+		logger.Default().Warn("orchestration: recording a task stall failed", zap.String("task_id", taskID), zap.Error(err))
+	}
 }

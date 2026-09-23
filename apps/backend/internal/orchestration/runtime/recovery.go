@@ -79,7 +79,7 @@ func (h *Handler) requeue(c *gin.Context, owner string, run *runmodels.Run) {
 
 const (
 	retryKeyPrefix     = "retry:"
-	retryStatusKey     = "status"
+	retryStatusKey     = statusKey
 	retryQueued        = "queued"
 	retryAlreadyQueued = "already_queued"
 	runQueued          = "queued"
