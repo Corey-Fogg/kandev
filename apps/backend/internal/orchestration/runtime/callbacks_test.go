@@ -43,6 +43,16 @@ func TestTaskCallbackWakesOnlyForReportableStates(t *testing.T) {
 	}
 }
 
+func TestTaskCallbackWakesForATaskWhoseSessionHasNotReplied(t *testing.T) {
+	s, db, _ := newRuntime(t)
+	delegate(s, "delegated", v1.TaskStateCompleted)
+	tasks := s.Tasks.(*testTasks)
+	tasks.sessions = []*taskmodels.TaskSession{{ID: "silent", TaskID: "delegated", State: taskmodels.TaskSessionStateCompleted}}
+	tasks.textErr = sql.ErrNoRows
+	require.NoError(t, s.taskCallback(context.Background(), "delegated"))
+	require.Len(t, queuedCallbacks(t, db), 1)
+}
+
 func TestTaskCallbackSkipsConversationAndUndelegatedTasks(t *testing.T) {
 	s, db, conversation := newRuntime(t)
 	ctx := context.Background()

@@ -144,7 +144,7 @@ func (s *Service) bridgeReply(ctx context.Context, event *bus.Event, data map[st
 		body, err = s.Tasks.GetLastAgentMessageForTurn(ctx, turnID)
 	}
 	if body == "" && turnID == "" && sessionID != "" {
-		body, err = s.Tasks.GetLastAgentMessage(ctx, sessionID)
+		body, err = s.lastAgentMessage(ctx, sessionID)
 	}
 	if err != nil {
 		return err

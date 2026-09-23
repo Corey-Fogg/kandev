@@ -3,7 +3,9 @@ package runtime
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -127,7 +129,7 @@ func (s *Service) describeTask(ctx context.Context, task *taskmodels.Task) (task
 			update.Error = clip(agentErr.Code+": "+agentErr.Message, 300)
 			identity = append(identity, "error:"+agentErr.Stamp())
 		}
-		text, err := s.Tasks.GetLastAgentMessage(ctx, session.ID)
+		text, err := s.lastAgentMessage(ctx, session.ID)
 		if err != nil {
 			return update, "", err
 		}
@@ -291,4 +293,14 @@ func writeTaskUpdates(text *strings.Builder, updates []taskUpdate) {
 // updatesForPrompt is the ordered update list a turn renders.
 func updatesForPrompt(payload map[string]any) []taskUpdate {
 	return mergeUpdates(payloadUpdates(payload))
+}
+
+// lastAgentMessage returns a session's latest agent reply, or "" when the
+// session has not replied yet.
+func (s *Service) lastAgentMessage(ctx context.Context, sessionID string) (string, error) {
+	text, err := s.Tasks.GetLastAgentMessage(ctx, sessionID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return text, err
 }

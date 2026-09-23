@@ -29,6 +29,7 @@ import (
 type testTasks struct {
 	tasks    map[string]*taskmodels.Task
 	text     string
+	textErr  error
 	sessions []*taskmodels.TaskSession
 	pending  []*taskmodels.Interaction
 }
@@ -45,7 +46,9 @@ func (f *testTasks) ListTaskSessions(context.Context, string) ([]*taskmodels.Tas
 func (f *testTasks) ListPendingInteractions(context.Context, taskmodels.PendingInteractionFilter) ([]*taskmodels.Interaction, error) {
 	return f.pending, nil
 }
-func (f *testTasks) GetLastAgentMessage(context.Context, string) (string, error) { return f.text, nil }
+func (f *testTasks) GetLastAgentMessage(context.Context, string) (string, error) {
+	return f.text, f.textErr
+}
 func (f *testTasks) GetLastAgentMessageForTurn(context.Context, string) (string, error) {
 	return f.text, nil
 }
