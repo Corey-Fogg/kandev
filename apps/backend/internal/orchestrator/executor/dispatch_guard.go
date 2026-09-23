@@ -34,13 +34,6 @@ func (e *Executor) CheckDispatch(ctx context.Context, taskID, sessionID, profile
 	return e.dispatchGuard(ctx, task, session, profileID)
 }
 
-func (e *Executor) guardedLaunch(ctx context.Context, req *LaunchAgentRequest) (*LaunchAgentResponse, error) {
-	if err := e.CheckDispatch(ctx, req.TaskID, req.SessionID, req.AgentProfileID); err != nil {
-		return nil, err
-	}
-	return e.agentManager.LaunchAgent(ctx, req)
-}
-
 func (e *Executor) guardedProcessStart(ctx context.Context, taskID, sessionID, executionID string) error {
 	if err := e.CheckDispatch(ctx, taskID, sessionID, ""); err != nil {
 		return err

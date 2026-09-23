@@ -63,57 +63,8 @@ func WorkspaceBrokerTools() []WorkspaceBrokerTool {
 		{Name: "remember", Description: "Store or replace one workspace memory entry that later turns receive in their prompt. Record standing user instructions and durable workspace facts only, never secrets.", Method: http.MethodPost, Path: "/runtime/memory",
 			Request: map[string]any{fieldKey: boundedStringSchema("Entry key; an existing key is replaced.", 200), "content": boundedStringSchema("Entry text.", 2000)}, RequestRequired: []string{"key", "content"}},
 		{Name: "forget", Description: "Delete one workspace memory entry by id.", Method: http.MethodDelete, Path: "/runtime/memory/:id"},
-		{Name: "create_task", Description: "Create a delegated workspace task. A title over 60 characters is shortened and kept in full at the top of the description. Select workflow_id when the workspace has several workflows. Pass source for work on a Jira or Linear issue: when the workspace already has a task for that issue, including one an issue watch created or an archived one, no task is created and the response is {id, duplicate: true, archived}. After an unknown outcome, read workspace_tasks before retrying.", Method: http.MethodPost, Path: "/runtime/tasks",
-			Request: map[string]any{
-				fieldTitle:         stringSchema("Task title, ideally 60 characters or fewer."),
-				fieldDescription:   stringSchema("Goal, bounded requirements, context, boundaries and verification."),
-				fieldWorkflowID:    stringSchema("Delivery workflow id."),
-				"workflow_step_id": stringSchema("Entry step id; must be a start step or allow manual moves."),
-				"repository_id":    stringSchema("Repository id."),
-				"parent_id":        stringSchema("Parent task id."),
-				"assignee":         stringSchema("Execution profile id."),
-				"execution_mode":   enumSchema("design starts in plan mode; default execute.", "design", "execute"),
-				"external_id":      stringSchema("Stable external reference; omit when source is set."),
-				"source": map[string]any{
-					schemaType:        schemaObject,
-					schemaDescription: "Tracker issue this task implements; enables branch naming and update_source_issue.",
-					"properties": map[string]any{
-						"tracker": enumSchema("Issue tracker.", TrackerJira, TrackerLinear),
-						fieldKey:  stringSchema("Issue key, such as ABC-123."),
-						"url":     stringSchema("Issue https URL."),
-					},
-					"required": []string{"tracker", fieldKey},
-				},
-			}, RequestRequired: []string{"title"}},
-		{Name: "manage_task", Description: "Change a task. Actions: edit (title, description, priority, parent_id; empty parent_id unnests); move (workflow_step_id, optional workflow_id, position); assign (assignee); adopt; start; stop; message (prompt, optional session_id; returns once the worker accepts it); repair_session (optional session_id; resumes a session stopped by a provider login or OAuth refresh failure, refuses others); session_mode (session_id, mode; bypass modes are unavailable); resolve_permission (session_id, request_id, pending_id and an allow_once or reject_once option_id from task_permissions); answer_question (session_id, pending_id and answers for every question, or rejected with reject_reason) for a task you delegated, only when the user's instructions or memory settle it; archive; delete (native cleanup refuses unsafe worktree removal). Pass ids instead of id to move, archive, adopt, assign, start or stop several tasks. Read task_details after changes; never blindly retry an unknown outcome.", Method: http.MethodPost, Path: "/runtime/tasks/:id/manage", Batch: true,
-			Request: map[string]any{
-				fieldAction:        enumSchema("Change to apply.", "edit", "move", "assign", "adopt", "start", "stop", "message", "repair_session", "session_mode", "resolve_permission", "answer_question", "archive", "delete"),
-				fieldTitle:         stringSchema("edit: new title, 60 characters or fewer."),
-				fieldDescription:   stringSchema("edit: new description."),
-				"priority":         stringSchema("edit: new priority."),
-				"parent_id":        stringSchema("edit: parent task id; empty unnests."),
-				fieldWorkflowID:    stringSchema("move: target workflow id."),
-				"workflow_step_id": stringSchema("move: target step id."),
-				"position":         integerSchema("move: position within the step."),
-				"assignee":         stringSchema("assign: execution profile id."),
-				"prompt":           stringSchema("message: text for the worker."),
-				fieldSessionID:     stringSchema("Target session; default latest where optional."),
-				"mode":             enumSchema("session_mode: permission mode.", "default", "acceptEdits", "auto"),
-				"request_id":       stringSchema("resolve_permission: request id."),
-				"pending_id":       stringSchema("resolve_permission or answer_question: pending id."),
-				"option_id":        stringSchema("resolve_permission: an option id whose kind is allow_once or reject_once."),
-				"answers": arraySchema("answer_question: one answer per question.", map[string]any{
-					schemaType: "object",
-					"properties": map[string]any{
-						"question_id":      stringSchema("Question id."),
-						"selected_options": arraySchema("Selected option ids.", map[string]any{schemaType: schemaString}),
-						"custom_text":      stringSchema("Free-text answer."),
-					},
-					"required": []string{"question_id"},
-				}),
-				"rejected":      map[string]any{schemaType: "boolean", schemaDescription: "answer_question: decline the questions."},
-				"reject_reason": stringSchema("answer_question: why the questions are declined."),
-			}, RequestRequired: []string{"action"}},
+		createTaskTool(),
+		manageTaskTool(),
 		{Name: "task_status", Description: "Set a task's status. Native completion gates apply. Use manage_task move to change its board column. Pass ids instead of id to update several tasks.", Method: http.MethodPost, Path: "/runtime/tasks/:id/status", Batch: true,
 			Request: map[string]any{"status": enumSchema("New status.", "todo", "in_progress", "in_review", "done")}, RequestRequired: []string{"status"}},
 		{Name: "update_source_issue", Description: "Comment on or move the Jira or Linear issue a task was created from (the task's source in workspace_tasks). The issue comes from the task, never from arguments. Write only what the user asked for or what the role instructions require, once per outcome; never repeat a write after a lost response.", Method: http.MethodPost, Path: "/runtime/tasks/:id/source-issue",
@@ -124,6 +75,65 @@ func WorkspaceBrokerTools() []WorkspaceBrokerTool {
 		{Name: "comment", Description: "Add an internal note to a conversation. Your final reply is already recorded automatically.", Method: http.MethodPost, Path: "/runtime/comments",
 			Request: map[string]any{"body": boundedStringSchema("Note text.", 32000), "task_id": stringSchema("Conversation task; default this conversation.")}, RequestRequired: []string{"body"}},
 	}
+}
+
+// createTaskTool describes the create_task broker tool.
+func createTaskTool() WorkspaceBrokerTool {
+	return WorkspaceBrokerTool{Name: "create_task", Description: "Create a delegated workspace task. A title over 60 characters is shortened and kept in full at the top of the description. Select workflow_id when the workspace has several workflows. Pass source for work on a Jira or Linear issue: when the workspace already has a task for that issue, including one an issue watch created or an archived one, no task is created and the response is {id, duplicate: true, archived}. After an unknown outcome, read workspace_tasks before retrying.", Method: http.MethodPost, Path: "/runtime/tasks",
+		Request: map[string]any{
+			fieldTitle:         stringSchema("Task title, ideally 60 characters or fewer."),
+			fieldDescription:   stringSchema("Goal, bounded requirements, context, boundaries and verification."),
+			fieldWorkflowID:    stringSchema("Delivery workflow id."),
+			"workflow_step_id": stringSchema("Entry step id; must be a start step or allow manual moves."),
+			"repository_id":    stringSchema("Repository id."),
+			"parent_id":        stringSchema("Parent task id."),
+			"assignee":         stringSchema("Execution profile id."),
+			"execution_mode":   enumSchema("design starts in plan mode; default execute.", "design", "execute"),
+			"external_id":      stringSchema("Stable external reference; omit when source is set."),
+			"source": map[string]any{
+				schemaType:        schemaObject,
+				schemaDescription: "Tracker issue this task implements; enables branch naming and update_source_issue.",
+				"properties": map[string]any{
+					"tracker": enumSchema("Issue tracker.", TrackerJira, TrackerLinear),
+					fieldKey:  stringSchema("Issue key, such as ABC-123."),
+					"url":     stringSchema("Issue https URL."),
+				},
+				"required": []string{"tracker", fieldKey},
+			},
+		}, RequestRequired: []string{"title"}}
+}
+
+// manageTaskTool describes the manage_task broker tool.
+func manageTaskTool() WorkspaceBrokerTool {
+	return WorkspaceBrokerTool{Name: "manage_task", Description: "Change a task. Actions: edit (title, description, priority, parent_id; empty parent_id unnests); move (workflow_step_id, optional workflow_id, position); assign (assignee); adopt; start; stop; message (prompt, optional session_id; returns once the worker accepts it); repair_session (optional session_id; resumes a session stopped by a provider login or OAuth refresh failure, refuses others); session_mode (session_id, mode; bypass modes are unavailable); resolve_permission (session_id, request_id, pending_id and an allow_once or reject_once option_id from task_permissions); answer_question (session_id, pending_id and answers for every question, or rejected with reject_reason) for a task you delegated, only when the user's instructions or memory settle it; archive; delete (native cleanup refuses unsafe worktree removal). Pass ids instead of id to move, archive, adopt, assign, start or stop several tasks. Read task_details after changes; never blindly retry an unknown outcome.", Method: http.MethodPost, Path: "/runtime/tasks/:id/manage", Batch: true,
+		Request: map[string]any{
+			fieldAction:        enumSchema("Change to apply.", "edit", "move", "assign", "adopt", "start", "stop", "message", "repair_session", "session_mode", "resolve_permission", "answer_question", "archive", "delete"),
+			fieldTitle:         stringSchema("edit: new title, 60 characters or fewer."),
+			fieldDescription:   stringSchema("edit: new description."),
+			"priority":         stringSchema("edit: new priority."),
+			"parent_id":        stringSchema("edit: parent task id; empty unnests."),
+			fieldWorkflowID:    stringSchema("move: target workflow id."),
+			"workflow_step_id": stringSchema("move: target step id."),
+			"position":         integerSchema("move: position within the step."),
+			"assignee":         stringSchema("assign: execution profile id."),
+			"prompt":           stringSchema("message: text for the worker."),
+			fieldSessionID:     stringSchema("Target session; default latest where optional."),
+			"mode":             enumSchema("session_mode: permission mode.", "default", "acceptEdits", "auto"),
+			"request_id":       stringSchema("resolve_permission: request id."),
+			"pending_id":       stringSchema("resolve_permission or answer_question: pending id."),
+			"option_id":        stringSchema("resolve_permission: an option id whose kind is allow_once or reject_once."),
+			"answers": arraySchema("answer_question: one answer per question.", map[string]any{
+				schemaType: "object",
+				"properties": map[string]any{
+					"question_id":      stringSchema("Question id."),
+					"selected_options": arraySchema("Selected option ids.", map[string]any{schemaType: schemaString}),
+					"custom_text":      stringSchema("Free-text answer."),
+				},
+				"required": []string{"question_id"},
+			}),
+			"rejected":      map[string]any{schemaType: "boolean", schemaDescription: "answer_question: decline the questions."},
+			"reject_reason": stringSchema("answer_question: why the questions are declined."),
+		}, RequestRequired: []string{"action"}}
 }
 
 // BatchActions are the manage_task actions a batched call may apply.

@@ -93,14 +93,10 @@ func (s *Service) finishTurn(ctx context.Context, event *bus.Event, data map[str
 	}
 	status := "finished"
 	if event.Type == events.AgentFailed {
-		if retried, retryErr := s.retryTurn(ctx, run, data); retried || retryErr != nil {
-			return retryErr
-		}
-		status = statusFailed
-		message, _ := data["error_message"].(string)
-		if err := s.Runs.RecordFailure(ctx, run.ID, message); err != nil {
+		if retried, err := s.recordTurnFailure(ctx, run, data); retried || err != nil {
 			return err
 		}
+		status = statusFailed
 	}
 	finished, err := s.Runs.FinishRun(ctx, run.ID, status, nil)
 	if err != nil {
@@ -118,6 +114,16 @@ func (s *Service) finishTurn(ctx context.Context, event *bus.Event, data map[str
 		message = "the agent failed"
 	}
 	return s.postTurnFailure(ctx, finished, message)
+}
+
+// recordTurnFailure retries a failed turn when it can; otherwise it records
+// the failure on the run. It reports true when the turn was retried.
+func (s *Service) recordTurnFailure(ctx context.Context, run *runmodels.Run, data map[string]any) (bool, error) {
+	if retried, err := s.retryTurn(ctx, run, data); retried || err != nil {
+		return true, err
+	}
+	message, _ := data["error_message"].(string)
+	return false, s.Runs.RecordFailure(ctx, run.ID, message)
 }
 func matchesClaimedTurn(event *bus.Event, data map[string]any, run *runmodels.Run) bool {
 	sessionID, _ := data["session_id"].(string)
