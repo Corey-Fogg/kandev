@@ -883,7 +883,9 @@ func currentModelFromConfig(options []streams.ConfigOption) string {
 // SetMode changes the agent's session mode via ACP session/set_mode.
 func (a *Adapter) SetMode(ctx context.Context, modeID string) error {
 	if a.assistantRestricted() {
-		if modeID == "default" {
+		// The broker pins its own permission mode; the profile's default and
+		// auto modes are accepted without changing it.
+		if modeID == "default" || modeID == "auto" {
 			return nil
 		}
 		return fmt.Errorf("assistant policy forbids mode changes")
@@ -1135,7 +1137,8 @@ func (a *Adapter) maybeEmitAuthRequired(err error) bool {
 // equivalent event; downstream persistence is idempotent so duplicates are
 // harmless.
 func (a *Adapter) SetConfigOption(ctx context.Context, configID, value string) error {
-	if a.assistantRestricted() && configID != "model" {
+	// Model and reasoning effort change depth, not the tool surface.
+	if a.assistantRestricted() && configID != "model" && configID != "effort" {
 		return fmt.Errorf("assistant policy forbids configuration changes")
 	}
 	a.mu.RLock()

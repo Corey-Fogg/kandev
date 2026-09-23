@@ -68,3 +68,25 @@ func TestAssistantAdapterRequiresHandshakeToMatchLaunchedVersion(t *testing.T) {
 		}
 	}
 }
+
+func TestAssistantRestrictedSessionAcceptsProfileModeAndEffortOnly(t *testing.T) {
+	a, _ := newSessionRequestCaptureAdapter(t, acpsdk.McpCapabilities{})
+	a.cfg.ToolPolicy = "claude-broker-v1"
+	for _, mode := range []string{"default", "auto"} {
+		require.NoError(t, a.SetMode(context.Background(), mode))
+	}
+	for _, mode := range []string{"acceptEdits", "bypassPermissions", "plan"} {
+		require.ErrorContains(t, a.SetMode(context.Background(), mode), "forbids")
+	}
+	for _, option := range []string{"fast", "permissions"} {
+		require.ErrorContains(t, a.SetConfigOption(context.Background(), option, "on"), "forbids")
+	}
+	require.NotContains(t, errString(a.SetConfigOption(context.Background(), "effort", "high")), "forbids")
+}
+
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}

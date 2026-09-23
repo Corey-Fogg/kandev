@@ -1604,6 +1604,13 @@ func (s *Service) startTask(ctx context.Context, taskID string, agentProfileID s
 			return nil, fmt.Errorf("explicit workflow start session became terminal before promotion")
 		}
 	}
+	// A durable run binds its session identity and credentials before any
+	// runtime event for this session can arrive.
+	if opts.OnSessionPrepared != nil {
+		if err := opts.OnSessionPrepared(ctx, sessionID); err != nil {
+			return nil, err
+		}
+	}
 	seam1Res.rebindToSession(sessionID)
 	s.recordManualOverrideIfAdmitted(ctx, taskID, sessionID, seam1Res.manualOverride, seam1Res.population, seam1Res.populationKnown, seam1Res.ceiling)
 
