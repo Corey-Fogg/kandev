@@ -100,6 +100,8 @@ func (h *Handler) executeOperation(c *gin.Context, operation *models.Operation, 
 	if errors.As(err, &rejected) {
 		state, status = statusFailed, rejected.status
 		raw, _ = json.Marshal(gin.H{errorResponseKey: rejected.message})
+	} else if state == statusUnknown && h.Service.OperationUnknown != nil {
+		h.Service.OperationUnknown(operation.OperationID, operation.Target, errors.Join(err, marshalErr))
 	}
 	// Receipt persistence must not inherit an upstream request's expired deadline.
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 5*time.Second)

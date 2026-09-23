@@ -55,6 +55,10 @@ func newOrchestrationRuntime(cfg *config.Config, repos *Repositories, services *
 			return updateOrchestratedStatus(ctx, services.Task, repos, ws, id, status)
 		},
 	}
+	runtime.OperationUnknown = func(operationID, target string, cause error) {
+		log.Warn("orchestration operation outcome unknown",
+			zap.String("operation_id", operationID), zap.String("target", target), zap.Error(cause))
+	}
 	orch.SetManagedFailureRecovery(runtime.HandleFailure, runtime.CancelRecovery)
 	return runtime
 }

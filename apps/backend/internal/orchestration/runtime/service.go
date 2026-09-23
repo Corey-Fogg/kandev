@@ -51,24 +51,27 @@ type Service struct {
 	AssistantEnabled        bool
 	Attention               AttentionReader
 	AttentionUpdated        func(context.Context, string, time.Time)
-	Now                     func() time.Time
-	attentionMu             sync.Mutex
-	attentionAfter          string
-	attentionNext           time.Time
-	Repo                    *store.Repository
-	Personas                *personas.Service
-	Runs                    *runstore.Repository
-	Queue                   *runservice.Service
-	Auth                    *runtimeauth.AgentAuth
-	Tasks                   Tasks
-	Manager                 Manager
-	Credentials             CredentialHealthReader
-	Capabilities            CapabilityReader
-	Authority               AssistantAuthorityReader
-	Start                   func(context.Context, Launch) error
-	UpdateStatus            func(context.Context, string, string, string) error
-	APIURL, CLI             string
-	mu                      sync.Mutex
+	// OperationUnknown reports the cause of an operation whose outcome became
+	// unknown; the caller only sees operation_outcome_unknown.
+	OperationUnknown func(operationID, target string, cause error)
+	Now              func() time.Time
+	attentionMu      sync.Mutex
+	attentionAfter   string
+	attentionNext    time.Time
+	Repo             *store.Repository
+	Personas         *personas.Service
+	Runs             *runstore.Repository
+	Queue            *runservice.Service
+	Auth             *runtimeauth.AgentAuth
+	Tasks            Tasks
+	Manager          Manager
+	Credentials      CredentialHealthReader
+	Capabilities     CapabilityReader
+	Authority        AssistantAuthorityReader
+	Start            func(context.Context, Launch) error
+	UpdateStatus     func(context.Context, string, string, string) error
+	APIURL, CLI      string
+	mu               sync.Mutex
 }
 
 func (s *Service) QueueTurn(ctx context.Context, id, taskID, reason, key string, payload map[string]any) error {
