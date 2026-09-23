@@ -58,8 +58,10 @@ export const orchestratorsHref = (ws: string) =>
   `/settings/workspaces/${encodeURIComponent(ws)}/orchestration`;
 export const orchestratorHref = (ws: string, id: string) =>
   `${orchestratorsHref(ws)}/${encodeURIComponent(id)}`;
+export const conversationHref = (task: string, ws?: string) =>
+  `/workspace/conversations/${encodeURIComponent(task)}${ws ? `?workspaceId=${encodeURIComponent(ws)}` : ""}`;
 export const orchestratorConversationHref = (ws: string, id: string, task: string) =>
-  `/workspace/conversations/${encodeURIComponent(task)}?workspaceId=${encodeURIComponent(ws)}&orchestratorId=${encodeURIComponent(id)}`;
+  `${conversationHref(task, ws)}&orchestratorId=${encodeURIComponent(id)}`;
 
 export const listOrchestratedTasks = (ws: string, id: string) =>
   fetchJson<{ tasks: { id: string; title: string; state: string }[] }>(

@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "@/components/routing/app-link";
-
 import { useTranslation } from "react-i18next";
 import { useCallback, useEffect, useState } from "react";
 import { IconBolt, IconPlayerPlay, IconPlayerStop, IconRefresh } from "@tabler/icons-react";
@@ -26,6 +24,8 @@ import { useRailWidth } from "./use-rail-width";
 import { useManualTrigger } from "./use-manual-trigger";
 import { useResponsiveBreakpoint } from "@/hooks/use-responsive-breakpoint";
 import { statusLabelKey } from "./run-status";
+import Link from "@/components/routing/app-link";
+import { conversationHref } from "@/lib/api/domains/orchestration-api";
 
 const MUTED_NOTE = "py-16 text-center text-sm text-muted-foreground";
 
@@ -232,10 +232,7 @@ function ActivityView({
     return (
       <div className="p-6 space-y-3" data-testid="automation-orchestrator-delivery">
         <p>{selected.error_message || t("automations:orchestratorDeliveryHint")}</p>
-        <Link
-          className="underline"
-          href={`/workspace/conversations/${selected.conversation_task_id}`}
-        >
+        <Link className="underline" href={conversationHref(selected.conversation_task_id)}>
           {t("automations:openOrchestratorChat")}
         </Link>
       </div>

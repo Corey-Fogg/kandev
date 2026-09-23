@@ -10,14 +10,14 @@ export type TriggerType =
   | "plugin_event";
 
 export type RunStatus =
-  | "dispatched"
   | "triggered"
   | "task_created"
   | "succeeded"
   | "failed"
   | "skipped"
   | "archived"
-  | "cancelled";
+  | "cancelled"
+  | "dispatched";
 
 export type ContinuationPolicy = "new_task" | "reuse_thread";
 export type TaskMode = "automation_run" | "normal_task";
@@ -29,7 +29,6 @@ export type AutomationRepository = {
 };
 
 export type Automation = {
-  orchestrator_id?: string;
   id: string;
   workspace_id: string;
   name: string;
@@ -64,6 +63,7 @@ export type Automation = {
    * absent means "nothing changed for this automation".
    */
   legacy_board_card?: boolean;
+  orchestrator_id?: string;
 };
 
 export type AutomationTrigger = {
@@ -78,7 +78,6 @@ export type AutomationTrigger = {
 };
 
 export type AutomationRun = {
-  conversation_task_id?: string;
   id: string;
   automation_id: string;
   trigger_id: string;
@@ -107,6 +106,7 @@ export type AutomationRun = {
   dedup_reason?: string;
   /** Why the webhook repository selector produced no binding. Empty when a repository was bound. */
   repository_reason?: string;
+  conversation_task_id?: string;
 };
 
 /**
@@ -226,7 +226,6 @@ export type TriggerTypeInfo = {
 // --- Request/response DTOs ---
 
 export type CreateAutomationRequest = {
-  orchestrator_id?: string;
   workspace_id: string;
   name: string;
   description?: string;
@@ -247,10 +246,10 @@ export type CreateAutomationRequest = {
     config: Record<string, unknown>;
     enabled: boolean;
   }>;
+  orchestrator_id?: string;
 };
 
 export type UpdateAutomationRequest = {
-  orchestrator_id?: string;
   name?: string;
   description?: string;
   workflow_id?: string;
@@ -266,6 +265,7 @@ export type UpdateAutomationRequest = {
   continuation_policy?: ContinuationPolicy;
   task_mode?: TaskMode;
   repository_mode?: RepositoryMode;
+  orchestrator_id?: string;
 };
 
 // CreateAutomationResponse mirrors the backend's one-time webhook secret

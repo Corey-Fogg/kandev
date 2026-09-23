@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "@/components/routing/app-link";
-
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { useRouter } from "@/lib/routing/client-router";
@@ -26,6 +24,8 @@ import { buildRunOutcomeReasonSuffix } from "@/lib/automation-run-reason";
 import { linkToTask } from "@/lib/links";
 import type { AutomationRun, RunStatus } from "@/lib/types/automation";
 import { formatRelativeTime } from "@/lib/utils";
+import Link from "@/components/routing/app-link";
+import { conversationHref } from "@/lib/api/domains/orchestration-api";
 
 type RunsSectionProps = {
   automationId: string | null;
@@ -85,10 +85,7 @@ function RunRow({ run, deleting, onDelete, onNavigate }: RunRowProps) {
       <TableCell className="text-sm">
         {run.trigger_type}
         {run.conversation_task_id && (
-          <Link
-            className="block underline"
-            href={`/workspace/conversations/${run.conversation_task_id}`}
-          >
+          <Link className="block underline" href={conversationHref(run.conversation_task_id)}>
             {t("automations:openOrchestratorChat")}
           </Link>
         )}
