@@ -75,7 +75,9 @@ func orchestrationBrowserRouteAllowed(ctx context.Context, p routeParams, path s
 	case workspaceTasksKey:
 		fields, err := p.officeRepo.GetTaskExecutionFields(ctx, parts[1])
 		if err != nil {
-			return false, err
+			// A task this gate cannot read is not a coordinator's: the Office
+			// handler answers for it with its own not-found or error.
+			return true, nil
 		}
 		id = fields.AssigneeAgentProfileID
 	default:
@@ -85,6 +87,9 @@ func orchestrationBrowserRouteAllowed(ctx context.Context, p routeParams, path s
 }
 
 func legacyOfficePersona(ctx context.Context, repo *orchestrationstore.Repository, id string) (bool, error) {
+	if id == "" {
+		return true, nil
+	}
 	role, err := repo.OrchestratorRoleID(ctx, id)
 	return role == "", err
 }
