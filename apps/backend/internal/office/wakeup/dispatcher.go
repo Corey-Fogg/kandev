@@ -15,7 +15,6 @@ import (
 	"github.com/kandev/kandev/internal/office/pause"
 	officesqlite "github.com/kandev/kandev/internal/office/repository/sqlite"
 	"github.com/kandev/kandev/internal/office/shared"
-	runmodels "github.com/kandev/kandev/internal/runs/models"
 )
 
 // Concurrency policy values stored on office_routines.concurrency_policy.
@@ -183,7 +182,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, requestID string) error {
 // route the event to its own fresh run instead of trusting the stale
 // in-memory status.
 func (d *Dispatcher) coalesceIntoInflightRun(
-	ctx context.Context, req *officesqlite.WakeupRequest, inflight *runmodels.Run,
+	ctx context.Context, req *officesqlite.WakeupRequest, inflight *models.Run,
 ) error {
 	reason := effectiveReason(req)
 	if reason != "" &&
@@ -295,7 +294,7 @@ func (d *Dispatcher) createFreshRun(
 	if payload == "" {
 		payload = "{}"
 	}
-	run := &runmodels.Run{
+	run := &models.Run{
 		ID:              uuid.New().String(),
 		AgentProfileID:  req.AgentProfileID,
 		Reason:          reason,

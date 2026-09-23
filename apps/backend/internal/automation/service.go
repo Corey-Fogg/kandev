@@ -492,7 +492,6 @@ func (s *Service) CreateAutomation(ctx context.Context, req *CreateAutomationReq
 		return nil, err
 	}
 	a := &Automation{
-		OrchestratorID:     req.OrchestratorID,
 		WorkspaceID:        req.WorkspaceID,
 		Name:               req.Name,
 		Description:        req.Description,
@@ -509,6 +508,7 @@ func (s *Service) CreateAutomation(ctx context.Context, req *CreateAutomationReq
 		Enabled:            true,
 		MaxConcurrentRuns:  maxRuns,
 		ContinuationPolicy: continuationPolicy,
+		OrchestratorID:     req.OrchestratorID,
 	}
 	if err := s.validateOrchestratorTarget(ctx, a); err != nil {
 		return nil, err
