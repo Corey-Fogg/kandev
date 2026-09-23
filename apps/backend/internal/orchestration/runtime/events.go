@@ -100,11 +100,22 @@ func (s *Service) finishTurn(ctx context.Context, event *bus.Event, data map[str
 			return err
 		}
 	}
-	if _, err := s.Runs.FinishRun(ctx, run.ID, status, nil); err != nil {
+	finished, err := s.Runs.FinishRun(ctx, run.ID, status, nil)
+	if err != nil {
 		return err
 	}
 	s.retiredExecutions.Delete(run.ID)
-	return s.Repo.SetRuntimeWorking(ctx, owner, false)
+	if err := s.Repo.SetRuntimeWorking(ctx, owner, false); err != nil {
+		return err
+	}
+	if finished == nil || status != statusFailed {
+		return nil
+	}
+	message, _ := data["error_message"].(string)
+	if message == "" {
+		message = "the agent failed"
+	}
+	return s.postTurnFailure(ctx, finished, message)
 }
 func matchesClaimedTurn(event *bus.Event, data map[string]any, run *runmodels.Run) bool {
 	sessionID, _ := data["session_id"].(string)

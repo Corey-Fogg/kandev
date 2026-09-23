@@ -1896,6 +1896,11 @@ func startSchedulingRuntime(
 		if _, err := repos.Runs.RecoverStaleExcept(ctx, time.Now().UTC().Add(-30*time.Minute), protected); err != nil && ctx.Err() == nil {
 			log.Warn("run recovery failed", zap.Error(err))
 		}
+		if services.Orchestration != nil {
+			if err := services.Orchestration.FailUnboundRuns(ctx, time.Now().UTC()); err != nil && ctx.Err() == nil {
+				log.Warn("orchestration unbound run recovery failed", zap.Error(err))
+			}
+		}
 	}
 
 	runScheduler := runsscheduler.New(

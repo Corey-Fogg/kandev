@@ -117,11 +117,8 @@ type clippedComment struct {
 func clipComments(rows []*models.TaskComment) []clippedComment {
 	clipped := make([]clippedComment, 0, len(rows))
 	for _, row := range rows {
-		view := clippedComment{TaskComment: row, Body: row.Body}
-		if runes := []rune(row.Body); len(runes) > runtimeCommentBodyRunes {
-			view.Body, view.Truncated = string(runes[:runtimeCommentBodyRunes]), true
-		}
-		clipped = append(clipped, view)
+		body, truncated := clipRunes(row.Body, runtimeCommentBodyRunes)
+		clipped = append(clipped, clippedComment{TaskComment: row, Body: body, Truncated: truncated})
 	}
 	return clipped
 }

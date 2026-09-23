@@ -113,6 +113,7 @@ func (s *Service) Process(ctx context.Context, run *runmodels.Run) (bool, error)
 		_ = s.Runs.RecordFailure(ctx, run.ID, err.Error())
 		_, _ = s.Runs.FinishRun(ctx, run.ID, statusFailed, nil)
 		_ = s.Repo.SetRuntimeWorking(ctx, run.AgentProfileID, false)
+		_ = s.postTurnFailure(ctx, run, err.Error())
 	}
 	return true, err
 }

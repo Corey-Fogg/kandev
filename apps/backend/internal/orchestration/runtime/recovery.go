@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
+
+	runmodels "github.com/kandev/kandev/internal/runs/models"
 )
 
 func (h *Handler) retry(c *gin.Context) {
@@ -19,6 +21,7 @@ func (h *Handler) retry(c *gin.Context) {
 	}
 	var req struct {
 		SessionID string `json:"session_id"`
+		RunID     string `json:"run_id"`
 		Action    string `json:"action"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -29,7 +32,7 @@ func (h *Handler) retry(c *gin.Context) {
 		fail(c, fmt.Errorf("invalid recovery action"))
 		return
 	}
-	run, err := h.Service.Runs.LatestRunForSession(c.Request.Context(), req.SessionID)
+	run, err := h.retryTarget(c.Request.Context(), req.RunID, req.SessionID)
 	if err != nil || run.AgentProfileID != owner {
 		c.AbortWithStatus(404)
 		return
@@ -52,6 +55,18 @@ func (h *Handler) retry(c *gin.Context) {
 		return
 	}
 	c.JSON(202, gin.H{"ok": true})
+}
+
+// retryTarget selects the run to retry: the named run, or the latest run of
+// the named session. A turn that never bound a session is retried by run id.
+func (h *Handler) retryTarget(ctx context.Context, runID, sessionID string) (*runmodels.Run, error) {
+	if runID != "" {
+		return h.Service.Runs.GetRunByID(ctx, runID)
+	}
+	if sessionID == "" {
+		return nil, fmt.Errorf("run_id or session_id is required")
+	}
+	return h.Service.Runs.LatestRunForSession(ctx, sessionID)
 }
 
 // RecoverInterrupted runs before subscriptions and dispatch start. An interrupted
