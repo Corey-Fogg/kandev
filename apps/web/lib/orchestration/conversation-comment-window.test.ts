@@ -35,6 +35,31 @@ describe("paged comment window", () => {
     view.dispose();
   });
 
+  it("keeps paged-in rows as new rows arrive above them", async () => {
+    // Newest first, two rows a page; the cursor is the last row of a page.
+    let rows = ["c5", "c4", "c3", "c2", "c1"];
+    const load = vi.fn(async (after: string): Promise<WindowPage<Row>> => {
+      const start = after ? rows.indexOf(after) + 1 : 0;
+      const page = rows.slice(start, start + 2);
+      const more = start + 2 < rows.length;
+      return { entries: page.map((id) => row(id)), next_cursor: more ? page.at(-1)! : "" };
+    });
+    const view = new PagedWindow<Row>(load);
+    await view.refresh();
+    await view.loadMore();
+    expect(view.getSnapshot().entries.map((entry) => entry.id)).toEqual(["c5", "c4", "c3", "c2"]);
+
+    rows = ["c7", "c6", ...rows];
+    await view.refresh();
+    const ids = view.getSnapshot().entries.map((entry) => entry.id);
+    expect(ids).toEqual(["c7", "c6", "c5", "c4", "c3", "c2"]);
+    expect(view.getSnapshot().nextCursor).not.toBe("");
+
+    await view.loadMore();
+    expect(view.getSnapshot().entries.at(-1)?.id).toBe("c1");
+    view.dispose();
+  });
+
   it("commits only the latest read", async () => {
     let release!: (page: WindowPage<Row>) => void;
     const load = vi
