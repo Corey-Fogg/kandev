@@ -197,6 +197,10 @@ func TestFailedApprovalLeavesTheProposalPending(t *testing.T) {
 	_, _, _, err = s.DecideProposal(context.Background(), models.ProposalDecision{WorkspaceID: "ws", OrchestratorID: "chief", ProposalID: id,
 		Action: models.ProposalActionApprove, Edits: &models.ProposalEdits{Title: &long}})
 	require.ErrorAs(t, err, &input, "a person's title is never shortened")
+	blank := "   "
+	_, _, _, err = s.DecideProposal(context.Background(), models.ProposalDecision{WorkspaceID: "ws", OrchestratorID: "chief", ProposalID: id,
+		Action: models.ProposalActionApprove, Edits: &models.ProposalEdits{Title: &blank}})
+	require.ErrorAs(t, err, &input, "a title is required")
 	require.EqualValues(t, 1, manager.creates.Load())
 }
 

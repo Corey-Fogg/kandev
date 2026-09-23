@@ -230,6 +230,9 @@ func (s *Service) createProposedTask(ctx context.Context, p *models.TaskProposal
 // never shortened.
 func validateProposalSpec(spec *models.ProposalSpec, now time.Time) (*models.TaskGoal, error) {
 	spec.Title = strings.TrimSpace(spec.Title)
+	if spec.Title == "" {
+		return nil, errors.New("title is required")
+	}
 	if err := taskservice.ValidateTaskTitle(spec.Title); err != nil {
 		return nil, err
 	}
