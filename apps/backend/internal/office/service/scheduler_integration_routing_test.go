@@ -137,6 +137,45 @@ func TestSchedulerIntegration_RoutingReceivesBuiltPromptAndEnv(t *testing.T) {
 	}
 }
 
+func TestSchedulerIntegration_RoutingForwardsExecutorProfile(t *testing.T) {
+	svc := newTestService(t, service.ServiceOptions{
+		TaskStarter: &mockTaskStarter{},
+		APIBaseURL:  "http://localhost:8080/api/v1",
+	})
+	svc.SetAgentTokenMinter(fakeAgentTokenMinter{token: "test-token"})
+	dispatcher := &captureDispatcher{}
+	svc.SetRoutingDispatcher(dispatcher)
+	ctx := context.Background()
+
+	agent := &models.AgentInstance{
+		ID:                 "routing-agent-profile",
+		WorkspaceID:        "ws-1",
+		Name:               "routing-profile-worker",
+		Role:               models.AgentRoleWorker,
+		Status:             models.AgentStatusIdle,
+		ExecutorPreference: `{"type":"ssh","executor_profile_id":"work-machine-profile"}`,
+	}
+	if err := svc.CreateAgentInstance(ctx, agent); err != nil {
+		t.Fatalf("create agent: %v", err)
+	}
+	svc.ExecSQL(t, `INSERT INTO tasks (id, workspace_id, title, description, priority, created_at, updated_at)
+		VALUES ('task-routing-profile', 'ws-1', 'Profile task', 'Implement endpoint', 'medium',
+		        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
+	if _, err := svc.QueueRun(ctx, agent.ID, service.RunReasonTaskAssigned,
+		`{"task_id":"task-routing-profile"}`, ""); err != nil {
+		t.Fatalf("queue: %v", err)
+	}
+
+	service.RunSchedulerTick(svc, ctx)
+
+	if dispatcher.callCount() != 1 {
+		t.Fatalf("expected exactly 1 DispatchWithRouting call; got %d", dispatcher.callCount())
+	}
+	if got := dispatcher.lastCall().ExecutorProfileID; got != "work-machine-profile" {
+		t.Fatalf("worker execution profile was dropped: %q", got)
+	}
+}
+
 func TestSchedulerIntegration_SeatActionFlowsToPromptAndLaunch(t *testing.T) {
 	mock := &mockTaskStarter{}
 	svc := newTestService(t, service.ServiceOptions{TaskStarter: mock})

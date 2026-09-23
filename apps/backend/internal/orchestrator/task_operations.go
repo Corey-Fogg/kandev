@@ -26,6 +26,7 @@ import (
 	"github.com/kandev/kandev/internal/editors/capabilities"
 	"github.com/kandev/kandev/internal/events"
 	"github.com/kandev/kandev/internal/events/bus"
+	mcpprofile "github.com/kandev/kandev/internal/mcp/profile"
 	"github.com/kandev/kandev/internal/orchestrator/dto"
 	"github.com/kandev/kandev/internal/orchestrator/executor"
 	"github.com/kandev/kandev/internal/orchestrator/messagequeue"
@@ -1240,6 +1241,11 @@ type startTaskOptions struct {
 	// workflow-entry record. The start path rechecks it immediately before
 	// runtime admission so a stale route cannot dispatch the old payload.
 	ceilingEntryBinding *models.CeilingWorkflowEntryBinding
+	// McpProfile selects the MCP surface for this launch.
+	McpProfile *mcpprofile.Context
+	// OnSessionPrepared runs once the session row exists and before the agent
+	// starts, so a durable run can bind to the session first.
+	OnSessionPrepared func(context.Context, string) error
 }
 
 // StartTaskWithRoute launches a stable Office identity through a complete
@@ -1268,6 +1274,9 @@ func (s *Service) StartTaskWithRoute(
 			// (the user kicked off the task; Office only chose the provider),
 			// which is not the ceiling's manual/automatic question.
 			Origin: launchOriginAutomatic,
+
+			McpProfile:        launch.McpProfile,
+			OnSessionPrepared: launch.OnSessionPrepared,
 		})
 }
 
@@ -1438,7 +1447,7 @@ func (s *Service) startTask(ctx context.Context, taskID string, agentProfileID s
 		return nil, fmt.Errorf("failed to determine office task status: %w", err)
 	}
 	if isOfficeTask {
-		if err := validateOfficeLaunchEnv(taskID, env); err != nil {
+		if err := validateOfficeLaunchEnv(taskID, env, opts.McpProfile != nil && opts.McpProfile.IsBroker()); err != nil {
 			return nil, err
 		}
 	}
@@ -1599,6 +1608,13 @@ func (s *Service) startTask(ctx context.Context, taskID string, agentProfileID s
 			return nil, fmt.Errorf("explicit workflow start session became terminal before promotion")
 		}
 	}
+	// A durable run binds its session identity and credentials before any
+	// runtime event for this session can arrive.
+	if opts.OnSessionPrepared != nil {
+		if err := opts.OnSessionPrepared(ctx, sessionID); err != nil {
+			return nil, err
+		}
+	}
 	seam1Res.rebindToSession(sessionID)
 	s.recordManualOverrideIfAdmitted(ctx, taskID, sessionID, seam1Res.manualOverride, seam1Res.population, seam1Res.populationKnown, seam1Res.ceiling)
 
@@ -1729,6 +1745,7 @@ func (s *Service) startTask(ctx context.Context, taskID string, agentProfileID s
 			autopilot:                 task.Autopilot,
 			includeParentQuestionTool: task.Autopilot && task.ParentID != "",
 			spawnOrigin:               opts.SpawnOrigin,
+			brokerOnly:                opts.McpProfile != nil && opts.McpProfile.IsBroker(),
 		})
 	}
 
@@ -1767,6 +1784,7 @@ func (s *Service) startTask(ctx context.Context, taskID string, agentProfileID s
 		WorkflowStepID:       workflowStepID,
 		StartAgent:           true,
 		McpMode:              mcpMode,
+		McpProfile:           opts.McpProfile,
 		Attachments:          attachments,
 		Env:                  env,
 		AdditionalSkillSlugs: append([]string(nil), opts.AdditionalSkillSlugs...),
@@ -1835,6 +1853,10 @@ type launchPromptContext struct {
 	includeParentQuestionTool bool
 	referenceContext          string
 	spawnOrigin               *SpawnOrigin
+	// brokerOnly marks a launch whose only tools come from the orchestrator
+	// broker. Its prompt already describes that surface, so no Kandev MCP
+	// context is injected.
+	brokerOnly bool
 }
 
 // applyLaunchPromptContext prepends the first-turn system context to a launch
@@ -1844,6 +1866,9 @@ type launchPromptContext struct {
 // Passthrough profiles get attribution only, as plain text — see
 // applySpawnOriginText for why they skip the MCP block entirely.
 func (s *Service) applyLaunchPromptContext(ctx context.Context, p launchPromptContext) string {
+	if p.brokerOnly {
+		return sysprompt.StripSystemContent(p.prompt)
+	}
 	var pullRequestTargetContext string
 	p.prompt, pullRequestTargetContext = s.addTaskPullRequestTargetContext(
 		ctx, p.taskID, p.prompt, p.isPassthrough,
@@ -1925,15 +1950,18 @@ func (s *Service) lookupOfficeTask(ctx context.Context, taskID string) (bool, er
 	return dbTask != nil && dbTask.IsFromOffice, nil
 }
 
-func validateOfficeRuntimeEnv(env map[string]string) error {
+func validateOfficeRuntimeEnv(env map[string]string, brokerOnly bool) error {
 	required := []string{
-		"KANDEV_CLI",
 		"KANDEV_API_URL",
 		"KANDEV_API_KEY",
 		"KANDEV_AGENT_ID",
 		"KANDEV_WORKSPACE_ID",
 		"KANDEV_RUN_ID",
 		"KANDEV_TASK_ID",
+	}
+	// A broker-only launch has no shell, so it is never handed the Kandev CLI.
+	if !brokerOnly {
+		required = append([]string{"KANDEV_CLI"}, required...)
 	}
 	missing := make([]string, 0, len(required))
 	for _, key := range required {
@@ -1966,8 +1994,8 @@ var (
 // task being launched. StartTaskWithEnv is only wired to the internal Office
 // scheduler adapter; the task binding still prevents a complete context map
 // from being reused for a different task.
-func validateOfficeLaunchEnv(taskID string, env map[string]string) error {
-	if err := validateOfficeRuntimeEnv(env); err != nil {
+func validateOfficeLaunchEnv(taskID string, env map[string]string, brokerOnly bool) error {
+	if err := validateOfficeRuntimeEnv(env, brokerOnly); err != nil {
 		return err
 	}
 	if env["KANDEV_TASK_ID"] != taskID {
@@ -2235,6 +2263,10 @@ func (s *Service) createStartSessionWithWorkflowRoute(
 			sessionID, prepareErr = s.executor.PrepareSession(ctx, task, agentProfileID, executorID, executorProfileID, workflowStepID)
 		}
 		return sessionID, prepareErr == nil, prepareErr
+	}
+
+	if resetErr := s.resetNativeConversation(ctx, dbTask); resetErr != nil {
+		return "", false, resetErr
 	}
 
 	sessionOwnerID := s.officeSessionOwnerID(dbTask, agentProfileID, officeAgentProfileID)
@@ -4820,6 +4852,12 @@ func (s *Service) CancelTaskExecutionSynchronously(ctx context.Context, taskID, 
 func (s *Service) StopSession(ctx context.Context, sessionID string, reason string, force bool) error {
 	if err := s.authorizeSession(ctx, sessionID); err != nil {
 		return err
+	}
+
+	if s.managedRetryCancel != nil {
+		if session, err := s.repo.GetTaskSession(ctx, sessionID); err == nil && session != nil {
+			s.managedRetryCancel(ctx, session.TaskID, sessionID)
+		}
 	}
 
 	// A direct session stop is a true retry-ending transition. Retire the

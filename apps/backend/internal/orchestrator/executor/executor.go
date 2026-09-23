@@ -709,6 +709,8 @@ type LaunchContext struct {
 	Attachments          []v1.MessageAttachment
 	Env                  map[string]string
 	AdditionalSkillSlugs []string
+	McpProfile           *mcpprofile.Context
+	OnSessionPrepared    func(context.Context, string) error
 }
 
 // LaunchAgentResponse contains the result of launching an agent
@@ -1083,6 +1085,8 @@ type Executor struct {
 	repoUpdater                     RepoUpdater
 	taskRepositoryBaseBranchUpdater TaskRepositoryBaseBranchUpdater
 	prBaseResolver                  PRBaseResolver
+
+	dispatchGuard DispatchGuard
 }
 
 // taskEnvLock returns the per-task mutex for env persistence, creating one on

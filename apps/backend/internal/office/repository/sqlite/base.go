@@ -13,6 +13,7 @@ import (
 	"github.com/kandev/kandev/internal/db"
 	"github.com/kandev/kandev/internal/db/dialect"
 	runssqlite "github.com/kandev/kandev/internal/runs/repository/sqlite"
+	tasksqlite "github.com/kandev/kandev/internal/task/repository/sqlite"
 )
 
 // newParticipantUUID is a thin wrapper over uuid.New so the migration
@@ -94,6 +95,10 @@ type Repository struct {
 	// before the companion alert-level insert, so a test can prove the
 	// pair rolls back together.
 	failBudgetExceededCompanionErr error
+
+	// externalAgents lists agent profiles owned by a runtime outside Office.
+	// Nil means Office owns every agent profile.
+	externalAgents ExternalAgents
 }
 
 // NewWithDB creates a new office repository with existing database connections.
@@ -404,6 +409,9 @@ const budgetClaimsDDL = `
 `
 
 func (r *Repository) createRunTables() error {
+	if err := r.Migrate(); err != nil {
+		return err
+	}
 	_, err := r.db.Exec(`
 	CREATE TABLE IF NOT EXISTS runs (
 		id TEXT PRIMARY KEY,
@@ -627,17 +635,6 @@ func (r *Repository) createActivityTables() error {
 	CREATE INDEX IF NOT EXISTS idx_activity_workspace_created ON office_activity_log(workspace_id, created_at DESC);
 	CREATE INDEX IF NOT EXISTS idx_activity_run_id ON office_activity_log(run_id) WHERE run_id != '';
 	CREATE INDEX IF NOT EXISTS idx_activity_session_id ON office_activity_log(session_id) WHERE session_id != '';
-
-	CREATE TABLE IF NOT EXISTS run_events (
-		run_id TEXT NOT NULL,
-		seq INTEGER NOT NULL,
-		event_type TEXT NOT NULL,
-		level TEXT NOT NULL DEFAULT 'info',
-		payload TEXT NOT NULL DEFAULT '{}',
-		created_at TIMESTAMP NOT NULL,
-		PRIMARY KEY (run_id, seq)
-	);
-	CREATE INDEX IF NOT EXISTS idx_run_events_run_created ON run_events(run_id, created_at);
 	`)
 	return err
 }
@@ -734,6 +731,9 @@ func (r *Repository) createLabelTables() error {
 }
 
 func (r *Repository) createTaskExtensionTables() error {
+	if err := tasksqlite.EnsureCommentsSchema(r.db); err != nil {
+		return err
+	}
 	_, err := r.db.Exec(`
 	CREATE TABLE IF NOT EXISTS task_blockers (
 		task_id TEXT NOT NULL,
@@ -742,18 +742,6 @@ func (r *Repository) createTaskExtensionTables() error {
 		PRIMARY KEY (task_id, blocker_task_id),
 		CHECK (task_id != blocker_task_id)
 	);
-
-	CREATE TABLE IF NOT EXISTS task_comments (
-		id TEXT PRIMARY KEY,
-		task_id TEXT NOT NULL,
-		author_type TEXT NOT NULL,
-		author_id TEXT NOT NULL,
-		body TEXT NOT NULL,
-		source TEXT NOT NULL DEFAULT 'user',
-		reply_channel_id TEXT DEFAULT '',
-		created_at TIMESTAMP NOT NULL
-	);
-	CREATE INDEX IF NOT EXISTS idx_task_comments_task_created ON task_comments(task_id, created_at);
 
 	-- office_task_participants was removed in ADR 0005 Wave C. Reviewer
 	-- and approver rows are now stored in workflow_step_participants

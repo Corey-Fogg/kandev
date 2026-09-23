@@ -4419,6 +4419,10 @@ type workspaceArchiveModeLister interface {
 	ListTasksByWorkspaceWithArchiveMode(ctx context.Context, workspaceID, workflowID, repositoryID, query string, page, pageSize int, sort string, includeArchived, includeEphemeral, onlyEphemeral, excludeConfig, onlyArchived bool) ([]*models.Task, int, error)
 }
 
+type deliveryTaskWorkspaceLister interface {
+	ListDeliveryTasksByWorkspace(context.Context, string, int, int, string) ([]*models.Task, int, error)
+}
+
 func listTasksByWorkspaceWithArchiveMode(repo taskrepo.TaskRepository, ctx context.Context, workspaceID, workflowID, repositoryID, query string, page, pageSize int, sort string, includeArchived, includeEphemeral, onlyEphemeral, excludeConfig, onlyArchived bool) ([]*models.Task, int, error) {
 	if lister, ok := repo.(workspaceArchiveModeLister); ok {
 		return lister.ListTasksByWorkspaceWithArchiveMode(ctx, workspaceID, workflowID, repositoryID, query, page, pageSize, sort, includeArchived, includeEphemeral, onlyEphemeral, excludeConfig, onlyArchived)
@@ -4434,6 +4438,18 @@ func listTasksByWorkspaceWithArchiveMode(repo taskrepo.TaskRepository, ctx conte
 // workflowID and repositoryID, when non-empty, further restrict results to that workflow/repository.
 func (s *Service) ListTasksByWorkspace(ctx context.Context, workspaceID, workflowID, repositoryID, query string, page, pageSize int, sort string, includeArchived, includeEphemeral, onlyEphemeral, excludeConfig bool) ([]*models.Task, int, error) {
 	return s.ListTasksByWorkspaceWithArchiveMode(ctx, workspaceID, workflowID, repositoryID, query, page, pageSize, sort, includeArchived, includeEphemeral, onlyEphemeral, excludeConfig, false)
+}
+
+// ListDeliveryTasksByWorkspace returns workspace tasks with ephemeral and
+// Office-owned rows excluded before pagination.
+func (s *Service) ListDeliveryTasksByWorkspace(ctx context.Context, workspaceID string, page, pageSize int, sort string) ([]*models.Task, int, error) {
+	if err := s.authorizeWorkspaceID(ctx, workspaceID); err != nil {
+		return nil, 0, err
+	}
+	if lister, ok := s.tasks.(deliveryTaskWorkspaceLister); ok {
+		return lister.ListDeliveryTasksByWorkspace(ctx, workspaceID, page, pageSize, sort)
+	}
+	return s.ListTasksByWorkspace(ctx, workspaceID, "", "", "", page, pageSize, sort, false, false, false, true)
 }
 
 // ListTasksByWorkspaceWithArchiveMode is the additive workspace-list contract

@@ -54,3 +54,34 @@ func TestLegacyAutomationHasNoQuestionCapability(t *testing.T) {
 		t.Fatalf("automation capabilities = %#v, want no question capability", ctx.Capabilities)
 	}
 }
+
+func TestLegacyAssistantSurfaceResolvesToBroker(t *testing.T) {
+	if got := New("assistant-broker-v1", nil, nil).Surface; got != SurfaceOrchestratorBroker {
+		t.Fatalf("surface = %q, want %q", got, SurfaceOrchestratorBroker)
+	}
+	if !(Context{Surface: "assistant-broker-v1"}).IsBroker() || !New(SurfaceOrchestratorBroker, nil, nil).IsBroker() {
+		t.Fatal("broker surfaces must report IsBroker")
+	}
+	if New(SurfaceOfficeTask, nil, nil).IsBroker() {
+		t.Fatal("office surface is not a broker")
+	}
+}
+
+func TestSessionUsesBrokerAcceptsCurrentAndLegacyKeys(t *testing.T) {
+	cases := []struct {
+		metadata map[string]any
+		want     bool
+	}{
+		{nil, false},
+		{map[string]any{}, false},
+		{map[string]any{BrokerPolicyMetadataKey: ""}, false},
+		{map[string]any{BrokerPolicyMetadataKey: string(SurfaceOrchestratorBroker)}, true},
+		{map[string]any{"assistant_broker_policy": "assistant-broker-v1"}, true},
+		{map[string]any{BrokerPolicyMetadataKey: "future-broker"}, true},
+	}
+	for _, tc := range cases {
+		if got := SessionUsesBroker(tc.metadata); got != tc.want {
+			t.Fatalf("SessionUsesBroker(%v) = %v, want %v", tc.metadata, got, tc.want)
+		}
+	}
+}

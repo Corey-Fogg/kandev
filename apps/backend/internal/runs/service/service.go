@@ -21,8 +21,8 @@ import (
 	"github.com/kandev/kandev/internal/common/logger"
 	"github.com/kandev/kandev/internal/events"
 	"github.com/kandev/kandev/internal/events/bus"
-	"github.com/kandev/kandev/internal/office/models"
 	"github.com/kandev/kandev/internal/runs/commentkeys"
+	"github.com/kandev/kandev/internal/runs/models"
 	runssqlite "github.com/kandev/kandev/internal/runs/repository/sqlite"
 )
 
@@ -92,6 +92,10 @@ type QueueRunRequest struct {
 	// QueueOutcomeDeduped instead of an error.
 	WakeWaveKey    string
 	WakeWaveString string
+
+	// DisableCoalescing queues a distinct run even when a matching run is
+	// already pending in the coalescing window.
+	DisableCoalescing bool
 }
 
 // CoalesceWindowSeconds is the default coalescing window. When two
@@ -334,7 +338,7 @@ func runPayload(req QueueRunRequest, agentInstanceID string) map[string]any {
 // longer describe the wake it delivers. idx_run_wake_wave, not this
 // window, is what reconciles wave-carrying requests.
 func shouldCoalesceRun(req QueueRunRequest) bool {
-	return req.WakeWaveKey == "" && !commentkeys.HasTaskCommentPrefix(req.IdempotencyKey)
+	return !req.DisableCoalescing && req.WakeWaveKey == "" && !commentkeys.HasTaskCommentPrefix(req.IdempotencyKey)
 }
 
 // publishRunQueued emits the OfficeRunQueued bus event so the WS

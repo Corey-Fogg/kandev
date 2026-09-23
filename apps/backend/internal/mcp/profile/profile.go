@@ -17,6 +17,12 @@ const (
 	SurfaceConfiguration Surface = "configuration"
 	SurfaceExternal      Surface = "external"
 	SurfaceAutomation    Surface = "automation"
+	// SurfaceOrchestratorBroker has no general native or plugin tools. Its only
+	// attachment is the workspace coordinator broker, authorized on every call.
+	SurfaceOrchestratorBroker Surface = "orchestrator-broker-v1"
+	// legacyAssistantBroker is the retired assistant surface name. A stored
+	// profile carrying it resolves to the broker, never to a wider surface.
+	legacyAssistantBroker Surface = "assistant-broker-v1"
 )
 
 type Capability string
@@ -101,8 +107,10 @@ func Legacy(mode string, disableAskQuestion bool, providers []string) Context {
 
 func normalizeSurface(surface Surface) Surface {
 	switch surface {
-	case SurfaceKanbanTask, SurfaceOfficeTask, SurfaceConfiguration, SurfaceExternal, SurfaceAutomation:
+	case SurfaceKanbanTask, SurfaceOfficeTask, SurfaceConfiguration, SurfaceExternal, SurfaceAutomation, SurfaceOrchestratorBroker:
 		return surface
+	case legacyAssistantBroker:
+		return SurfaceOrchestratorBroker
 	default:
 		return SurfaceKanbanTask
 	}

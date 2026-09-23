@@ -317,7 +317,7 @@ func (s *Service) RegisterEventSubscribers(eb bus.EventBus) error {
 		{events.AgentTurnMessageSaved, maybeAsync(s.handleAgentTurnMessageSaved)},
 	}
 	for _, sub := range subs {
-		if _, err := eb.Subscribe(sub.subject, sub.handler); err != nil {
+		if _, err := eb.Subscribe(sub.subject, s.skipExternalConversation(sub.handler)); err != nil {
 			return fmt.Errorf("subscribe %s: %w", sub.subject, err)
 		}
 	}

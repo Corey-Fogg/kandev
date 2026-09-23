@@ -452,6 +452,9 @@ type FeaturesConfig struct {
 	// Office gates the autonomous-agent feature: backend service construction,
 	// HTTP/WS route registration, and frontend nav/route visibility.
 	Office bool `mapstructure:"office" json:"office"`
+	// Orchestration gates the Orchestrator: workspace coordinator
+	// conversations, their broker tools and the work they manage.
+	Orchestration bool `mapstructure:"orchestration" json:"orchestration"`
 
 	// Auth is the on/off switch for opt-in authentication and per-user
 	// workspaces. When on, every visitor must sign in (the first becomes the

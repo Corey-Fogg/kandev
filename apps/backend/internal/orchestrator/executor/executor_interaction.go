@@ -644,6 +644,9 @@ func (e *Executor) prompt(ctx context.Context, taskID, sessionID string, prompt 
 	if session.TaskID != taskID {
 		return nil, ErrExecutionNotFound
 	}
+	if err := e.CheckDispatch(ctx, taskID, sessionID, session); err != nil {
+		return nil, err
+	}
 	executionID, err := e.agentManager.GetExecutionIDForSession(ctx, sessionID)
 	if err != nil || executionID == "" {
 		return nil, ErrExecutionNotFound
@@ -999,6 +1002,9 @@ func (e *Executor) prepareModelSwitch(ctx context.Context, taskID, sessionID str
 	if session.TaskID != taskID {
 		return nil, nil, "", "", nil, fmt.Errorf("session %s does not belong to task %s", sessionID, taskID)
 	}
+	if err := e.CheckDispatch(ctx, taskID, sessionID, session); err != nil {
+		return nil, nil, "", "", nil, err
+	}
 	executionID, err := e.agentManager.GetExecutionIDForSession(ctx, sessionID)
 	if err != nil || executionID == "" {
 		return nil, nil, "", "", nil, ErrExecutionNotFound
@@ -1190,7 +1196,7 @@ func (e *Executor) launchModelSwitchAgent(
 		return err
 	}
 
-	if err := e.agentManager.StartAgentProcess(ctx, resp.AgentExecutionID); err != nil {
+	if err := e.guardedProcessStart(ctx, taskID, sessionID, resp.AgentExecutionID); err != nil {
 		e.logger.Error("failed to start agent process after model switch",
 			zap.String("task_id", taskID),
 			zap.String("agent_execution_id", resp.AgentExecutionID),

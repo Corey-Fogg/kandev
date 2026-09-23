@@ -202,7 +202,7 @@ const automationColumns = `id, workspace_id, name, description, workflow_id, wor
 	agent_profile_id, executor_profile_id, task_mode, repository_mode, prompt, task_title_template,
 	 enabled, max_concurrent_runs, continuation_policy, continuation_task_id, webhook_secret,
 	 last_triggered_at, created_at, updated_at,
-	execution_mode = 'task' AS legacy_board_card`
+	execution_mode = 'task' AS legacy_board_card, orchestrator_id`
 
 func (s *Store) initSchema() error {
 	if _, err := s.db.Exec(schemaSQLForDriver(createTablesSQL+pluginWebhookTablesSQL, s.db.DriverName())); err != nil {
@@ -237,6 +237,9 @@ func (s *Store) initSchema() error {
 		}
 	}
 	if err := migrate.Err(); err != nil {
+		return fmt.Errorf("required automation migration: %w", err)
+	}
+	if err := s.migrateOrchestratorTargets(); err != nil {
 		return fmt.Errorf("required automation migration: %w", err)
 	}
 	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS automation_webhook_receipts_due ON automation_webhook_receipts(state,next_attempt_at,created_at,id)`); err != nil {
@@ -442,14 +445,14 @@ func (s *Store) CreateAutomation(ctx context.Context, a *Automation) error {
 			agent_profile_id, executor_profile_id,
 			task_mode, repository_mode, prompt, task_title_template, execution_mode,
 			enabled, max_concurrent_runs, continuation_policy, continuation_task_id,
-			webhook_secret, last_triggered_at, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?)`),
+			webhook_secret, last_triggered_at, created_at, updated_at, orchestrator_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?)`),
 		a.ID, a.WorkspaceID, a.Name, a.Description, a.WorkflowID, a.WorkflowStepID,
 		a.AgentProfileID, a.ExecutorProfileID,
 		string(a.TaskMode), string(a.RepositoryMode),
 		a.Prompt, a.TaskTitleTemplate,
 		a.Enabled, a.MaxConcurrentRuns, a.ContinuationPolicy, a.ContinuationTaskID,
-		a.WebhookSecret, a.LastTriggeredAt, a.CreatedAt, a.UpdatedAt)
+		a.WebhookSecret, a.LastTriggeredAt, a.CreatedAt, a.UpdatedAt, a.OrchestratorID)
 	if err != nil {
 		return err
 	}
@@ -690,13 +693,15 @@ func (s *Store) UpdateAutomation(ctx context.Context, id string, req *UpdateAuto
 		UPDATE automations SET name = ?, description = ?, workflow_id = ?, workflow_step_id = ?,
 			agent_profile_id = ?, executor_profile_id = ?,
 			task_mode = ?, repository_mode = ?, prompt = ?, task_title_template = ?,
-			enabled = ?, max_concurrent_runs = ?, continuation_policy = ?, updated_at = ?
+			enabled = ?, max_concurrent_runs = ?, continuation_policy = ?, updated_at = ?,
+			orchestrator_id = ?
 		WHERE id = ?`),
 		a.Name, a.Description, a.WorkflowID, a.WorkflowStepID,
 		a.AgentProfileID, a.ExecutorProfileID,
 		string(a.TaskMode), string(a.RepositoryMode),
 		a.Prompt, a.TaskTitleTemplate,
-		a.Enabled, a.MaxConcurrentRuns, a.ContinuationPolicy, a.UpdatedAt, id)
+		a.Enabled, a.MaxConcurrentRuns, a.ContinuationPolicy, a.UpdatedAt,
+		a.OrchestratorID, id)
 	if err != nil {
 		return err
 	}
@@ -780,6 +785,9 @@ func applyAutomationUpdate(a *Automation, req *UpdateAutomationRequest) {
 	}
 	if req.ContinuationPolicy != nil {
 		a.ContinuationPolicy = *req.ContinuationPolicy
+	}
+	if req.OrchestratorID != nil {
+		a.OrchestratorID = *req.OrchestratorID
 	}
 }
 
@@ -1220,11 +1228,12 @@ func (s *Store) CreateRun(ctx context.Context, r *AutomationRun) error {
 	_, err := s.db.ExecContext(ctx, s.db.Rebind(`
 		INSERT INTO automation_runs (id, automation_id, trigger_id, trigger_type, task_id, status,
 			dedup_key, trigger_data, error_message, session_id, turn_id, thread_action, thread_reason,
-			display_title, dedup_reason, repository_reason, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`),
+			display_title, dedup_reason, repository_reason, created_at, conversation_task_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`),
 		r.ID, r.AutomationID, r.TriggerID, r.TriggerType, r.TaskID, r.Status,
 		r.DedupKey, r.TriggerDataJSON, r.ErrorMessage, r.SessionID, r.TurnID,
-		r.ThreadAction, r.ThreadReason, r.DisplayTitle, r.DedupReason, r.RepositoryReason, r.CreatedAt)
+		r.ThreadAction, r.ThreadReason, r.DisplayTitle, r.DedupReason, r.RepositoryReason, r.CreatedAt,
+		r.ConversationTaskID)
 	return err
 }
 
@@ -1568,7 +1577,8 @@ const runTaskStateColumnsSQL = `
 			SELECT ts.id FROM task_sessions ts
 				WHERE ts.task_id = ar.task_id AND ts.is_primary = 1
 			LIMIT 1
-		), ar.session_id, '') AS session_id`
+		), ar.session_id, '') AS session_id,
+		ar.conversation_task_id`
 
 // runTaskStateArgs binds the placeholders in runTaskStateColumnsSQL, in
 // order. Kept next to the SQL so a new WHEN can't be added without the

@@ -70,6 +70,9 @@ const (
 	// precedence over the cancelled-session check when both apply — see
 	// listRunsWithTaskState.
 	RunStatusCancelled RunStatus = "cancelled"
+	// RunStatusDispatched records a firing handed to a workspace orchestrator
+	// conversation instead of creating a task.
+	RunStatusDispatched RunStatus = "dispatched"
 )
 
 // ContinuationPolicy controls whether a firing receives an isolated task or
@@ -166,6 +169,10 @@ type Automation struct {
 	// response compatibility projection for older clients.
 	Repositories  []AutomationRepository `json:"repositories" db:"-"`
 	RepositoryIDs []string               `json:"repository_ids" db:"-"`
+
+	// OrchestratorID routes firings to a workspace orchestrator conversation
+	// instead of creating a task. Empty means the normal task path.
+	OrchestratorID string `json:"orchestrator_id" db:"orchestrator_id"`
 }
 
 // AutomationTrigger is a single trigger attached to an automation.
@@ -218,6 +225,9 @@ type AutomationRun struct {
 	// no binding (see the token catalog in event_handlers_automation.go).
 	// Empty whenever a repository was bound — the binding is its own record.
 	RepositoryReason string `json:"repository_reason,omitempty" db:"repository_reason"`
+	// ConversationTaskID is the orchestrator conversation that received a
+	// dispatched firing.
+	ConversationTaskID string `json:"conversation_task_id,omitempty" db:"conversation_task_id"`
 }
 
 // WorkspaceAutomationRun is a run carrying just enough of its owning
@@ -409,6 +419,7 @@ type CreateAutomationRequest struct {
 	TaskMode           TaskMode               `json:"task_mode,omitempty"`
 	RepositoryMode     RepositoryMode         `json:"repository_mode,omitempty"`
 	Triggers           []CreateTriggerSpec    `json:"triggers"`
+	OrchestratorID     string                 `json:"orchestrator_id"`
 }
 
 // CreateTriggerSpec defines a trigger to add during automation creation.
@@ -438,6 +449,7 @@ type UpdateAutomationRequest struct {
 	ContinuationPolicy *ContinuationPolicy `json:"continuation_policy,omitempty"`
 	TaskMode           *TaskMode           `json:"task_mode,omitempty"`
 	RepositoryMode     *RepositoryMode     `json:"repository_mode,omitempty"`
+	OrchestratorID     *string             `json:"orchestrator_id,omitempty"`
 }
 
 // AddTriggerRequest adds a trigger to an existing automation.

@@ -133,18 +133,37 @@ func taskScanColumnSQL(alias string, useExpressions bool) string {
 // when the task is owned by office: either it has a non-empty project_id
 // (explicit office task) or its workflow matches the workspace's
 // office_workflow_id (the canonical "office workflow"). Kanban tasks live
-// in any other workflow and have no project.
+// in any other workflow and have no project. Orchestration conversation tasks
+// run through the same managed-run path, so they are classified with Office.
 func isFromOfficeProjection(alias string) string {
 	if alias == "" {
 		alias = defaultTaskAlias
 	}
 	return `(
-		COALESCE(` + alias + `.project_id, '') != ''
+		` + alias + `.origin = 'native_conversation'
+		OR COALESCE(` + alias + `.project_id, '') != ''
 		OR EXISTS (
 			SELECT 1 FROM workspaces w
 			WHERE w.id = ` + alias + `.workspace_id
 			  AND COALESCE(w.office_workflow_id, '') != ''
 			  AND w.office_workflow_id = ` + alias + `.workflow_id
+		)
+	)`
+}
+
+// deliveryExclusionFilter hides Office tasks and system routine-workflow tasks
+// from workspace delivery listings. Routine tasks stay ordinary Kanban tasks
+// everywhere else; only the delivery overview omits them. The subquery keeps
+// the predicate independent of the outer query's table alias.
+func deliveryExclusionFilter() string {
+	return ` AND id NOT IN (
+		SELECT dt.id FROM tasks dt
+		WHERE ` + isFromOfficeProjection("dt") + `
+		   OR EXISTS (
+			SELECT 1 FROM workflows ow
+			WHERE ow.id = dt.workflow_id
+			  AND ow.workspace_id = dt.workspace_id
+			  AND ow.is_system = 1 AND ow.workflow_template_id = 'routine'
 		)
 	)`
 }
@@ -1208,6 +1227,11 @@ func (r *Repository) updateTaskTx(ctx context.Context, tx *sql.Tx, task *models.
 		// is reserved for the addressed resource and wins the precedence
 		// ladder over every other case (design's error-mapping table).
 		return "", 0, fmt.Errorf("%w: %s", ErrTaskNotFound, task.ID)
+	}
+	if task.State == v1.TaskStateCompleted {
+		if err := guardManagedParentCompletion(ctx, tx, r.db, task.ID); err != nil {
+			return "", 0, err
+		}
 	}
 	if err := r.applyPreservedPositionInTx(ctx, tx, task, preservePosition); err != nil {
 		return "", 0, err
@@ -3567,6 +3591,16 @@ func (r *Repository) ListEphemeralTasksAllWorkspaces(ctx context.Context) ([]*mo
 // used by the sidebar archive view. onlyArchived takes precedence over
 // includeArchived when both are true.
 func (r *Repository) ListTasksByWorkspaceWithArchiveMode(ctx context.Context, workspaceID, workflowID, repositoryID, query string, page, pageSize int, sort string, includeArchived, includeEphemeral, onlyEphemeral, excludeConfig, onlyArchived bool) ([]*models.Task, int, error) {
+	return r.listWorkspaceTasks(ctx, workspaceID, workflowID, repositoryID, query, page, pageSize, sort, includeArchived, includeEphemeral, onlyEphemeral, excludeConfig, onlyArchived, false, false)
+}
+
+// ListDeliveryTasksByWorkspace applies the Office/ephemeral exclusion before
+// pagination so totals and page cursors describe the visible delivery set.
+func (r *Repository) ListDeliveryTasksByWorkspace(ctx context.Context, workspaceID string, page, pageSize int, sort string) ([]*models.Task, int, error) {
+	return r.listWorkspaceTasks(ctx, workspaceID, "", "", "", page, pageSize, sort, false, false, false, true, false, false, true)
+}
+
+func (r *Repository) listWorkspaceTasks(ctx context.Context, workspaceID, workflowID, repositoryID, query string, page, pageSize int, sort string, includeArchived, includeEphemeral, onlyEphemeral, excludeConfig, onlyArchived, kanbanOnly, excludeOffice bool) ([]*models.Task, int, error) {
 	ctx, span := tracing.Tracer("kandev-db").Start(ctx, "db.ListTasksByWorkspace")
 	defer span.End()
 	// Calculate offset
@@ -3590,6 +3624,9 @@ func (r *Repository) ListTasksByWorkspaceWithArchiveMode(ctx context.Context, wo
 	// are hidden by provenance, and "include quick chats" is not a request to
 	// see them.
 	filter += andNotAutomationOrigin
+	if excludeOffice {
+		filter += deliveryExclusionFilter()
+	}
 
 	if onlyArchived {
 		filter += " AND archived_at IS NOT NULL"
@@ -3599,6 +3636,9 @@ func (r *Repository) ListTasksByWorkspaceWithArchiveMode(ctx context.Context, wo
 
 	if excludeConfig {
 		filter += " AND " + excludeConfigModePredicate(r.ro.DriverName(), "metadata")
+	}
+	if kanbanOnly {
+		filter += kanbanWorkflowFilter
 	}
 
 	var rows *sql.Rows
@@ -4588,6 +4628,9 @@ func (r *Repository) CountOpenWatcherCreatedTasks(ctx context.Context, metadataK
 
 // UpdateTaskState updates the state of a task
 func (r *Repository) UpdateTaskState(ctx context.Context, id string, state v1.TaskState) error {
+	if state == v1.TaskStateCompleted {
+		return r.completeTaskState(ctx, id)
+	}
 	result, err := r.db.ExecContext(ctx, r.db.Rebind(`UPDATE tasks SET state = ?, updated_at = ? WHERE id = ?`), state, time.Now().UTC(), id)
 	if err != nil {
 		return err
@@ -4598,6 +4641,57 @@ func (r *Repository) UpdateTaskState(ctx context.Context, id string, state v1.Ta
 		return fmt.Errorf("%w: %s", ErrTaskNotFound, id)
 	}
 	return nil
+}
+
+// completeTaskState writes COMPLETED in the same transaction as the managed
+// parent completion guard.
+func (r *Repository) completeTaskState(ctx context.Context, id string) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := guardManagedParentCompletion(ctx, tx, r.db, id); err != nil {
+		return err
+	}
+	result, err := tx.ExecContext(ctx, r.db.Rebind(`UPDATE tasks SET state = ?, updated_at = ? WHERE id = ?`), v1.TaskStateCompleted, time.Now().UTC(), id)
+	if err != nil {
+		return err
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return fmt.Errorf("%w: %s", ErrTaskNotFound, id)
+	}
+	return tx.Commit()
+}
+
+// guardManagedParentCompletion rejects completion while an Orchestrator-owned
+// parent has child work that has not reached a terminal state. Keep this check
+// in the same transaction as the state write so every task-state entry point
+// enforces the invariant.
+func guardManagedParentCompletion(ctx context.Context, tx *sql.Tx, db *sqlx.DB, taskID string) error {
+	managedExpr := dialect.JSONExtract(db.DriverName(), "parent.metadata", "orchestration_managed")
+	var managedValue any = true
+	if dialect.IsPostgres(db.DriverName()) {
+		managedValue = "true"
+	}
+	query := fmt.Sprintf(`
+		SELECT child.id, child.state
+		FROM tasks parent JOIN tasks child ON child.parent_id = parent.id
+		WHERE parent.id = ? AND parent.state <> ? AND %s = ?
+		  AND child.archived_at IS NULL AND child.is_ephemeral = ?
+		  AND child.state NOT IN (?, ?, ?)
+		LIMIT 1`, managedExpr)
+	var childID string
+	var childState v1.TaskState
+	err := tx.QueryRowContext(ctx, db.Rebind(query), taskID, v1.TaskStateCompleted, managedValue, dialect.BoolToInt(false),
+		v1.TaskStateCompleted, v1.TaskStateFailed, v1.TaskStateCancelled).Scan(&childID, &childState)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return fmt.Errorf("cannot complete orchestration-managed parent %s while child task %s is %s", taskID, childID, childState)
 }
 
 // UpdateTaskStateIfSessionState atomically ties a task-state write to the
@@ -4686,6 +4780,11 @@ func (r *Repository) tryUpdateTaskStateIfSessionState(
 	if oldState == v1.TaskStateCompleted && state == v1.TaskStateInProgress {
 		return oldState, false, false, nil
 	}
+	if state == v1.TaskStateCompleted && oldState != v1.TaskStateCompleted {
+		if err := guardManagedParentCompletion(ctx, tx, r.db, taskID); err != nil {
+			return oldState, false, false, err
+		}
+	}
 	if archivedAt.Valid || currentSessionState != expectedSessionState ||
 		(requirePrimary && !currentSessionIsPrimary) {
 		return oldState, false, false, nil
@@ -4752,6 +4851,11 @@ func (r *Repository) RestoreTaskMessageRollbackIfSessionState(
 	fromWorkflowID, fromStepID, _, err := r.readTaskStepInTx(ctx, tx, task.ID)
 	if err != nil {
 		return false, err
+	}
+	if task.State == v1.TaskStateCompleted {
+		if err := guardManagedParentCompletion(ctx, tx, r.db, task.ID); err != nil {
+			return false, err
+		}
 	}
 	// See updateTaskTx's comment: stamped after the transactional lock, not
 	// before BeginTx, so occurred_at reflects true commit-serialization order
@@ -4843,6 +4947,11 @@ func (r *Repository) UpdateTaskStateIfCurrentIn(
 	}
 	if !taskStateInSet(currentState, allowed) {
 		return currentState, false, nil
+	}
+	if state == v1.TaskStateCompleted && currentState != v1.TaskStateCompleted {
+		if err := guardManagedParentCompletion(ctx, tx, r.db, id); err != nil {
+			return currentState, false, err
+		}
 	}
 
 	result, err := tx.ExecContext(ctx, r.db.Rebind(`
@@ -4944,6 +5053,11 @@ func (r *Repository) tryUpdateTaskStateIfNotArchived(
 	}
 	if archivedAt.Valid {
 		return currentState, false, false, nil
+	}
+	if state == v1.TaskStateCompleted && currentState != v1.TaskStateCompleted {
+		if err := guardManagedParentCompletion(ctx, tx, r.db, id); err != nil {
+			return currentState, false, false, err
+		}
 	}
 
 	result, err := tx.ExecContext(ctx, r.db.Rebind(`

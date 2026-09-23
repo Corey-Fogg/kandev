@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kandev/kandev/internal/agent/runtimeauth"
 	"github.com/kandev/kandev/internal/common/logger"
 	"github.com/kandev/kandev/internal/office/models"
 	"github.com/kandev/kandev/internal/office/routing"
@@ -61,33 +62,7 @@ func RegisterRoutes(group *gin.RouterGroup, svc *AgentService, log *logger.Logge
 
 // AgentAuthMiddleware returns a gin.HandlerFunc that extracts and validates agent JWTs.
 // Requests without a JWT are treated as UI/admin requests and pass through.
-func AgentAuthMiddleware(svc *AgentService) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		auth := c.GetHeader("Authorization")
-		if auth == "" || !strings.HasPrefix(auth, "Bearer ") {
-			c.Next()
-			return
-		}
-		token := strings.TrimPrefix(auth, "Bearer ")
-		claims, err := svc.ValidateAgentJWT(token)
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
-			return
-		}
-		agent, err := svc.GetAgentInstance(c.Request.Context(), claims.AgentProfileID)
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "agent not found"})
-			return
-		}
-		if wsID := c.Param("wsId"); wsID != "" && claims.WorkspaceID != wsID {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "token workspace mismatch"})
-			return
-		}
-		c.Set(ctxKeyAgentClaims, claims)
-		c.Set(ctxKeyAgentCaller, agent)
-		c.Next()
-	}
-}
+func AgentAuthMiddleware(svc *AgentService) gin.HandlerFunc { return runtimeauth.Middleware(svc, svc) }
 
 // agentCallerFromCtx returns the authenticated agent or nil for UI requests.
 func agentCallerFromCtx(c *gin.Context) *models.AgentInstance {

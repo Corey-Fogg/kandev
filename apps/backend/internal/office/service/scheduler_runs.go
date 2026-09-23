@@ -25,6 +25,12 @@ func (s *Service) ClaimNextRun(ctx context.Context) (*models.Run, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.recordRunClaimed(ctx, req)
+	return req, nil
+}
+
+// recordRunClaimed logs a claimed run and counts it in the loop metrics.
+func (s *Service) recordRunClaimed(ctx context.Context, req *models.Run) {
 	s.logger.Info("run claimed",
 		zap.String("id", req.ID),
 		zap.String("agent", req.AgentProfileID),
@@ -34,7 +40,6 @@ func (s *Service) ClaimNextRun(ctx context.Context) (*models.Run, error) {
 		workspaceID = agent.WorkspaceID
 	}
 	IncLoopRunClaimed(workspaceID)
-	return req, nil
 }
 
 // FinishRun marks a claimed run as finished, records outcome (one of the

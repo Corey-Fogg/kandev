@@ -24,6 +24,7 @@ type MockClient struct {
 	issueOrder    []string
 	getError      *APIError
 	setStateCalls []setStateCall
+	comments      map[string][]string // issue id → comment bodies
 }
 
 type setStateCall struct {
@@ -230,6 +231,25 @@ func (m *MockClient) Reset() {
 	m.issueOrder = nil
 	m.getError = nil
 	m.setStateCalls = nil
+	m.comments = nil
+}
+
+// AddComment records a comment on an issue.
+func (m *MockClient) AddComment(_ context.Context, issueID, body string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.comments == nil {
+		m.comments = make(map[string][]string)
+	}
+	m.comments[issueID] = append(m.comments[issueID], body)
+	return nil
+}
+
+// Comments returns the comments recorded on an issue.
+func (m *MockClient) Comments(issueID string) []string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return append([]string(nil), m.comments[issueID]...)
 }
 
 // MockClientFactory returns a ClientFactory that always hands back the shared

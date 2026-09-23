@@ -13,11 +13,14 @@ type ExecutorConfig struct {
 	ResourceLimits   string `json:"resource_limits,omitempty"`
 	EnvironmentID    string `json:"environment_id,omitempty"`
 	WorktreeStrategy string `json:"worktree_strategy,omitempty"`
+
+	// ExecutorProfileID is the saved executor profile passed to the launch.
+	ExecutorProfileID string `json:"executor_profile_id,omitempty"`
 }
 
 // IsEmpty returns true if the config has no executor type set.
 func (c ExecutorConfig) IsEmpty() bool {
-	return c.Type == ""
+	return c.Type == "" && c.ExecutorProfileID == ""
 }
 
 // ResolveExecutor walks the resolution chain to determine executor config.

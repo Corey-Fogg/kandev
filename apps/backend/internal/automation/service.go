@@ -169,6 +169,7 @@ type Service struct {
 	// workflowStepLocator gates the relationship between a workflow and its
 	// selected step. Optional for isolated tests, but wired in production.
 	workflowStepLocator WorkflowStepLocator
+	orchestratorTarget  OrchestratorTarget
 
 	// repoLookup validates repository_ids on create/update — every ID must
 	// resolve to a repository belonging to the automation's workspace. Nil
@@ -507,6 +508,10 @@ func (s *Service) CreateAutomation(ctx context.Context, req *CreateAutomationReq
 		Enabled:            true,
 		MaxConcurrentRuns:  maxRuns,
 		ContinuationPolicy: continuationPolicy,
+		OrchestratorID:     req.OrchestratorID,
+	}
+	if err := s.validateOrchestratorTarget(ctx, a); err != nil {
+		return nil, err
 	}
 	if err := s.validateAgentProfileID(ctx, req.AgentProfileID); err != nil {
 		return nil, err
@@ -594,6 +599,9 @@ func (s *Service) UpdateAutomation(ctx context.Context, id string, req *UpdateAu
 		}
 	}
 	if err := s.authorizeUpdatedReferences(ctx, id, req); err != nil {
+		return nil, err
+	}
+	if err := s.validateUpdatedTarget(ctx, id, req); err != nil {
 		return nil, err
 	}
 	unlock := s.automationRunLock(id)
@@ -1574,6 +1582,15 @@ func (s *Service) FireTrigger(ctx context.Context, automationID, triggerID strin
 		DedupKey:     dedup.Key(),
 	}
 
+	if a.OrchestratorID != "" {
+		result, err := s.dispatchOrchestrator(ctx, a, evt)
+		if err == nil {
+			if updateErr := s.store.UpdateLastTriggered(ctx, automationID, now); updateErr != nil {
+				s.logger.Warn("failed to update last_triggered_at", zap.String("automation_id", automationID), zap.Error(updateErr))
+			}
+		}
+		return result, err
+	}
 	event := bus.NewEvent(events.AutomationTriggered, "automation_service", evt)
 	if err := s.eventBus.Publish(ctx, events.AutomationTriggered, event); err != nil {
 		if markErr := s.store.MarkRunTerminal(ctx, admittedRun.ID, "", "", RunStatusFailed, err.Error()); markErr != nil {

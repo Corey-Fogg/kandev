@@ -29,6 +29,7 @@ import (
 	"github.com/kandev/kandev/internal/common/securityutil"
 	"github.com/kandev/kandev/internal/gitconfigenv"
 	"github.com/kandev/kandev/internal/githubauth"
+	mcpprofile "github.com/kandev/kandev/internal/mcp/profile"
 	tools "github.com/kandev/kandev/internal/tools/installer"
 	"go.uber.org/zap"
 )
@@ -1435,6 +1436,7 @@ func (m *Manager) startOneShot() error {
 // buildAdapterConfig constructs the adapter configuration and initialises the
 // protocol adapter, including merging any adapter-provided environment variables.
 func (m *Manager) buildAdapterConfig() error {
+	config.RefreshBrokerPolicy(m.cfg)
 	mcpServers := make([]adapter.McpServerConfig, len(m.cfg.McpServers))
 	for i, mcp := range m.cfg.McpServers {
 		mcpServers[i] = adapter.McpServerConfig{
@@ -1458,6 +1460,19 @@ func (m *Manager) buildAdapterConfig() error {
 		NotificationQueueCapacity: m.cfg.NotificationQueueCapacity,
 		PromptCancelJoinTimeout:   m.cfg.PromptCancelJoinTimeout,
 		ProviderGatewayAuth:       m.cfg.ProviderGatewayAuth,
+	}
+	// A broker coordinator gets no ACP host operations on any provider. Claude
+	// additionally receives a session policy that preapproves only the broker.
+	// A provider whose built-in tools cannot be switched off never starts.
+	if m.cfg.BrokerRestricted() {
+		if !mcpprofile.BrokerCapableAgent(m.cfg.AgentType) {
+			return fmt.Errorf("agent %q cannot run a broker-only coordinator: its built-in tools cannot be disabled", m.cfg.AgentType)
+		}
+		m.adapterCfg.BrokerRestricted = true
+		if m.cfg.AgentType == "claude-acp" {
+			m.adapterCfg.ToolPolicy = config.BrokerToolPolicy
+			m.adapterCfg.ToolPolicyVersion = config.ClaudeACPCommandVersion(m.cfg.AgentArgs)
+		}
 	}
 
 	// Configure one-shot mode when a continue command is provided.

@@ -860,6 +860,9 @@ func (e *Executor) resumeSession(
 		return nil, err
 	}
 
+	if err := e.CheckDispatch(ctx, session.TaskID, session.ID, session); err != nil {
+		return nil, err
+	}
 	resumeInitialState := session.State
 	previousCredentialSnapshot := captureResumeCredentialSnapshot(session)
 	completedResume := options.AllowCompletedSessionResume &&

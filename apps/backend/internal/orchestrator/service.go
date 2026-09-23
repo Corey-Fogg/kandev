@@ -1482,6 +1482,11 @@ type Service struct {
 	dynamicSuccessorCancel  context.CancelFunc
 	dynamicSuccessorStopped bool
 	dynamicSuccessorWorkers sync.WaitGroup
+
+	// managedFailure and managedRetryCancel let the orchestration runtime own
+	// retries for orchestration-managed sessions.
+	managedFailure     func(context.Context, watcher.AgentEventData) (int, time.Time, error)
+	managedRetryCancel func(context.Context, string, string) bool
 }
 
 func (s *Service) officeStallDependencies() (

@@ -61,7 +61,18 @@ func (e *Executor) resolveTaskSessionMCPMode(ctx context.Context, taskID string,
 	return "", nil
 }
 
+// coordinatorConversationOrigin marks the standing conversation task of a
+// workspace coordinator.
+const coordinatorConversationOrigin = "native_conversation"
+
+func brokerProfile() mcpprofile.Context {
+	return mcpprofile.New(mcpprofile.SurfaceOrchestratorBroker, nil, nil)
+}
+
 func (e *Executor) resolveTaskSessionMCPProfile(ctx context.Context, taskID string, session *models.TaskSession, allowTitleTool bool) (mcpprofile.Context, error) {
+	if session != nil && mcpprofile.SessionUsesBroker(session.Metadata) {
+		return brokerProfile(), nil
+	}
 	if isConfigModeSession(session) {
 		capabilities := []mcpprofile.Capability{mcpprofile.CapabilityUserQuestion}
 		if session.IsPassthrough {
@@ -83,6 +94,11 @@ func (e *Executor) resolveTaskSessionMCPProfile(ctx context.Context, taskID stri
 	}
 	if task.Origin == models.TaskOriginAutomationRun {
 		return e.withCanvasCapability(mcpprofile.NewAutomation()), nil
+	}
+	if task.Origin == coordinatorConversationOrigin {
+		// A coordinator conversation never runs outside the broker, even when
+		// its session predates the recorded broker policy.
+		return brokerProfile(), nil
 	}
 	surface := mcpprofile.SurfaceKanbanTask
 	if task.IsFromOffice {
@@ -1474,6 +1490,9 @@ func (e *Executor) LaunchPreparedSession(ctx context.Context, task *v1.Task, ses
 		// connection config reaches lifecycle instead of falling back to the
 		// workspace default (or an empty config).
 		executorID = strings.TrimSpace(session.ExecutorID)
+	}
+	if err := e.CheckDispatch(ctx, task.ID, sessionID, session); err != nil {
+		return nil, err
 	}
 	if opts.McpMode == "" {
 		opts.McpMode, err = e.resolveTaskSessionMCPMode(ctx, task.ID, session, opts.StartAgent)

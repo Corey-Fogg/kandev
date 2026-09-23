@@ -407,6 +407,7 @@ func (si *SchedulerIntegration) prepareAndLaunch(
 
 	launchCtx := LaunchContext{
 		ExecutorID:           execCfg.Type,
+		ExecutorProfileID:    execCfg.ExecutorProfileID,
 		Prompt:               prompt,
 		Env:                  env,
 		ProfileID:            profileID,

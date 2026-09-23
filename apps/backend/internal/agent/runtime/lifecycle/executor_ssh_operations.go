@@ -942,6 +942,9 @@ const (
 	envKeyKandevWakeReason     = "KANDEV_WAKE_REASON"
 	envKeyKandevWakeCommentID  = "KANDEV_WAKE_COMMENT_ID"
 	envKeyKandevWakePayload    = "KANDEV_WAKE_PAYLOAD_JSON"
+	// envKeyKandevRuntimeAPIPrefix routes the remote agentctl CLI to the
+	// runtime API that owns the run (Office or workspace orchestration).
+	envKeyKandevRuntimeAPIPrefix = "KANDEV_RUNTIME_API_PREFIX"
 )
 
 var sshRemoteAgentCredentialEnvKeys = []string{
@@ -974,6 +977,7 @@ var sshRemoteAgentRuntimeEnvKeys = []string{
 	envKeyKandevWakeReason,
 	envKeyKandevWakeCommentID,
 	envKeyKandevWakePayload,
+	envKeyKandevRuntimeAPIPrefix,
 }
 
 // sshRemoteAgentEnv builds the env map sent to the remote agent instance. Each

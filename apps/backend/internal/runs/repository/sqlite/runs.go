@@ -13,8 +13,8 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"github.com/kandev/kandev/internal/db/dialect"
-	"github.com/kandev/kandev/internal/office/models"
 	"github.com/kandev/kandev/internal/runs/commentkeys"
+	"github.com/kandev/kandev/internal/runs/models"
 )
 
 // CreateRunTx creates a new run queue entry using a transaction the caller
@@ -670,6 +670,14 @@ func (r *Repository) ClaimNextEligibleRun(ctx context.Context) (*models.Run, err
 			  ) = 0
 			  AND (w.scheduled_retry_at IS NULL OR w.scheduled_retry_at <= ?)
 			  AND w.routing_blocked_status IS NULL
+			  AND NOT EXISTS (
+				SELECT 1 FROM runs recovering
+				WHERE recovering.agent_profile_id = w.agent_profile_id
+				  AND recovering.id <> w.id AND recovering.status = 'queued'
+				  AND recovering.retry_count > 0 AND recovering.scheduled_retry_at IS NOT NULL
+				  AND recovering.capabilities = 'workspace_coordinator'
+				  AND recovering.requested_at <= w.requested_at
+			  )
 			ORDER BY w.requested_at ASC
 			LIMIT 1
 		)
@@ -725,6 +733,16 @@ func (r *Repository) ScheduleRetryIfClaimed(ctx context.Context, runID string, r
 	return n > 0, nil
 }
 
+// ReleaseClaim returns a claimed run to the queue unchanged, for a dispatcher
+// that could not decide which runtime owns it.
+func (r *Repository) ReleaseClaim(ctx context.Context, id string) error {
+	_, err := r.db.ExecContext(ctx, r.db.Rebind(`
+		UPDATE runs SET status = 'queued', claimed_at = NULL
+		WHERE id = ? AND status = 'claimed'
+	`), id)
+	return err
+}
+
 // CleanExpired deletes finished/failed runs older than the given time.
 func (r *Repository) CleanExpired(ctx context.Context, olderThan time.Time) (int64, error) {
 	res, err := r.db.ExecContext(ctx, r.db.Rebind(`
@@ -744,6 +762,29 @@ func (r *Repository) RecoverStale(ctx context.Context, claimedOlderThan time.Tim
 		SET status = 'queued', claimed_at = NULL
 		WHERE status = 'claimed' AND claimed_at < ?
 	`), claimedOlderThan)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// RecoverStaleExcept is RecoverStale for every agent profile except the
+// protected ones, whose runs follow their owner's recovery policy.
+func (r *Repository) RecoverStaleExcept(ctx context.Context, claimedOlderThan time.Time, protectedProfiles []string) (int64, error) {
+	if len(protectedProfiles) == 0 {
+		return r.RecoverStale(ctx, claimedOlderThan)
+	}
+	query := `
+		UPDATE runs
+		SET status = 'queued', claimed_at = NULL
+		WHERE status = 'claimed' AND claimed_at < ?
+		  AND agent_profile_id NOT IN (?` + strings.Repeat(", ?", len(protectedProfiles)-1) + `)`
+	args := make([]any, 0, len(protectedProfiles)+1)
+	args = append(args, claimedOlderThan)
+	for _, id := range protectedProfiles {
+		args = append(args, id)
+	}
+	res, err := r.db.ExecContext(ctx, r.db.Rebind(query), args...)
 	if err != nil {
 		return 0, err
 	}
@@ -932,4 +973,34 @@ func (r *Repository) SetRunErrorMessageForTest(
 		UPDATE runs SET error_message = ? WHERE id = ?
 	`), errMsg, runID)
 	return err
+}
+
+// RetryClaimedSession fences delayed or duplicate failures against cancellation,
+// replacement sessions and the attempt that actually owned the failed execution.
+func (r *Repository) RetryClaimedSession(ctx context.Context, runID, sessionID string, count int, retryAt time.Time) (bool, error) {
+	result, err := r.db.ExecContext(ctx, r.db.Rebind(`
+		UPDATE runs SET status = 'queued', retry_count = retry_count + 1,
+			scheduled_retry_at = ?, claimed_at = NULL, finished_at = NULL,
+			error_message = '', failure_reason = ''
+		WHERE id = ? AND session_id = ? AND status = 'claimed' AND retry_count = ?
+	`), retryAt, runID, sessionID, count)
+	if err != nil {
+		return false, err
+	}
+	changed, err := result.RowsAffected()
+	return changed == 1, err
+}
+
+// CancelScheduledSessionRetry never cancels a successor that has already launched.
+func (r *Repository) CancelScheduledSessionRetry(ctx context.Context, sessionID string) (bool, error) {
+	result, err := r.db.ExecContext(ctx, r.db.Rebind(`
+		UPDATE runs SET status = 'cancelled', finished_at = ?,
+			cancel_reason = 'automatic recovery cancelled', scheduled_retry_at = NULL
+		WHERE session_id = ? AND status = 'queued' AND scheduled_retry_at IS NOT NULL AND retry_count > 0
+	`), time.Now().UTC(), sessionID)
+	if err != nil {
+		return false, err
+	}
+	changed, err := result.RowsAffected()
+	return changed > 0, err
 }

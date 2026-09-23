@@ -241,7 +241,7 @@ func (r *Repository) ListAgentInstances(ctx context.Context, workspaceID string)
 	if agents == nil {
 		agents = []*models.AgentInstance{}
 	}
-	return agents, nil
+	return r.withoutExternalAgents(ctx, agents)
 }
 
 // ListAgentInstancesByIDs returns the office agent_profiles rows whose ids
@@ -677,7 +677,7 @@ func (r *Repository) ListAgentInstancesFiltered(
 	if agents == nil {
 		agents = []*models.AgentInstance{}
 	}
-	return agents, nil
+	return r.withoutExternalAgents(ctx, agents)
 }
 
 // normalizeAgentJSONArray returns "[]" for empty values; otherwise the input.

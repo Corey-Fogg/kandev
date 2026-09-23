@@ -716,3 +716,39 @@ func seedTerminal(
 	run := queueRunAt(t, repo, id, "a1", time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC))
 	setStatus(t, repo, run.ID, status, nil, finishedAt)
 }
+
+func TestRecoverStaleExceptDoesNotReplayOrchestratorWrites(t *testing.T) {
+	repo := newTestRepo(t)
+	cutoff := time.Now().UTC()
+	for _, profile := range []string{"chief", "legacy"} {
+		run := queueRunAt(t, repo, profile, profile, cutoff.Add(-time.Hour))
+		setStatus(t, repo, run.ID, "claimed", timePtr(cutoff.Add(-time.Hour)), nil)
+	}
+	count, err := repo.RecoverStaleExcept(context.Background(), cutoff, []string{"chief"})
+	if err != nil || count != 1 {
+		t.Fatalf("recovery: %d %v", count, err)
+	}
+	checkString(t, "chief status", string(mustGetRun(t, repo, "chief").Status), "claimed")
+	checkString(t, "legacy status", string(mustGetRun(t, repo, "legacy").Status), "queued")
+}
+
+func TestReleaseClaimRequeuesOnlyAClaimedRun(t *testing.T) {
+	repo := newTestRepo(t)
+	claimedAt := time.Now().UTC()
+	for _, id := range []string{"claimed", "finished"} {
+		queueRunAt(t, repo, id, "a1", claimedAt.Add(-time.Minute))
+	}
+	setStatus(t, repo, "claimed", "claimed", timePtr(claimedAt), nil)
+	setStatus(t, repo, "finished", "finished", timePtr(claimedAt), timePtr(claimedAt))
+	for _, id := range []string{"claimed", "finished"} {
+		if err := repo.ReleaseClaim(context.Background(), id); err != nil {
+			t.Fatalf("release %s: %v", id, err)
+		}
+	}
+	released := mustGetRun(t, repo, "claimed")
+	checkString(t, "released status", string(released.Status), "queued")
+	if released.ClaimedAt != nil {
+		t.Fatalf("released run kept claimed_at %v", released.ClaimedAt)
+	}
+	checkString(t, "finished status", string(mustGetRun(t, repo, "finished").Status), "finished")
+}

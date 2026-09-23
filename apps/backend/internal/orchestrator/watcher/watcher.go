@@ -66,6 +66,8 @@ type AgentEventData struct {
 	// under someone who just asked the retries to stop would defeat the
 	// purpose of the cancel button.
 	UserInitiated bool `json:"user_initiated,omitempty"`
+	// RunID is the durable run that launched this session, when known.
+	RunID string `json:"run_id,omitempty"`
 }
 
 // ACPSessionEventData contains data from ACP session events

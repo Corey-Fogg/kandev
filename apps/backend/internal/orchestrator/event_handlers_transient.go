@@ -983,6 +983,11 @@ func (s *Service) CancelTransientRetry(ctx context.Context, taskID, sessionID st
 	if err := s.authorizeTaskSessionPair(ctx, taskID, sessionID); err != nil {
 		return false
 	}
+	// A managed conversation parks its retry durably instead of in the
+	// in-memory transient loop; cancelling must reach that retry too.
+	if s.managedRetryCancel != nil && s.managedRetryCancel(ctx, taskID, sessionID) {
+		return true
+	}
 	noticeState, releaseNoticeState := s.acquireTransientRetryNoticeState(sessionID)
 	if noticeState == nil {
 		return false

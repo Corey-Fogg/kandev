@@ -60,14 +60,17 @@ func assembleInteractions(rows []*models.Message) []*models.Interaction {
 		if pendingID == "" {
 			continue
 		}
-		if _, seen := grouped[pendingID]; !seen {
-			order = append(order, pendingID)
+		requestID, _ := row.Metadata["request_id"].(string)
+		key := row.TaskID + "\x00" + row.TaskSessionID + "\x00" + pendingID + "\x00" + requestID
+		if _, seen := grouped[key]; !seen {
+			order = append(order, key)
 		}
-		grouped[pendingID] = append(grouped[pendingID], row)
+		grouped[key] = append(grouped[key], row)
 	}
 	out := make([]*models.Interaction, 0, len(order))
-	for _, pendingID := range order {
-		if interaction := buildInteraction(pendingID, grouped[pendingID]); interaction != nil {
+	for _, key := range order {
+		pendingID, _ := grouped[key][0].Metadata["pending_id"].(string)
+		if interaction := buildInteraction(pendingID, grouped[key]); interaction != nil {
 			out = append(out, interaction)
 		}
 	}

@@ -393,6 +393,10 @@ func isDeferredPath(c *gin.Context, path string) bool {
 		// officeagents.AgentAuthMiddleware validates it. Bearer-less office
 		// requests do NOT defer — they need a session like any other API call.
 		return true
+	case strings.HasPrefix(path, "/api/v1/orchestration/") && BearerToken(c.Request) != "":
+		// Orchestration agents call back with a runtime JWT that
+		// runtimeauth.Middleware validates. Bearer-less requests need a session.
+		return true
 	case !strings.HasPrefix(path, "/api/") && !strings.HasPrefix(path, "/debug/"):
 		// SPA shell + static assets (NoRoute handler): must stay reachable so
 		// the login page can render. The boot payload carries no data for
