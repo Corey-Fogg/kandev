@@ -169,7 +169,8 @@ type taskCreatorAdapter struct {
 	profiles interface {
 		GetAgentProfile(context.Context, string) (*settingsmodels.AgentProfile, error)
 	}
-	taskSvc *taskservice.Service
+	taskSvc        *taskservice.Service
+	clarifications clarificationBundleResolver
 }
 
 func (a *taskCreatorAdapter) CreateOfficeTask(ctx context.Context, workspaceID, projectID, assigneeAgentID, title, description string) (string, error) {

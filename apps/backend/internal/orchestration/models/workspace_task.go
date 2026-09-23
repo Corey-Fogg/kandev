@@ -29,13 +29,24 @@ type WorkspaceTaskCommand struct {
 	WorkspaceID    string
 	ChiefID        string
 	TaskID         string
-	Action         string  `json:"action"`
-	AssigneeID     string  `json:"assignee"`
-	Title          *string `json:"title,omitempty"`
-	Description    *string `json:"description,omitempty"`
-	Priority       *string `json:"priority,omitempty"`
-	ParentID       *string `json:"parent_id,omitempty"`
-	WorkflowID     string  `json:"workflow_id,omitempty"`
-	WorkflowStepID string  `json:"workflow_step_id,omitempty"`
-	Position       *int    `json:"position,omitempty"`
+	Action         string                    `json:"action"`
+	AssigneeID     string                    `json:"assignee"`
+	Title          *string                   `json:"title,omitempty"`
+	Description    *string                   `json:"description,omitempty"`
+	Priority       *string                   `json:"priority,omitempty"`
+	ParentID       *string                   `json:"parent_id,omitempty"`
+	WorkflowID     string                    `json:"workflow_id,omitempty"`
+	WorkflowStepID string                    `json:"workflow_step_id,omitempty"`
+	Position       *int                      `json:"position,omitempty"`
+	Answers        []WorkspaceQuestionAnswer `json:"answers,omitempty"`
+	Rejected       bool                      `json:"rejected,omitempty"`
+	RejectReason   string                    `json:"reject_reason,omitempty"`
+}
+
+// WorkspaceQuestionAnswer answers one question of a delegated task's pending
+// clarification bundle.
+type WorkspaceQuestionAnswer struct {
+	QuestionID      string   `json:"question_id"`
+	SelectedOptions []string `json:"selected_options,omitempty"`
+	CustomText      string   `json:"custom_text,omitempty"`
 }

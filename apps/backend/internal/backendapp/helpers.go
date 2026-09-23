@@ -771,6 +771,11 @@ func registerRoutes(p routeParams) {
 		p.orchestratorSvc.HandleClarificationPrimaryAnswered,
 		p.log,
 	)
+	if p.services.Orchestration != nil {
+		if manager, ok := p.services.Orchestration.Manager.(*workspaceAdminAdapter); ok {
+			manager.clarifications = clarificationResolver
+		}
+	}
 
 	// Wire pending clarification requests into the office inbox.
 	if p.services.OfficeSvcs != nil && p.services.OfficeSvcs.Dashboard != nil {

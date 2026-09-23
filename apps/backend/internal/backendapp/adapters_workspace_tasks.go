@@ -170,6 +170,8 @@ func (a *taskCreatorAdapter) dispatchWorkspaceTask(ctx context.Context, task *mo
 	switch command.Action {
 	case "session_mode", "resolve_permission":
 		return a.controlWorkspacePermission(ctx, task, command)
+	case "answer_question":
+		return a.answerWorkspaceQuestion(ctx, task, command)
 	case "message":
 		return a.messageWorkspaceTask(ctx, task, command)
 	case "adopt", "assign":
