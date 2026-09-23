@@ -10,7 +10,13 @@ import {
   DropdownMenuTrigger,
 } from "@kandev/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { ALL_STATUSES, STATUS_FILTER_OPTIONS, type RunStatusFilter } from "./run-status";
+import { useFeature } from "@/hooks/domains/features/use-feature";
+import {
+  ALL_STATUSES,
+  STATUS_FILTER_OPTIONS,
+  visibleStatusFilters,
+  type RunStatusFilter,
+} from "./run-status";
 
 export const ANY_AUTOMATION = "any";
 
@@ -73,6 +79,7 @@ export function RunFilters({
   automations,
 }: RunFiltersProps) {
   const { t } = useTranslation();
+  const orchestration = useFeature("orchestration");
   // Both filters are driven off the loaded feed, so the automation list only
   // ever offers automations that have actually produced a run.
   const automationOptions = [
@@ -84,7 +91,7 @@ export function RunFilters({
     <div className="flex items-center gap-2">
       <FilterMenu
         value={status}
-        options={STATUS_FILTER_OPTIONS.map((option) => ({
+        options={visibleStatusFilters(STATUS_FILTER_OPTIONS, orchestration).map((option) => ({
           value: option.value,
           label: t(option.labelKey),
         }))}

@@ -26,6 +26,8 @@ import type { AutomationRun, RunStatus } from "@/lib/types/automation";
 import { formatRelativeTime } from "@/lib/utils";
 import Link from "@/components/routing/app-link";
 import { conversationHref } from "@/lib/api/domains/orchestration-api";
+import { useFeature } from "@/hooks/domains/features/use-feature";
+import { visibleStatusFilters } from "@/components/runs/run-status";
 
 type RunsSectionProps = {
   automationId: string | null;
@@ -220,9 +222,10 @@ function StatusFilter({
   onChange: (value: RunStatus | "all") => void;
 }) {
   const { t } = useTranslation();
+  const orchestration = useFeature("orchestration");
   return (
     <div className="flex items-center gap-1 flex-wrap" data-testid="run-status-filter">
-      {STATUS_FILTERS.map((filter) => {
+      {visibleStatusFilters(STATUS_FILTERS, orchestration).map((filter) => {
         const count =
           filter.value === "all"
             ? runs.length

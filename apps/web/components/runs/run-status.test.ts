@@ -9,6 +9,7 @@ import {
   STATUS_FILTER_OPTIONS,
   statusDotClass,
   statusLabelKey,
+  visibleStatusFilters,
 } from "./run-status";
 import { ANY_AUTOMATION, isDefaultFilters } from "./run-filters";
 import automationsEn from "@/src/locales/en/automations.json";
@@ -81,6 +82,14 @@ describe("status filter options", () => {
     expect(STATUS_FILTER_OPTIONS[0].value).toBe(ALL_STATUSES);
     const values = STATUS_FILTER_OPTIONS.map((o) => o.value);
     expect(new Set(values).size).toBe(values.length);
+  });
+
+  it("offers Dispatched only while orchestration is on", () => {
+    const values = (on: boolean) =>
+      visibleStatusFilters(STATUS_FILTER_OPTIONS, on).map((o) => o.value);
+    expect(values(false)).not.toContain("dispatched");
+    expect(values(true)).toContain("dispatched");
+    expect(values(false)).toContain("skipped");
   });
 
   it("labels each option the same way the feed labels the run", () => {

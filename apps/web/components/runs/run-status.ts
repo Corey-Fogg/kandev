@@ -31,6 +31,19 @@ export const RUN_STATUS_DOT: Record<RunStatus, string> = {
   cancelled: "bg-amber-500",
 };
 
+/** Statuses only orchestration produces; their filters show only while it is on. */
+export const ORCHESTRATION_RUN_STATUSES: ReadonlySet<string> = new Set(["dispatched"]);
+
+/** Drops the orchestration-only filters while the orchestration feature is off. */
+export function visibleStatusFilters<T extends { value: string }>(
+  filters: T[],
+  orchestration: boolean,
+): T[] {
+  return orchestration
+    ? filters
+    : filters.filter((filter) => !ORCHESTRATION_RUN_STATUSES.has(filter.value));
+}
+
 /**
  * Filter options carrying catalog keys rather than copy — this is a plain
  * module, so the label is resolved by whoever renders the control.
