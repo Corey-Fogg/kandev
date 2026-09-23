@@ -103,12 +103,6 @@ func FormatPullRequestTargetContext(targets []PullRequestTarget) string {
 	return strings.Join(lines, "\n")
 }
 
-// InjectConversationContext advertises the core conversation tool surface.
-func InjectConversationContext(taskID, sessionID, prompt string, trustedContents ...string) string {
-	content := Resolve("conversation-context", map[string]string{"task_id": taskID, "session_id": sessionID})
-	return canonicalizeKandevContext(content, prompt, trustedContextContents(sessionID, trustedContents...))
-}
-
 // InjectPullRequestTargetContext prepends one canonical hidden target block.
 // It removes a stale or upstream copy before inserting the current snapshot.
 func InjectPullRequestTargetContext(prompt string, targets []PullRequestTarget) (string, string) {
@@ -148,9 +142,6 @@ const (
 )
 
 func contextKindForBlock(block string, trustedContents []string) contextKind {
-	if strings.Contains(block, "KANDEV CONVERSATION MCP TOOLS") {
-		return contextOffice
-	}
 	if strings.Contains(block, officeContextMarker) {
 		return contextOffice
 	}
