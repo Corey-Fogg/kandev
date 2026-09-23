@@ -5,7 +5,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/kandev/kandev/internal/task/models"
 	v1 "github.com/kandev/kandev/pkg/api/v1"
 	"github.com/stretchr/testify/require"
 )
@@ -19,10 +18,11 @@ func TestDispatchGuardCoversNativeDispatch(t *testing.T) {
 			manager.getExecutionIDForSessionFunc = func(context.Context, string) (string, error) { return "execution", nil }
 			e := newTestExecutor(t, manager, repo)
 			denied := errors.New("coordinator run required")
-			e.SetDispatchGuard(func(_ context.Context, task *models.Task, session *models.TaskSession, profile string) error {
-				require.Equal(t, "task-1", task.ID)
+			e.SetDispatchGuard(func(_ context.Context, target DispatchTarget) error {
+				require.Equal(t, "task-1", target.TaskID)
+				session, err := target.Session()
+				require.NoError(t, err)
 				require.Equal(t, "sess-1", session.ID)
-				require.Equal(t, "profile-1", profile)
 				return denied
 			})
 			var err error

@@ -1491,7 +1491,7 @@ func (e *Executor) LaunchPreparedSession(ctx context.Context, task *v1.Task, ses
 		// workspace default (or an empty config).
 		executorID = strings.TrimSpace(session.ExecutorID)
 	}
-	if err := e.CheckDispatch(ctx, task.ID, sessionID, agentProfileID); err != nil {
+	if err := e.CheckDispatch(ctx, task.ID, sessionID, session); err != nil {
 		return nil, err
 	}
 	if opts.McpMode == "" {

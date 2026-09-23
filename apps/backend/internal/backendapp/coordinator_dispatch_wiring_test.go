@@ -27,5 +27,5 @@ func TestCoordinatorDispatchGuardIsInstalledWithOrchestrationDisabled(t *testing
 	require.NotNil(t, setter.guard, "the guard is installed before the feature check")
 	task, err := tasks.GetTask(ctx, taskID)
 	require.NoError(t, err)
-	require.ErrorIs(t, setter.guard(ctx, task, nil, "profile"), orchestrationruntime.ErrOrchestrationDisabled)
+	require.ErrorIs(t, setter.guard(ctx, dispatchTarget(task.ID, nil)), orchestrationruntime.ErrOrchestrationDisabled)
 }

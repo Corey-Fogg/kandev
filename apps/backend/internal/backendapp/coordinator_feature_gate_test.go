@@ -11,6 +11,7 @@ import (
 	orchestrationmodels "github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/orchestration/personas"
 	orchestrationruntime "github.com/kandev/kandev/internal/orchestration/runtime"
+	"github.com/kandev/kandev/internal/orchestrator/executor"
 	runstore "github.com/kandev/kandev/internal/runs/repository/sqlite"
 	runservice "github.com/kandev/kandev/internal/runs/service"
 	taskmodels "github.com/kandev/kandev/internal/task/models"
@@ -52,11 +53,16 @@ func TestCoordinatorFeatureGateNativeConversationDispatch(t *testing.T) {
 	require.NoError(t, err)
 	for _, runtime := range []*orchestrationruntime.Service{nil, {Repo: repo}} {
 		guard := coordinatorDispatchGuard(runtime, repo)
-		require.ErrorIs(t, guard(context.Background(), task, nil, "profile"), orchestrationruntime.ErrOrchestrationDisabled)
+		require.ErrorIs(t, guard(context.Background(), dispatchTarget(task.ID, nil)), orchestrationruntime.ErrOrchestrationDisabled)
 	}
-	ordinary := &taskmodels.Task{ID: "ordinary-task", WorkspaceID: task.WorkspaceID}
-	require.NoError(t, coordinatorDispatchGuard(nil, repo)(context.Background(), ordinary, nil, "profile"),
+	loads := 0
+	ordinary := executor.DispatchTarget{TaskID: "ordinary-task", Session: func() (*taskmodels.TaskSession, error) {
+		loads++
+		return nil, nil
+	}}
+	require.NoError(t, coordinatorDispatchGuard(nil, repo)(context.Background(), ordinary),
 		"tasks that are not coordinator conversations keep native dispatch")
+	require.Zero(t, loads, "an ordinary dispatch never loads its session")
 }
 
 func TestCoordinatorDispatchGuardRequiresClaimedRun(t *testing.T) {
@@ -74,11 +80,15 @@ func TestCoordinatorDispatchGuardRequiresClaimedRun(t *testing.T) {
 	require.NoError(t, err)
 	session := &taskmodels.TaskSession{ID: "session", TaskID: taskID, Metadata: map[string]interface{}{mcpprofile.BrokerPolicyMetadataKey: string(mcpprofile.SurfaceOrchestratorBroker)}}
 	guard := coordinatorDispatchGuard(s, repo)
-	require.ErrorIs(t, guard(ctx, task, session, "profile"), orchestrationmodels.ErrConflict, "a native launch outside a claimed run is refused")
+	require.ErrorIs(t, guard(ctx, dispatchTarget(task.ID, session)), orchestrationmodels.ErrConflict, "a native launch outside a claimed run is refused")
 
 	require.NoError(t, s.QueueTurn(ctx, "fixture-chief", taskID, "task_comment", "guard-run", nil))
 	run, err := runs.ClaimNextEligibleRun(ctx)
 	require.NoError(t, err)
 	require.NoError(t, runs.UpdateRunRuntimeSnapshot(ctx, run.ID, "workspace_coordinator", run.Payload, session.ID))
-	require.NoError(t, guard(ctx, task, session, "profile"), "the claimed run's broker session dispatches")
+	require.NoError(t, guard(ctx, dispatchTarget(task.ID, session)), "the claimed run's broker session dispatches")
+}
+
+func dispatchTarget(taskID string, session *taskmodels.TaskSession) executor.DispatchTarget {
+	return executor.DispatchTarget{TaskID: taskID, Session: func() (*taskmodels.TaskSession, error) { return session, nil }}
 }

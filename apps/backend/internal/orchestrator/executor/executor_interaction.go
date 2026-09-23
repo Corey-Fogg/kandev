@@ -631,9 +631,6 @@ func (e *Executor) dispatchToAgent(
 }
 
 func (e *Executor) prompt(ctx context.Context, taskID, sessionID string, prompt string, attachments []v1.MessageAttachment, dispatchOnly bool, onDispatched func(), steer bool, preloadedSession ...*models.TaskSession) (*PromptResult, error) {
-	if err := e.CheckDispatch(ctx, taskID, sessionID, ""); err != nil {
-		return nil, err
-	}
 	var session *models.TaskSession
 	if len(preloadedSession) > 0 && preloadedSession[0] != nil {
 		session = preloadedSession[0]
@@ -646,6 +643,9 @@ func (e *Executor) prompt(ctx context.Context, taskID, sessionID string, prompt 
 	}
 	if session.TaskID != taskID {
 		return nil, ErrExecutionNotFound
+	}
+	if err := e.CheckDispatch(ctx, taskID, sessionID, session); err != nil {
+		return nil, err
 	}
 	executionID, err := e.agentManager.GetExecutionIDForSession(ctx, sessionID)
 	if err != nil || executionID == "" {
@@ -995,15 +995,15 @@ func (e *Executor) switchModel(
 // validate a replacement request. It deliberately does not stop the current
 // agent; Kubernetes must prove exact recorded authority first.
 func (e *Executor) prepareModelSwitch(ctx context.Context, taskID, sessionID string) (*models.TaskSession, *models.Task, string, string, *models.ExecutorRunning, error) {
-	if err := e.CheckDispatch(ctx, taskID, sessionID, ""); err != nil {
-		return nil, nil, "", "", nil, err
-	}
 	session, err := e.repo.GetTaskSession(ctx, sessionID)
 	if err != nil {
 		return nil, nil, "", "", nil, fmt.Errorf("failed to get session: %w", err)
 	}
 	if session.TaskID != taskID {
 		return nil, nil, "", "", nil, fmt.Errorf("session %s does not belong to task %s", sessionID, taskID)
+	}
+	if err := e.CheckDispatch(ctx, taskID, sessionID, session); err != nil {
+		return nil, nil, "", "", nil, err
 	}
 	executionID, err := e.agentManager.GetExecutionIDForSession(ctx, sessionID)
 	if err != nil || executionID == "" {
