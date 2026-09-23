@@ -29,7 +29,9 @@ routes use Kandev's authenticated identity and the caller's workspace access.
 - `POST /tasks/:id/retry` retries a failed turn with fresh credentials.
 
 Conversations are workspace-scoped: any member with access to the workspace can
-read and post.
+read them. Posting and retrying, like creating, updating, pausing or deleting an
+orchestrator, need workspace manage access, because the coordinator acts with
+that authority.
 
 ## Coordinator task observations
 
@@ -105,8 +107,10 @@ workspace returns the existing task.
 Use `move` for board progression; `task_status` changes native status under the
 normal completion gates. Read `task_details` to verify the result. Bypass
 permission modes are unavailable, and `resolve_permission` accepts only
-`allow_once` or `reject_once` options. Answers and permission decisions apply
-only to the exact live request; a stale or replaced request returns 409.
+`allow_once` or `reject_once` options. `session_mode`, `resolve_permission` and
+`answer_question` work only on tasks the coordinator created or adopted.
+Answers and permission decisions apply only to the exact live request; a stale
+or replaced request returns 409.
 
 `manage_workspace` takes `resource` (`workspace`, `workflow`, `step`,
 `repository`), `action` (`create`, `update`, `delete`, `reorder`), optional `id`

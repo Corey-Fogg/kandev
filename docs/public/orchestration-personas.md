@@ -21,7 +21,7 @@ Choose **Persona icon** in the global role settings to use name initials or a bu
 
 Edit orchestrators with the shared **Save changes** and **Reset** controls. Pause blocks new turns; it does not interrupt a running turn. Delete removes the coordinator and stops its conversation sessions, while delivery tasks remain on their board. Opening a conversation does not create another workspace or workflow.
 
-Every conversation belongs to its workspace. Anyone with access to the workspace can read it and send messages.
+Every conversation belongs to its workspace. Anyone with access to the workspace can read it. Sending messages, like adding or changing an orchestrator, needs workspace manage access, because the coordinator acts with that authority.
 
 ## Work from the Coordinator view
 
