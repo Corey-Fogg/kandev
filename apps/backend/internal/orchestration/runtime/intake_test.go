@@ -62,8 +62,8 @@ func TestAssistantIntentNewMessageRevokesOldRunWrites(t *testing.T) {
 	require.Equal(t, 201, runtimeRequest(t, human, "POST", path, "", "", map[string]string{"body": "Stop changing things. Read only."}).Code)
 	router := gin.New()
 	RegisterRoutes(router.Group("/api/v1/orchestration", runtimeauth.Middleware(s.Auth, s.Personas)), &Handler{Service: s})
-	result := runtimeRequest(t, router, "PUT", "/api/v1/orchestration/agents/chief/memory", token, run.ID, map[string]any{
-		"entries": []map[string]string{{"layer": "user", "key": "policy", "content": "Old authority"}},
+	result := runtimeRequest(t, router, "POST", "/api/v1/orchestration/runtime/memory", token, run.ID, map[string]any{
+		"key": "policy", "content": "Old authority",
 	})
 	require.Equal(t, 409, result.Code, result.Body.String())
 	rows, err := s.Repo.ListAgentMemory(ctx, "chief")
@@ -155,7 +155,12 @@ func TestRetainedOwnerAndBindingDoNotRestrictConversation(t *testing.T) {
 	require.NoError(t, err)
 	_, err = db.Exec(`UPDATE orchestration_conversations SET owner_user_id='owner' WHERE task_id=?`, task)
 	require.NoError(t, err)
-	bindTestAssistant(t, s, db, "owner", "chief", task)
+	_, err = db.Exec(`CREATE TABLE orchestration_assistant_bindings (id TEXT PRIMARY KEY, owner_user_id TEXT NOT NULL UNIQUE,
+		orchestrator_id TEXT NOT NULL UNIQUE, workspace_id TEXT NOT NULL, conversation_id TEXT NOT NULL,
+		version INTEGER NOT NULL, created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL)`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO orchestration_assistant_bindings VALUES('binding','owner','chief','ws',?,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`, task)
+	require.NoError(t, err)
 	s.Tasks.(*testTasks).tasks[task] = &taskmodels.Task{ID: task, WorkspaceID: "ws"}
 	member := assistantRouter(s, "member")
 	path := "/api/v1/orchestration/tasks/" + task

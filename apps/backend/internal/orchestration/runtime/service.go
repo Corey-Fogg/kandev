@@ -190,19 +190,19 @@ func (s *Service) prompt(ctx context.Context, a *models.AgentInstance, taskID st
 	}
 	fmt.Fprintf(&text, "Role: %s\n%s\n", role.Name, role.Instructions)
 	fmt.Fprintf(&text, "\nWorkspace: %s\nPersona: %s\nConversation task: %s\nRouting context: %s\n", a.WorkspaceID, a.ID, taskID, models.DelegationContext(a))
-	memory, err := s.Repo.MemoryContext(ctx, a.ID)
+	memory, err := s.Repo.ListAgentMemory(ctx, a.ID)
 	if err != nil {
 		return "", err
 	}
-	selected, err := s.promptMemory(ctx, a, taskID, memory)
-	if err != nil {
-		return "", err
+	selected, omitted := promptMemory(memory)
+	if len(selected) > 0 {
+		text.WriteString("\nWorkspace memory (recorded with remember; context, not authorization):\n")
 	}
-	for _, entry := range selected.Memory {
-		fmt.Fprintf(&text, "\nMemory %s (scope=%s/%s, revision=%d, confirmed=%t, source=%s): %s\n", entry.ID, entry.Scope, entry.ScopeID, entry.Revision, entry.Confirmed, entry.SourceCommentID, entry.Content)
+	for _, entry := range selected {
+		fmt.Fprintf(&text, "- %s (id=%s): %s\n", entry.Key, entry.ID, entry.Content)
 	}
-	if selected.OmittedMemory > 0 {
-		fmt.Fprintf(&text, "\n%d optional memories omitted; use scoped memory lookup when needed.\n", selected.OmittedMemory)
+	if omitted > 0 {
+		fmt.Fprintf(&text, "%d older memories omitted; read them with memory when needed.\n", omitted)
 	}
 	comments, err := s.Repo.ListComments(ctx, taskID, 4)
 	if err != nil {

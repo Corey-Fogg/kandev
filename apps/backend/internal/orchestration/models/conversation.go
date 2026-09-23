@@ -3,23 +3,14 @@ package models
 import "time"
 
 type AgentMemory struct {
-	OwnerUserID     string     `json:"owner_user_id" db:"owner_user_id"`
-	Scope           string     `json:"scope" db:"scope"`
-	ScopeID         string     `json:"scope_id" db:"scope_id"`
-	SourceCommentID string     `json:"source_comment_id" db:"source_comment_id"`
-	Revision        int64      `json:"revision" db:"revision"`
-	Confirmed       bool       `json:"confirmed" db:"confirmed"`
-	Priority        int        `json:"priority" db:"priority"`
-	ExpiresAt       *time.Time `json:"expires_at,omitempty" db:"expires_at"`
-	ForgottenAt     *time.Time `json:"-" db:"forgotten_at"`
-	ID              string     `json:"id" db:"id"`
-	AgentProfileID  string     `json:"agent_profile_id" db:"agent_profile_id"`
-	Layer           string     `json:"layer" db:"layer"`
-	Key             string     `json:"key" db:"key"`
-	Content         string     `json:"content" db:"content"`
-	Metadata        string     `json:"metadata" db:"metadata"`
-	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at" db:"updated_at"`
+	ID             string    `json:"id" db:"id"`
+	AgentProfileID string    `json:"agent_profile_id" db:"agent_profile_id"`
+	Layer          string    `json:"layer" db:"layer"`
+	Key            string    `json:"key" db:"key"`
+	Content        string    `json:"content" db:"content"`
+	Metadata       string    `json:"metadata" db:"metadata"`
+	CreatedAt      time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
 }
 type TaskComment struct {
 	ClientMessageID string    `json:"client_message_id,omitempty" db:"client_message_id"`

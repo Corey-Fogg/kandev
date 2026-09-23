@@ -41,13 +41,13 @@ func TestOrchestratorBrokerForwardsOnlyNamedOperations(t *testing.T) {
 
 func TestOrchestratorBrokerAdvertisesWorkspaceTools(t *testing.T) {
 	s := newOrchestratorMCP(&kandevClient{})
-	for _, name := range []string{"manage_workspace", "workspace", "workspace_tasks", "task_details", "task_content", "task_permissions", "comments", "capabilities", "memory", "create_task", "manage_task", "task_status", "comment"} {
+	for _, name := range []string{"manage_workspace", "workspace", "workspace_tasks", "task_details", "task_content", "task_permissions", "comments", "capabilities", "memory", "remember", "forget", "create_task", "manage_task", "task_status", "comment"} {
 		require.NotNil(t, s.GetTool(name), name)
 	}
 	for _, name := range []string{"create_objective", "objectives", "maintenance", "workspace_links", "context", "attention", "improvements"} {
 		require.Nil(t, s.GetTool(name), name)
 	}
-	for _, action := range []string{"edit", "move", "archive", "delete", "assign", "start", "stop", "message", "session_mode", "resolve_permission"} {
+	for _, action := range []string{"edit", "move", "archive", "delete", "assign", "start", "stop", "message", "session_mode", "resolve_permission", "answer_question"} {
 		require.Contains(t, s.GetTool("manage_task").Tool.Description, action)
 	}
 	for _, resource := range []string{"workflow", "step", "repository", "configuration"} {

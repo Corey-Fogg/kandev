@@ -41,9 +41,12 @@ func newOrchestratorMCP(client *kandevClient) *server.MCPServer {
 		if strings.Contains(definition.Path, ":id") {
 			options = append(options, mcp.WithString("id", mcp.Required()))
 		}
-		if definition.Method == http.MethodGet {
+		switch definition.Method {
+		case http.MethodGet:
 			options = append(options, mcp.WithReadOnlyHintAnnotation(true))
-		} else {
+		case http.MethodDelete:
+			options = append(options, mcp.WithDestructiveHintAnnotation(true))
+		default:
 			options = append(options, mcp.WithObject("request", mcp.Required(), mcp.Description("Native request body. Runtime authorization is checked by Kandev.")))
 		}
 		s.AddTool(mcp.NewTool(definition.Name, options...), func(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {

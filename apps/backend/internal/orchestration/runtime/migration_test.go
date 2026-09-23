@@ -39,9 +39,6 @@ func TestMigrationPreservesRegisteredPersonaHistoryOnly(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, memory, 1)
 	require.Equal(t, "Keep my preference", memory[0].Content)
-	require.False(t, memory[0].Confirmed)
-	require.Equal(t, "workspace", memory[0].Scope)
-	require.Empty(t, memory[0].OwnerUserID)
 	_, err = db.Exec(`DELETE FROM orchestration_memory;
  INSERT INTO office_agent_instructions(id,agent_profile_id,filename,content) VALUES ('late','chief','LATE.md','Must stay in Office')`)
 	require.NoError(t, err)

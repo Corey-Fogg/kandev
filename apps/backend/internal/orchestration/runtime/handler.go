@@ -26,7 +26,6 @@ const (
 	statusFailed        = "failed"
 	nextCursorKey       = "next_cursor"
 	authorTypeUser      = "user"
-	scopeWorkspace      = "workspace"
 )
 
 type Handler struct {
@@ -37,11 +36,8 @@ type Handler struct {
 func RegisterRoutes(g *gin.RouterGroup, h *Handler) {
 	g.GET("/runtime/capabilities", h.workspaceCapabilities)
 	g.GET("/runtime/memory", h.runtimeMemory)
-	g.GET("/assistant/memory", h.assistantMemory)
-	g.GET("/assistant/memory/:id", h.assistantMemory)
-	g.GET("/assistant/memory/:id/source", h.assistantMemorySource)
-	g.PUT("/assistant/memory/:id", h.editAssistantMemory)
-	g.DELETE("/assistant/memory/:id", h.forgetAssistantMemory)
+	g.POST("/runtime/memory", h.remember)
+	g.DELETE("/runtime/memory/:id", h.forget)
 	g.GET("/tasks/:id", h.conversation)
 	g.GET("/tasks/:id/comments", h.comments)
 	g.POST("/tasks/:id/comments", h.comment)
@@ -56,9 +52,6 @@ func RegisterRoutes(g *gin.RouterGroup, h *Handler) {
 	g.POST("/runtime/tasks/:id/manage", h.manageTask)
 	g.POST("/runtime/tasks/:id/status", h.updateTask)
 	g.POST("/runtime/comments", h.runtimeComment)
-	g.GET("/agents/:id/memory", h.memory)
-	g.GET("/agents/:id/memory/summary", h.memory)
-	g.PUT("/agents/:id/memory", h.setMemory)
 }
 func fail(c *gin.Context, err error) {
 	c.JSON(http.StatusBadRequest, gin.H{errorResponseKey: err.Error()})
