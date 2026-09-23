@@ -1,5 +1,5 @@
 ---
-status: draft
+status: active
 system: orchestration
 created: 2026-09-17
 owners:
@@ -11,11 +11,11 @@ owners:
 ## Overview
 
 A person coordinating an existing Kanban workspace needs to see its work and
-talk to the selected coordinator on one page. This extends the persistent
-conversation and linked-task list in the local prototype. The user accepted the
-task-overview-plus-chat direction in
-[issue #3752](https://github.com/kdlbs/kandev/issues/3752#issuecomment-5713059573).
-This is a design for implementation, not evidence of a shipped page.
+talk to the selected coordinator on one page. The Coordinator view combines a
+workspace-wide task overview with the selected assignment's persistent
+conversation. Orchestration owns the view because it joins a coordinator
+assignment with task observations; the task system stays the source of truth
+for every task and session.
 
 **Observation** means displaying existing task state. It neither adopts a task
 for an agent nor grants authority to mutate it. **Coordinated tasks** are tasks
@@ -81,7 +81,7 @@ task to have been created or adopted by a coordinator.
 - **AC-ORCHESTRATION-COORDINATOR-VIEW-003.2:** Multiple workspace coordinators
   shall remain selectable, with role/profile identity and configuration links.
   Switching selection shall load only that assignment's conversation and shall
-  not transfer transcripts, drafts, ownership or task assignments.
+  not transfer transcripts, drafts or task assignments.
 - **AC-ORCHESTRATION-COORDINATOR-VIEW-003.3:** With no assignment or an invalid
   configuration, the page shall explain the required setup and link to it.
   Opening the page, loading task status or selecting an assignment shall not
@@ -129,25 +129,25 @@ task to have been created or adopted by a coordinator.
 
 #### Acceptance criteria
 
-- **AC-ORCHESTRATION-COORDINATOR-VIEW-006.1:** Task/conversation reads shall
-  enforce current workspace and retained-owner access. Conversation tasks and
-  transcripts shall not enter task rows, search results, counts or exports.
+- **AC-ORCHESTRATION-COORDINATOR-VIEW-006.1:** Task and conversation reads shall
+  enforce current workspace access. Conversation tasks and transcripts shall
+  not enter task rows, search results, counts or exports.
 - **AC-ORCHESTRATION-COORDINATOR-VIEW-006.2:** A pending input or recovery link
-  shall open the authoritative native task interface. This delivery shall not
-  answer questions, grant permissions or resolve requests automatically.
+  shall open the authoritative native task interface. The view itself shall not
+  answer questions, grant permissions or resolve requests.
 - **AC-ORCHESTRATION-COORDINATOR-VIEW-006.3:** Disabling Orchestration shall
   remove/reject its entry points and new execution while retaining saved
-  configuration and ownership protections. Existing Kanban/Office access and
+  configuration. Existing Kanban/Office access and
   behavior shall retain their independent controls.
 
 ## Out of scope
 
-New task execution or scheduling engines; a personal assistant attention ledger;
-automatic task adoption, permission resolution or cross-workspace grants;
-guaranteed read-only provider execution; typed report persistence; workflow-step
-monitoring policy; plugin host API additions; dependency graphs, editable phase
-plans, build buttons and replacement board/diff editors from the example images.
-Existing native task/board/PR destinations remain available through links.
-
-Published evidence shall use fictional records and generic prompts in disposable
-fixtures. Private conversation history is not acceptance-test or demo material.
+- New task execution or scheduling engines.
+- Automatic task adoption, cross-workspace access, typed report persistence and
+  workflow-step monitoring policy.
+- Plugin host API additions.
+- Dependency graphs, editable phase plans, build buttons and replacement board
+  or diff editors. Native task, board and pull-request pages stay reachable
+  through links.
+- Relaying questions and permissions through the coordinator conversation,
+  which [coordinator assistance](coordinator-assistance.md) specifies.
