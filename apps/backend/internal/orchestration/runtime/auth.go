@@ -83,6 +83,12 @@ func (h *Handler) scopedConversation(c *gin.Context) (string, string, bool) {
 			c.AbortWithStatus(404)
 			return "", "", false
 		}
+		if c.Request.Method != http.MethodGet && h.AuthorizeManage != nil {
+			if err := h.AuthorizeManage(c.Request.Context(), ws); err != nil {
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{errorResponseKey: "workspace manage access required"})
+				return "", "", false
+			}
+		}
 	}
 	return owner, ws, true
 }

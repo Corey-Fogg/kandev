@@ -75,9 +75,11 @@ agent configuration.
   shall return the same conversation every time and shall not send a prompt or
   start an agent.
 - **AC-ORCHESTRATION-COORDINATOR-002.2:** Every member with read access to the
-  workspace shall be able to read and post in the conversation. Conversations
-  created before this contract, including ones that recorded an owning user,
-  shall remain readable by workspace members.
+  workspace shall be able to read the conversation. Because the coordinator
+  acts with workspace-manage authority, posting in the conversation, retrying a
+  turn and changing an assignment shall require workspace-manage access.
+  Conversations created before this contract, including ones that recorded an
+  owning user, shall remain readable by workspace members.
 - **AC-ORCHESTRATION-COORDINATOR-002.3:** When a client posts a message with a
   `client_message_id`, the system shall accept it durably before any run exists.
   An identical retry shall return the original receipt, and a different body

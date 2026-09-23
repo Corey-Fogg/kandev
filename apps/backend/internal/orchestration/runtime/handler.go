@@ -28,6 +28,10 @@ const (
 type Handler struct {
 	Service   *Service
 	Authorize func(context.Context, string) error
+	// AuthorizeManage gates a person's writes to a coordinator conversation.
+	// The coordinator acts with workspace-manage authority, so directing it
+	// needs that authority too.
+	AuthorizeManage func(context.Context, string) error
 }
 
 func RegisterRoutes(g *gin.RouterGroup, h *Handler) {

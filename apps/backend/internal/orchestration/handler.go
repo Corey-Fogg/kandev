@@ -4,6 +4,7 @@ package orchestration
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -18,10 +19,14 @@ const (
 )
 
 type Handler struct {
-	Registry         *sqlite.Repository
-	Repo             *sqlite.Repository
-	Agents           *personas.Service
-	Authorize        func(context.Context, string) error
+	Registry  *sqlite.Repository
+	Repo      *sqlite.Repository
+	Agents    *personas.Service
+	Authorize func(context.Context, string) error
+	// AuthorizeManage gates changes to a workspace's coordinators. A
+	// coordinator acts with workspace-manage authority, so configuring one
+	// needs that authority too.
+	AuthorizeManage  func(context.Context, string) error
 	RoleWrite        gin.HandlerFunc
 	ValidateExecutor func(context.Context, string) error
 }
@@ -37,6 +42,9 @@ func RegisterRoutes(group *gin.RouterGroup, h *Handler) {
 				c.AbortWithStatusJSON(http.StatusNotFound, gin.H{errorResponseKey: "workspace not found"})
 				return
 			}
+		}
+		if !h.authorizeChange(c) {
+			return
 		}
 		c.Next()
 	})
@@ -55,6 +63,22 @@ func RegisterRoutes(group *gin.RouterGroup, h *Handler) {
 	group.POST("/workspaces/:wsId/orchestrators/:id/conversation", h.conversation)
 	group.POST("/workspaces/:wsId/orchestrators/:id/status", h.status)
 }
+
+// authorizeChange requires workspace-manage access for every change to a
+// workspace's coordinators. Opening a conversation only ensures it exists,
+// so readers can still see the chat.
+func (h *Handler) authorizeChange(c *gin.Context) bool {
+	ws := c.Param("wsId")
+	if ws == "" || h.AuthorizeManage == nil || c.Request.Method == http.MethodGet || strings.HasSuffix(c.FullPath(), "/conversation") {
+		return true
+	}
+	if err := h.AuthorizeManage(c.Request.Context(), ws); err != nil {
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{errorResponseKey: "workspace manage access required"})
+		return false
+	}
+	return true
+}
+
 func fail(c *gin.Context, err error) {
 	c.JSON(http.StatusBadRequest, gin.H{errorResponseKey: err.Error()})
 }

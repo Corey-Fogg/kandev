@@ -76,7 +76,10 @@ Human routes, all under `/api/v1/orchestration`:
 | `POST /workspaces/:wsId/orchestrators/:id/status` | Pause or resume |
 | `POST /workspaces/:wsId/import/:id` | Register an existing agent persona as an assignment, keeping its identity and history |
 
-Every route authorizes the caller against `:wsId`. Deleting an assignment
+Every route authorizes the caller against `:wsId`. Reads need workspace read
+access. Every change except opening the conversation needs
+`workspace.manage`, as do posting and retrying in a conversation, because the
+coordinator acts with that authority. Deleting an assignment
 stops its conversation sessions; delegated tasks keep their metadata and stay
 on their boards.
 

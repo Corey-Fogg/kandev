@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
@@ -156,3 +157,24 @@ func TestImportPreservesAssistantIdentityAndRejectsOtherWorkspaces(t *testing.T)
 		t.Fatalf("duplicate import: %d", duplicate.Code)
 	}
 }
+
+func TestCoordinatorChangesRequireWorkspaceManageAccess(t *testing.T) {
+	router := gin.New()
+	readOnly := func(context.Context, string) error { return nil }
+	noManage := func(context.Context, string) error { return errForbiddenForTest }
+	RegisterRoutes(router.Group("/api/v1/orchestration"), &Handler{Authorize: readOnly, AuthorizeManage: noManage})
+	base := "/api/v1/orchestration/workspaces/ws"
+	for _, route := range []struct{ method, path string }{
+		{http.MethodPost, base + "/orchestrators"},
+		{http.MethodPut, base + "/orchestrators/chief"},
+		{http.MethodDelete, base + "/orchestrators/chief"},
+		{http.MethodPost, base + "/orchestrators/chief/status"},
+		{http.MethodPost, base + "/import/chief"},
+	} {
+		if w := request(t, router, route.method, route.path, map[string]any{}); w.Code != http.StatusForbidden {
+			t.Fatalf("%s %s by a reader = %d, want 403", route.method, route.path, w.Code)
+		}
+	}
+}
+
+var errForbiddenForTest = errors.New("forbidden")

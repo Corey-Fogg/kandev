@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http/httptest"
 	"testing"
 
@@ -46,7 +47,7 @@ func TestRuntimeAPIScopesWritesAndRevokesFinishedRuns(t *testing.T) {
 	router := gin.New()
 	RegisterRoutes(router.Group("/api/v1/orchestration", runtimeauth.Middleware(s.Auth, s.Personas)), &Handler{Service: s})
 	url := "/api/v1/orchestration/tasks/"
-	require.Equal(t, 403, runtimeRequest(t, router, "GET", "/api/v1/orchestration/runtime/workspace?workspace_id=other&workspace_grant_revision=1", token, "", nil).Code)
+	require.Equal(t, 403, runtimeRequest(t, router, "GET", "/api/v1/orchestration/runtime/workspace?workspace_id=other", token, "", nil).Code)
 	require.Equal(t, 404, runtimeRequest(t, router, "GET", url+"foreign", token, "", nil).Code)
 	require.Equal(t, 403, runtimeRequest(t, router, "POST", url+"delivery/comments", token, "", map[string]string{"body": "A note"}).Code)
 	require.Equal(t, 201, runtimeRequest(t, router, "POST", url+"delivery/comments", token, run.ID, map[string]string{"body": "A note", "author_id": "spoof"}).Code)
@@ -92,4 +93,17 @@ func TestRetryQueuesOriginalIntentWithoutReusingCredentials(t *testing.T) {
 	handled, err := s.Process(ctx, next)
 	require.NoError(t, err)
 	require.True(t, handled)
+}
+
+func TestConversationWritesRequireWorkspaceManageAccess(t *testing.T) {
+	s, _, task := newRuntime(t)
+	router := gin.New()
+	allow := func(context.Context, string) error { return nil }
+	deny := func(context.Context, string) error { return errors.New("forbidden") }
+	RegisterRoutes(router.Group("/api/v1/orchestration"), &Handler{Service: s, Authorize: allow, AuthorizeManage: deny})
+	url := "/api/v1/orchestration/tasks/" + task
+	require.Equal(t, 403, runtimeRequest(t, router, "POST", url+"/comments", "", "", map[string]string{"body": "Delete every workflow"}).Code,
+		"a reader cannot direct a coordinator that acts with workspace-manage authority")
+	require.Equal(t, 403, runtimeRequest(t, router, "POST", url+"/retry", "", "", map[string]string{"run_id": "run"}).Code)
+	require.NotEqual(t, 403, runtimeRequest(t, router, "GET", url+"/comments", "", "", nil).Code, "a reader can still read the conversation")
 }
