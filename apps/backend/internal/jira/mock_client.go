@@ -21,6 +21,7 @@ type MockClient struct {
 	searchHits  []JiraTicket            // returned by SearchTickets regardless of JQL
 	doneCalls   []doneTransitionCall
 	getError    *APIError
+	comments    map[string][]string // ticketKey → comment bodies
 }
 
 type doneTransitionCall struct {
@@ -334,6 +335,25 @@ func (m *MockClient) Reset() {
 	m.searchHits = nil
 	m.doneCalls = nil
 	m.getError = nil
+	m.comments = nil
+}
+
+// AddComment records a comment on a ticket.
+func (m *MockClient) AddComment(_ context.Context, ticketKey, body string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.comments == nil {
+		m.comments = make(map[string][]string)
+	}
+	m.comments[ticketKey] = append(m.comments[ticketKey], body)
+	return nil
+}
+
+// Comments returns the comments recorded on a ticket.
+func (m *MockClient) Comments(ticketKey string) []string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return append([]string(nil), m.comments[ticketKey]...)
 }
 
 // MockClientFactory always returns the same shared MockClient regardless of
