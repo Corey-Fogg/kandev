@@ -4628,23 +4628,37 @@ func (r *Repository) CountOpenWatcherCreatedTasks(ctx context.Context, metadataK
 
 // UpdateTaskState updates the state of a task
 func (r *Repository) UpdateTaskState(ctx context.Context, id string, state v1.TaskState) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
 	if state == v1.TaskStateCompleted {
-		if err := guardManagedParentCompletion(ctx, tx, r.db, id); err != nil {
-			return err
-		}
+		return r.completeTaskState(ctx, id)
 	}
-	result, err := tx.ExecContext(ctx, r.db.Rebind(`UPDATE tasks SET state = ?, updated_at = ? WHERE id = ?`), state, time.Now().UTC(), id)
+	result, err := r.db.ExecContext(ctx, r.db.Rebind(`UPDATE tasks SET state = ?, updated_at = ? WHERE id = ?`), state, time.Now().UTC(), id)
 	if err != nil {
 		return err
 	}
 
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
+		return fmt.Errorf("%w: %s", ErrTaskNotFound, id)
+	}
+	return nil
+}
+
+// completeTaskState writes COMPLETED in the same transaction as the managed
+// parent completion guard.
+func (r *Repository) completeTaskState(ctx context.Context, id string) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := guardManagedParentCompletion(ctx, tx, r.db, id); err != nil {
+		return err
+	}
+	result, err := tx.ExecContext(ctx, r.db.Rebind(`UPDATE tasks SET state = ?, updated_at = ? WHERE id = ?`), v1.TaskStateCompleted, time.Now().UTC(), id)
+	if err != nil {
+		return err
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
 		return fmt.Errorf("%w: %s", ErrTaskNotFound, id)
 	}
 	return tx.Commit()

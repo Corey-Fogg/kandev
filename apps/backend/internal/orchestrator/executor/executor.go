@@ -960,7 +960,6 @@ type GitLabCredentialResolver interface {
 
 // Executor manages agent execution for tasks
 type Executor struct {
-	dispatchGuard     DispatchGuard
 	agentManager      AgentManagerClient
 	attachmentReader  AttachmentReader
 	repo              executorStore
@@ -1086,6 +1085,8 @@ type Executor struct {
 	repoUpdater                     RepoUpdater
 	taskRepositoryBaseBranchUpdater TaskRepositoryBaseBranchUpdater
 	prBaseResolver                  PRBaseResolver
+
+	dispatchGuard DispatchGuard
 }
 
 // taskEnvLock returns the per-task mutex for env persistence, creating one on

@@ -32,6 +32,7 @@ func (s ApprovalStatus) String() string { return string(s) }
 // See internal/office/scheduler/run.go for the state machine.
 type RunStatus = runmodels.RunStatus
 
+// Run queue status values.
 const (
 	RunStatusQueued   = runmodels.RunStatusQueued
 	RunStatusClaimed  = runmodels.RunStatusClaimed
@@ -289,6 +290,7 @@ func (s ProviderHealthState) String() string { return string(s) }
 // provider can be selected.
 type RoutingBlockedStatus = runmodels.RoutingBlockedStatus
 
+// Routing blocked-status values.
 const (
 	RoutingBlockedWaitingForCapacity = runmodels.RoutingBlockedWaitingForCapacity
 	RoutingBlockedActionRequired     = runmodels.RoutingBlockedActionRequired
@@ -382,6 +384,7 @@ func (s SkillApprovalState) String() string { return string(s) }
 // Free-form by convention: info | warn | error.
 type RunEventLevel = runmodels.RunEventLevel
 
+// Run event level values.
 const (
 	RunEventLevelInfo  = runmodels.RunEventLevelInfo
 	RunEventLevelWarn  = runmodels.RunEventLevelWarn
@@ -393,6 +396,7 @@ const (
 // Typed for documentation, not for exhaustiveness.
 type RunEventType = runmodels.RunEventType
 
+// Well-known run event types. Adapters may emit additional values.
 const (
 	RunEventTypeInit          = runmodels.RunEventTypeInit
 	RunEventTypeAdapterInvoke = runmodels.RunEventTypeAdapterInvoke

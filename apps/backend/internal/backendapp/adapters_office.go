@@ -162,13 +162,15 @@ func (a *childTaskCreatorAdapter) CreateChildTask(
 
 // taskCreatorAdapter adapts the task service to the office TaskCreator interface.
 type taskCreatorAdapter struct {
+	taskSvc *taskservice.Service
+
+	// Orchestration delegated-task dependencies.
 	workflow *workflowrepository.Repository
 	orch     *orchestrator.Service
 	taskRepo *tasksqlite.Repository
 	profiles interface {
 		GetAgentProfile(context.Context, string) (*settingsmodels.AgentProfile, error)
 	}
-	taskSvc        *taskservice.Service
 	clarifications clarificationBundleResolver
 }
 

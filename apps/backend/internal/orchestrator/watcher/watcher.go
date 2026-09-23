@@ -32,7 +32,6 @@ type TaskEventData struct {
 
 // AgentEventData contains data from agent events
 type AgentEventData struct {
-	RunID              string                   `json:"run_id,omitempty"`
 	TaskID             string                   `json:"task_id"`
 	SessionID          string                   `json:"session_id"`
 	TaskEnvironmentID  string                   `json:"task_environment_id,omitempty"`
@@ -67,6 +66,8 @@ type AgentEventData struct {
 	// under someone who just asked the retries to stop would defeat the
 	// purpose of the cancel button.
 	UserInitiated bool `json:"user_initiated,omitempty"`
+	// RunID is the durable run that launched this session, when known.
+	RunID string `json:"run_id,omitempty"`
 }
 
 // ACPSessionEventData contains data from ACP session events

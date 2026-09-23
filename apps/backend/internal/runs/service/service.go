@@ -90,8 +90,11 @@ type QueueRunRequest struct {
 	// into by a later request, and idx_run_wake_wave deduplicates a second
 	// insert for the same (WakeWaveKey, AgentProfileID) into
 	// QueueOutcomeDeduped instead of an error.
-	WakeWaveKey       string
-	WakeWaveString    string
+	WakeWaveKey    string
+	WakeWaveString string
+
+	// DisableCoalescing queues a distinct run even when a matching run is
+	// already pending in the coalescing window.
 	DisableCoalescing bool
 }
 

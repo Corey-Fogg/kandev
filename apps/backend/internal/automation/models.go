@@ -45,7 +45,6 @@ const (
 type RunStatus string
 
 const (
-	RunStatusDispatched  RunStatus = "dispatched"
 	RunStatusTriggered   RunStatus = "triggered"
 	RunStatusTaskCreated RunStatus = "task_created"
 	RunStatusSucceeded   RunStatus = "succeeded"
@@ -71,6 +70,9 @@ const (
 	// precedence over the cancelled-session check when both apply — see
 	// listRunsWithTaskState.
 	RunStatusCancelled RunStatus = "cancelled"
+	// RunStatusDispatched records a firing handed to a workspace orchestrator
+	// conversation instead of creating a task.
+	RunStatusDispatched RunStatus = "dispatched"
 )
 
 // ContinuationPolicy controls whether a firing receives an isolated task or
@@ -119,11 +121,10 @@ const (
 
 // Automation is a named rule with triggers, a prompt template, and agent/executor config.
 type Automation struct {
-	OrchestratorID string `json:"orchestrator_id" db:"orchestrator_id"`
-	ID             string `json:"id" db:"id"`
-	WorkspaceID    string `json:"workspace_id" db:"workspace_id"`
-	Name           string `json:"name" db:"name"`
-	Description    string `json:"description" db:"description"`
+	ID          string `json:"id" db:"id"`
+	WorkspaceID string `json:"workspace_id" db:"workspace_id"`
+	Name        string `json:"name" db:"name"`
+	Description string `json:"description" db:"description"`
 	// TaskModeAutomationRun is coordinator-only and may omit a workflow. A
 	// TaskModeNormalTask must name a workflow so the generated task enters the
 	// normal task lifecycle and appears in the Kanban/sidebar.
@@ -168,6 +169,10 @@ type Automation struct {
 	// response compatibility projection for older clients.
 	Repositories  []AutomationRepository `json:"repositories" db:"-"`
 	RepositoryIDs []string               `json:"repository_ids" db:"-"`
+
+	// OrchestratorID routes firings to a workspace orchestrator conversation
+	// instead of creating a task. Empty means the normal task path.
+	OrchestratorID string `json:"orchestrator_id" db:"orchestrator_id"`
 }
 
 // AutomationTrigger is a single trigger attached to an automation.
@@ -185,18 +190,17 @@ type AutomationTrigger struct {
 
 // AutomationRun records a single trigger firing for audit/observability.
 type AutomationRun struct {
-	ConversationTaskID string          `json:"conversation_task_id,omitempty" db:"conversation_task_id"`
-	ID                 string          `json:"id" db:"id"`
-	AutomationID       string          `json:"automation_id" db:"automation_id"`
-	TriggerID          string          `json:"trigger_id" db:"trigger_id"`
-	TriggerType        TriggerType     `json:"trigger_type" db:"trigger_type"`
-	TaskID             string          `json:"task_id,omitempty" db:"task_id"`
-	Status             RunStatus       `json:"status" db:"status"`
-	DedupKey           string          `json:"dedup_key" db:"dedup_key"`
-	TriggerData        json.RawMessage `json:"trigger_data" db:"-"`
-	TriggerDataJSON    string          `json:"-" db:"trigger_data"`
-	ErrorMessage       string          `json:"error_message,omitempty" db:"error_message"`
-	CreatedAt          time.Time       `json:"created_at" db:"created_at"`
+	ID              string          `json:"id" db:"id"`
+	AutomationID    string          `json:"automation_id" db:"automation_id"`
+	TriggerID       string          `json:"trigger_id" db:"trigger_id"`
+	TriggerType     TriggerType     `json:"trigger_type" db:"trigger_type"`
+	TaskID          string          `json:"task_id,omitempty" db:"task_id"`
+	Status          RunStatus       `json:"status" db:"status"`
+	DedupKey        string          `json:"dedup_key" db:"dedup_key"`
+	TriggerData     json.RawMessage `json:"trigger_data" db:"-"`
+	TriggerDataJSON string          `json:"-" db:"trigger_data"`
+	ErrorMessage    string          `json:"error_message,omitempty" db:"error_message"`
+	CreatedAt       time.Time       `json:"created_at" db:"created_at"`
 
 	// Summary is the tail of the agent's last message on the generated task,
 	// read at list time and truncated for display. Hidden automation-run tasks
@@ -221,6 +225,9 @@ type AutomationRun struct {
 	// no binding (see the token catalog in event_handlers_automation.go).
 	// Empty whenever a repository was bound — the binding is its own record.
 	RepositoryReason string `json:"repository_reason,omitempty" db:"repository_reason"`
+	// ConversationTaskID is the orchestrator conversation that received a
+	// dispatched firing.
+	ConversationTaskID string `json:"conversation_task_id,omitempty" db:"conversation_task_id"`
 }
 
 // WorkspaceAutomationRun is a run carrying just enough of its owning
@@ -396,7 +403,6 @@ type TaskOriginLookup interface {
 
 // CreateAutomationRequest is the payload for creating an automation.
 type CreateAutomationRequest struct {
-	OrchestratorID     string                 `json:"orchestrator_id"`
 	WorkspaceID        string                 `json:"workspace_id"`
 	Name               string                 `json:"name"`
 	Description        string                 `json:"description"`
@@ -413,6 +419,7 @@ type CreateAutomationRequest struct {
 	TaskMode           TaskMode               `json:"task_mode,omitempty"`
 	RepositoryMode     RepositoryMode         `json:"repository_mode,omitempty"`
 	Triggers           []CreateTriggerSpec    `json:"triggers"`
+	OrchestratorID     string                 `json:"orchestrator_id"`
 }
 
 // CreateTriggerSpec defines a trigger to add during automation creation.
@@ -424,7 +431,6 @@ type CreateTriggerSpec struct {
 
 // UpdateAutomationRequest is the payload for updating an automation.
 type UpdateAutomationRequest struct {
-	OrchestratorID    *string `json:"orchestrator_id,omitempty"`
 	Name              *string `json:"name,omitempty"`
 	Description       *string `json:"description,omitempty"`
 	WorkflowID        *string `json:"workflow_id,omitempty"`
@@ -443,6 +449,7 @@ type UpdateAutomationRequest struct {
 	ContinuationPolicy *ContinuationPolicy `json:"continuation_policy,omitempty"`
 	TaskMode           *TaskMode           `json:"task_mode,omitempty"`
 	RepositoryMode     *RepositoryMode     `json:"repository_mode,omitempty"`
+	OrchestratorID     *string             `json:"orchestrator_id,omitempty"`
 }
 
 // AddTriggerRequest adds a trigger to an existing automation.

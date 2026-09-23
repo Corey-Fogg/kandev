@@ -1208,12 +1208,10 @@ func (s *Service) StartTaskWithEnvAndSkills(ctx context.Context, taskID string, 
 // some callers supply. Keeping them in one struct avoids growing startTask's
 // already long positional parameter list for every new orthogonal concern.
 type startTaskOptions struct {
-	McpProfile *mcpprofile.Context
 	// ProfileExplicit marks a non-empty profile selected through an explicit
 	// selector-backed choice. It bypasses workflow-step profile resolution for
 	// this new session.
-	ProfileExplicit   bool
-	OnSessionPrepared func(context.Context, string) error
+	ProfileExplicit bool
 	// Env holds launch-scoped environment variables for the agent runtime.
 	Env map[string]string
 	// AdditionalSkillSlugs are materialized for this launch in addition to the
@@ -1243,6 +1241,11 @@ type startTaskOptions struct {
 	// workflow-entry record. The start path rechecks it immediately before
 	// runtime admission so a stale route cannot dispatch the old payload.
 	ceilingEntryBinding *models.CeilingWorkflowEntryBinding
+	// McpProfile selects the MCP surface for this launch.
+	McpProfile *mcpprofile.Context
+	// OnSessionPrepared runs once the session row exists and before the agent
+	// starts, so a durable run can bind to the session first.
+	OnSessionPrepared func(context.Context, string) error
 }
 
 // StartTaskWithRoute launches a stable Office identity through a complete
@@ -1264,8 +1267,6 @@ func (s *Service) StartTaskWithRoute(
 		launch.ExecutorID, launch.ExecutorProfileID, launch.Priority,
 		launch.Prompt, launch.WorkflowStepID, launch.PlanMode, false,
 		launch.Attachments, startTaskOptions{
-			McpProfile:           launch.McpProfile,
-			OnSessionPrepared:    launch.OnSessionPrepared,
 			Env:                  launch.Env,
 			AdditionalSkillSlugs: append([]string(nil), launch.AdditionalSkillSlugs...),
 			Route:                &route,
@@ -1273,6 +1274,9 @@ func (s *Service) StartTaskWithRoute(
 			// (the user kicked off the task; Office only chose the provider),
 			// which is not the ceiling's manual/automatic question.
 			Origin: launchOriginAutomatic,
+
+			McpProfile:        launch.McpProfile,
+			OnSessionPrepared: launch.OnSessionPrepared,
 		})
 }
 

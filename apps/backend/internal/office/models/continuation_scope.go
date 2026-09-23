@@ -23,11 +23,24 @@ func ContinuationScopeForRun(run *Run, agentProfileID string) string {
 	if run == nil {
 		return "agent:" + agentProfileID
 	}
-	var payload struct {
-		RoutineID string `json:"routine_id"`
-	}
-	if json.Unmarshal([]byte(run.ContextSnapshot), &payload) == nil && payload.RoutineID != "" {
-		return "routine:" + payload.RoutineID
+	if id := extractRoutineID(run.ContextSnapshot); id != "" {
+		return "routine:" + id
 	}
 	return "agent:" + agentProfileID
+}
+
+// extractRoutineID pulls routine_id out of a JSON context snapshot.
+// Returns "" for missing / malformed payloads so the caller falls back to
+// the agent-scoped key.
+func extractRoutineID(snapshot string) string {
+	if snapshot == "" {
+		return ""
+	}
+	var p struct {
+		RoutineID string `json:"routine_id"`
+	}
+	if err := json.Unmarshal([]byte(snapshot), &p); err != nil {
+		return ""
+	}
+	return p.RoutineID
 }

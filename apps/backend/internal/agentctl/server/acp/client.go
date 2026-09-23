@@ -32,15 +32,16 @@ type CursorTaskHandler func(params json.RawMessage)
 
 // Client implements acp.Client interface and handles all agent requests
 type Client struct {
-	logger          *zap.Logger
-	workspaceRoot   string
-	restrictedTools bool
-	terminals       *TerminalManager
+	logger        *zap.Logger
+	workspaceRoot string
+	terminals     *TerminalManager
 
 	mu                sync.RWMutex
 	updateHandler     UpdateHandler
 	permissionHandler PermissionRequestHandler
 	cursorTaskHandler CursorTaskHandler
+
+	restrictedTools bool
 }
 
 // ClientOption configures a Client
