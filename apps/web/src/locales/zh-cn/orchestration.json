@@ -108,8 +108,6 @@
   "criterionStatus_met": "已满足",
   "criterionStatus_unmet": "未满足",
   "criterionEvidence": "依据：{{evidence}}",
-  "showCriteria": "显示验收标准",
-  "hideCriteria": "隐藏验收标准",
   "stall_no_progress": "停滞：无进展",
   "stall_never_started": "停滞：从未开始",
   "stall_orphaned": "停滞：会话丢失",

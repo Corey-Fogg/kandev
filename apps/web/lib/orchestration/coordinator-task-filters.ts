@@ -4,6 +4,7 @@ import { applyFilters, viewRequiresArchivedTasks } from "@/lib/sidebar/apply-vie
 import { getLocalStorage, setLocalStorage } from "@/lib/local-storage";
 import { isIssueWatchFromMetadata, isPRReviewFromMetadata } from "@/lib/metadata-utils";
 import { repositorySlug } from "@/lib/repository-slug";
+import { repositoryPathFromSummary, taskPRInfoFromSummary } from "@/lib/task-pr-info";
 import type { FilterClause } from "@/lib/state/slices/ui/sidebar-view-types";
 import type { Repository, Task } from "@/lib/types/http";
 import { COORDINATOR_GROUPS, type CoordinatorTaskGroup } from "./coordinator-task-groups";
@@ -45,13 +46,12 @@ export function catalogLookup(repositories: Repository[]): CatalogLookup {
   return { repositorySlugById, repositoryIdBySlug };
 }
 
-function pullRequestInfo(task: Task): TaskSwitcherItem["prInfo"] {
-  const pr = task.status_summary?.pull_request;
-  if (!pr || (pr.number === undefined && !pr.state && !(pr.count ?? 0))) return undefined;
-  return { number: pr.number ?? 0, state: pr.state ?? "", aggregateState: pr.aggregate_state };
-}
-
-/** Projects a coordinator task onto the sidebar's filter item so sidebar clauses apply unchanged. */
+/**
+ * Projects a coordinator task onto the sidebar's filter item so sidebar
+ * clauses apply unchanged. Pull request info and the repository path are
+ * derived exactly as the sidebar derives them, so a copied clause matches the
+ * same tasks in both places.
+ */
 export function toFilterItem(task: Task, lookup: CatalogLookup): TaskSwitcherItem {
   const summary = task.status_summary;
   const repositories = [...(task.repositories ?? [])]
@@ -69,10 +69,10 @@ export function toFilterItem(task: Task, lookup: CatalogLookup): TaskSwitcherIte
     workflowId: task.workflow_id,
     workflowStepId: task.workflow_step_id,
     remoteExecutorType: task.primary_executor_type ?? undefined,
-    repositoryPath: repositories[0],
+    repositoryPath: repositoryPathFromSummary(summary) ?? repositories[0],
     repositories,
     diffStats: git ? { additions: git.additions ?? 0, deletions: git.deletions ?? 0 } : undefined,
-    prInfo: pullRequestInfo(task),
+    prInfo: taskPRInfoFromSummary(summary),
     isPRReview: isPRReviewFromMetadata(task.metadata),
     isIssueWatch: isIssueWatchFromMetadata(task.metadata),
     isArchived: task.archived_at != null,

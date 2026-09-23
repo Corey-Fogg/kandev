@@ -108,8 +108,6 @@
   "criterionStatus_met": "達成",
   "criterionStatus_unmet": "未達成",
   "criterionEvidence": "根拠: {{evidence}}",
-  "showCriteria": "受け入れ基準を表示",
-  "hideCriteria": "受け入れ基準を非表示",
   "stall_no_progress": "停滞: 進捗なし",
   "stall_never_started": "停滞: 未開始",
   "stall_orphaned": "停滞: セッション消失",

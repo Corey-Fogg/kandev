@@ -47,3 +47,19 @@ it("renders nothing for a task without signals", () => {
   );
   expect(container.textContent).toBe("");
 });
+
+it("shows how long a task was stalled as visible, localized text", () => {
+  const stalled = {
+    ...task,
+    metadata: {
+      orchestration_stall: {
+        outcome: "no_progress",
+        stalled_for: "2h5m0s",
+        detected_at: "2026-09-23T12:00:00Z",
+      },
+    },
+  } as unknown as Task;
+  render(<CoordinatorTaskSignals task={stalled} />);
+  expect(screen.getByTestId("stall-duration").textContent).toBe("Stalled for 2 hours, 5 minutes");
+  expect(screen.getByTestId("stall-badge").getAttribute("title")).toBeNull();
+});

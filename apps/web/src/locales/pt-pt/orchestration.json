@@ -108,8 +108,6 @@
   "criterionStatus_met": "Cumprido",
   "criterionStatus_unmet": "Não cumprido",
   "criterionEvidence": "Evidência: {{evidence}}",
-  "showCriteria": "Mostrar critérios de aceitação",
-  "hideCriteria": "Ocultar critérios de aceitação",
   "stall_no_progress": "Parada: sem progresso",
   "stall_never_started": "Parada: nunca começou",
   "stall_orphaned": "Parada: sessão perdida",

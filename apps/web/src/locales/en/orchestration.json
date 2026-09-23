@@ -108,8 +108,6 @@
   "criterionStatus_met": "Met",
   "criterionStatus_unmet": "Not met",
   "criterionEvidence": "Evidence: {{evidence}}",
-  "showCriteria": "Show acceptance criteria",
-  "hideCriteria": "Hide acceptance criteria",
   "stall_no_progress": "Stalled: no progress",
   "stall_never_started": "Stalled: never started",
   "stall_orphaned": "Stalled: session lost",

@@ -10,6 +10,7 @@ import {
   type SourceIssueChip as SourceIssue,
   type TaskGoalSignal,
 } from "@/lib/orchestration/coordinator-task-signals";
+import { formatStallDuration, parseGoDuration } from "@/lib/orchestration/stall-duration";
 
 // Catalog keys, not copy: each resolves through `t()` at render.
 const TRACKER_KEYS = {
@@ -100,20 +101,26 @@ export function PullRequestChip({ task }: { task: Task }) {
   );
 }
 
+/** The stall's outcome, with how long the task was stalled shown beside it. */
 export function StallBadge({ task }: { task: Task }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const stall = activeStall(task);
   if (!stall) return null;
+  const seconds = parseGoDuration(stall.stalledFor);
   return (
     <Badge
       variant="outline"
-      className={`${CHIP} border-destructive text-destructive`}
-      title={
-        stall.stalledFor ? t("orchestration:stallFor", { duration: stall.stalledFor }) : undefined
-      }
+      className={`${CHIP} gap-1.5 border-destructive text-destructive`}
       data-testid="stall-badge"
     >
-      {t(STALL_KEYS[stall.outcome])}
+      <span>{t(STALL_KEYS[stall.outcome])}</span>
+      {seconds !== null && (
+        <span className="font-normal" data-testid="stall-duration">
+          {t("orchestration:stallFor", {
+            duration: formatStallDuration(seconds, i18n.resolvedLanguage ?? i18n.language),
+          })}
+        </span>
+      )}
     </Badge>
   );
 }
@@ -132,7 +139,6 @@ export function CriteriaChip({ goal }: { goal: TaskGoalSignal }) {
         className={`h-5 px-2 text-[0.625rem] cursor-pointer ${CHIP}`}
         aria-expanded={open}
         aria-controls={listId}
-        title={t(open ? "orchestration:hideCriteria" : "orchestration:showCriteria")}
         onClick={() => setOpen(!open)}
         data-testid="criteria-chip"
       >

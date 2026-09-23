@@ -108,8 +108,6 @@
   "criterionStatus_met": "已滿足",
   "criterionStatus_unmet": "未滿足",
   "criterionEvidence": "依據：{{evidence}}",
-  "showCriteria": "顯示驗收標準",
-  "hideCriteria": "隱藏驗收標準",
   "stall_no_progress": "停滯：無進展",
   "stall_never_started": "停滯：從未開始",
   "stall_orphaned": "停滯：工作階段丟失",

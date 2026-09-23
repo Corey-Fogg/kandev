@@ -12,6 +12,7 @@ import {
   type CoordinatorFilterState,
 } from "./coordinator-task-filters";
 
+const UPDATED = "2026-09-02T00:00:00Z";
 const repo = (id: string, owner: string, name: string) =>
   ({
     id,
@@ -29,7 +30,7 @@ const task = (id: string, patch: Partial<Task> = {}) =>
     workflow_id: "wf",
     workflow_step_id: "todo",
     created_at: "2026-09-01T00:00:00Z",
-    updated_at: "2026-09-02T00:00:00Z",
+    updated_at: UPDATED,
     metadata: {},
     ...patch,
   }) as Task;
@@ -55,7 +56,7 @@ describe("toFilterItem", () => {
         primary_executor_type: "local",
         status_summary: {
           revision: 1,
-          updated_at: "2026-09-02T00:00:00Z",
+          updated_at: UPDATED,
           last_activity_at: "2026-09-02T01:00:00Z",
           primary_session: { id: "s", state: "RUNNING" },
           git: { additions: 3, deletions: 1 },
@@ -69,7 +70,7 @@ describe("toFilterItem", () => {
       repositoryPath: "acme/api",
       repositories: ["acme/api", "acme/web"],
       diffStats: { additions: 3, deletions: 1 },
-      prInfo: { number: 9, state: "open" },
+      prInfo: { number: 9, state: "Open" },
       isArchived: true,
       remoteExecutorType: "local",
       lastActivityAt: "2026-09-02T01:00:00Z",
@@ -78,6 +79,30 @@ describe("toFilterItem", () => {
     expect(bare).toMatchObject({ sessionState: "WAITING_FOR_INPUT", isArchived: false });
     expect(bare.prInfo).toBeUndefined();
     expect(bare.diffStats).toBeUndefined();
+  });
+
+  it("derives pull request info and the repository path as the sidebar does", () => {
+    const summary = { revision: 1, updated_at: UPDATED };
+    const aggregate = toFilterItem(
+      task("agg", {
+        repositories: [{ repository_id: "r1", position: 0 }] as Task["repositories"],
+        status_summary: { ...summary, pull_request: { count: 2, aggregate_state: "open" } },
+      }),
+      lookup,
+    );
+    expect(aggregate.prInfo, "a summary without a number has no pull request").toBeUndefined();
+    expect(aggregate.repositoryPath).toBe("acme/api");
+    const fork = toFilterItem(
+      task("fork", {
+        repositories: [{ repository_id: "r1", position: 0 }] as Task["repositories"],
+        status_summary: {
+          ...summary,
+          pull_request: { number: 4, state: "open", url: "https://github.com/fork/api/pull/4" },
+        },
+      }),
+      lookup,
+    );
+    expect(fork.repositoryPath, "the pull request URL names the repository first").toBe("fork/api");
   });
 });
 
@@ -130,7 +155,7 @@ describe("applyCoordinatorFilters", () => {
       metadata: { orchestration_chief_id: "jeb" },
       status_summary: {
         revision: 1,
-        updated_at: "2026-09-02T00:00:00Z",
+        updated_at: UPDATED,
         pull_request: { number: 3, state: "open" },
       },
     }),

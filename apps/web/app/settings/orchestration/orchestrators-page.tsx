@@ -48,7 +48,7 @@ function OrchestratorList({ workspaceId }: { workspaceId: string }) {
         <p className="text-sm text-muted-foreground">{t("orchestration:singleOrchestratorHint")}</p>
       )}
       {count > 1 && (
-        <p role="alert" className="text-sm text-amber-600" data-testid="legacy-orchestrators">
+        <p role="note" className="text-sm text-amber-600" data-testid="legacy-orchestrators">
           {t("orchestration:legacyMultipleOrchestrators")}
         </p>
       )}
