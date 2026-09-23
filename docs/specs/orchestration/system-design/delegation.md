@@ -8,6 +8,8 @@ requirements:
   - REQ-ORCHESTRATION-DELEGATION-004
   - REQ-ORCHESTRATION-DELEGATION-005
   - REQ-ORCHESTRATION-DELEGATION-006
+  - REQ-ORCHESTRATION-DELEGATION-007
+  - REQ-ORCHESTRATION-DELEGATION-008
 ---
 
 # Delegation System Design
@@ -34,6 +36,8 @@ Runtime credentials and the broker attachment are described in the
 | `REQ-ORCHESTRATION-DELEGATION-004` | [Callbacks](#callbacks) |
 | `REQ-ORCHESTRATION-DELEGATION-005` | [Callbacks](#callbacks) |
 | `REQ-ORCHESTRATION-DELEGATION-006` | [Automation target](#automation-target) |
+| `REQ-ORCHESTRATION-DELEGATION-007` | [Task proposals](#task-proposals) |
+| `REQ-ORCHESTRATION-DELEGATION-008` | [Acceptance criteria](#acceptance-criteria) |
 
 ## Broker tool catalog
 
@@ -97,6 +101,62 @@ unchanged. Every handler loads the task and rejects it unless
 `task.WorkspaceID` equals the token's workspace. Legacy Office task profile
 pins are not applied to `orchestration_managed` tasks.
 
+## Task proposals
+
+When the caller's assignment has `ask_before_create`, the `create_task`
+handler runs its usual title, mode, source and criteria validation, including
+the existing-task check for a source issue, and then calls
+`Service.ProposeTask` instead of `CreateWorkspaceTask`. One transaction inserts
+an `orchestration_task_proposals` row and a conversation comment whose ID is
+the proposal ID and whose `source` is `proposal`; the web renders that comment
+as a card. The row is unique on `(agent_id, run_id, request_hash)`, so a replay
+in the same run returns the stored proposal (200) instead of a new one (202).
+Inside the same transaction, after the insert, a pending or approving proposal
+for the same source key rolls the insert back and is returned with
+`duplicate_proposal: true`. A partial unique index on `(agent_id, source_key)`
+over undecided rows backs this; it is created only when no duplicates exist,
+so parallel `create_task` calls for one issue store one card.
+
+`DecideProposal` backs the human routes. Approval claims the row
+(`pending -> approving`) under a random `claim_token` with `claimed_at`; an
+`approving` row is claimed again only once its claim is more than five minutes
+old (an interrupted approval). A concurrent approve therefore gets 409
+`proposal_approval_in_progress` with the current proposal instead of creating
+a second task, and only the claim holder can release or complete the claim.
+Approval then applies the edits, validates the final spec
+(human titles are never shortened) and creates the task with
+`ChiefID` = the assignment and the external ID of the spec, the source issue or
+`orchestration-proposal:<id>`. A `DuplicateTaskError` counts as success, so a
+retried approval creates one task. Validation or create failures release the
+claim and answer 422. Dismissal is a `pending -> dismissed` update. Each
+decision queues a `proposal_decision` turn keyed `proposal-decision:<id>` with
+a `proposal_decisions` payload; a queue failure is logged and the decision
+stands. The prompt lists the decisions and tells the coordinator not to
+propose a dismissed task again. `task_proposals` lets the coordinator read its
+own proposals.
+
+## Acceptance criteria
+
+`create_task` and proposals accept `acceptance_criteria`; the runtime builds a
+goal with IDs `c1…cN` and the adapter stores it as `orchestration_goal` task
+metadata. `manage_task` handles `set_criteria` and `verify_criteria` before
+the native task action. Both require the task in the token's workspace,
+delegated to the caller (403 otherwise) and not archived; neither is
+batchable. Verification is all or nothing, redacts evidence and records the
+run. Criteria actions on one task are serialized through a striped in-process
+lock, so parallel verifications never overwrite each other. `set_criteria`
+with an empty list is refused with 409 `acceptance_criteria_unmet` while any
+current criterion is unmet, since clearing would lift the completion gate. The
+runtime writes metadata only through `TaskMetadataWriter`, which
+accepts only `orchestration_goal` and `orchestration_stall` and publishes
+`task.updated`. `task_status` with `done` or `COMPLETED` answers 409
+`acceptance_criteria_unmet` with the unmet list before calling the native
+update, and a `move` into a step with `complete_task_on_enter` is refused the
+same way (the adapter returns `ErrCriteriaUnmet`, answered as 409). Digests
+carry the criteria outside the digest identity, and the prompt
+reminds the coordinator to verify before reporting a task in review or
+completed as done.
+
 ## Session repair
 
 `repair_session` selects the given session or the task's latest session. It
@@ -141,7 +201,9 @@ a callback with state `STALLED`, an outcome (`never_started` when the agent
 never started, `no_progress` for other agent stalls, `orphaned` for task
 stalls), the stall duration and the session. Its key is
 `workspace-task-stall:<assignment>:<task>:<session>:<episode>`; the stall
-publishers already emit once per episode.
+publishers already emit once per episode. Before queueing, the episode is
+written to the task as `orchestration_stall` metadata (outcome, duration,
+session, detection time), also while the assignment is paused.
 
 The callback payload carries task ID, title and state, plus the pending
 request or stall details when present. The prompt tells the coordinator to

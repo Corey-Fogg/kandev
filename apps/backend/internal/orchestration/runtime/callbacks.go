@@ -48,16 +48,22 @@ type taskUpdate struct {
 	// LoginFailure marks a session that stopped on a provider login refresh
 	// failure, which repair_session clears and resumes.
 	LoginFailure bool `json:"login_failure,omitempty"`
+	// Criteria are the task's acceptance criteria and their status. They are
+	// not part of the digest identity.
+	Criteria []criterionDigest `json:"criteria,omitempty"`
+	// SourceWriteBackError is set when the automatic tracker update for the
+	// task's latest transition failed.
+	SourceWriteBackError string `json:"source_writeback_error,omitempty"`
 }
 
 // actionable reports whether the update warrants a coordinator turn: the
 // task reached a reportable state or a delegated session waits on input.
 func (u taskUpdate) actionable() bool {
 	switch u.State {
-	case "REVIEW", "COMPLETED", "FAILED", "WAITING_FOR_INPUT", "BLOCKED":
+	case stateReview, stateCompleted, "FAILED", "WAITING_FOR_INPUT", "BLOCKED":
 		return true
 	}
-	return u.PendingPermissions+u.PendingQuestions > 0 || u.StallOutcome != "" || u.LoginFailure
+	return u.PendingPermissions+u.PendingQuestions > 0 || u.StallOutcome != "" || u.LoginFailure || u.SourceWriteBackError != ""
 }
 
 // taskCallback wakes the delegating coordinator with the task's digest. An
@@ -106,7 +112,8 @@ func (s *Service) delegatingCoordinator(ctx context.Context, taskID string) (*ta
 // makes an update new: state, latest session, full latest reply, error and
 // the identities of pending permissions and questions.
 func (s *Service) describeTask(ctx context.Context, task *taskmodels.Task) (taskUpdate, string, error) {
-	update := taskUpdate{TaskID: task.ID, Title: clip(task.Title, 300), State: string(task.State), Source: models.TaskSourceIssue(task.Metadata)}
+	update := taskUpdate{TaskID: task.ID, Title: clip(task.Title, 300), State: string(task.State), Source: models.TaskSourceIssue(task.Metadata),
+		Criteria: criteriaDigest(task.Metadata)}
 	identity := []string{update.State}
 	if s.PullRequests != nil {
 		prs, err := s.PullRequests(ctx, []string{task.ID})
@@ -305,6 +312,7 @@ func writeTaskUpdates(text *strings.Builder, updates []taskUpdate) {
 		if u.LastMessage != "" {
 			fmt.Fprintf(text, "  Latest reply: %s\n", u.LastMessage)
 		}
+		writeUpdateFollowUps(text, u)
 	}
 	text.WriteString("Post only new information in this chat.\n")
 }
@@ -322,4 +330,27 @@ func (s *Service) lastAgentMessage(ctx context.Context, sessionID string) (strin
 		return "", nil
 	}
 	return text, err
+}
+
+// writeUpdateFollowUps renders an update's acceptance criteria and failed
+// tracker write-back.
+func writeUpdateFollowUps(text *strings.Builder, u taskUpdate) {
+	if len(u.Criteria) > 0 {
+		met, parts := 0, make([]string, 0, len(u.Criteria))
+		for _, criterion := range u.Criteria {
+			if criterion.Status == models.CriterionMet {
+				met++
+				parts = append(parts, criterion.ID+" met")
+				continue
+			}
+			parts = append(parts, fmt.Sprintf("%s %s: %s", criterion.ID, criterion.Status, criterion.Text))
+		}
+		fmt.Fprintf(text, "  Acceptance criteria (%d/%d met): %s\n", met, len(u.Criteria), strings.Join(parts, "; "))
+		if met < len(u.Criteria) && (u.State == stateReview || u.State == stateCompleted) {
+			text.WriteString("  Verify each criterion with manage_task verify_criteria before reporting this task done.\n")
+		}
+	}
+	if u.SourceWriteBackError != "" {
+		fmt.Fprintf(text, "  Automatic tracker update failed: %s. Use update_source_issue only if the user wants it retried.\n", u.SourceWriteBackError)
+	}
 }

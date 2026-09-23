@@ -124,6 +124,9 @@ something to act on.
   callback, however many times its event is delivered.
 - **AC-ORCHESTRATION-DELEGATION-005.3:** Quiet time alone shall not produce a
   stall callback. Only a stall signal published by the task system shall.
+- **AC-ORCHESTRATION-DELEGATION-005.4:** The system shall record the latest
+  stall episode (outcome, duration, session and detection time) on the task,
+  also while the assignment is paused, so the Coordinator view can show it.
 
 ### REQ-ORCHESTRATION-DELEGATION-006: Automation delivery
 
@@ -144,6 +147,57 @@ something to act on.
   fall back to another assignment or account. A repeated firing shall be
   deduplicated.
 
+### REQ-ORCHESTRATION-DELEGATION-007: Task proposals
+
+**Intent:** Let a person approve the tasks a coordinator wants to create.
+
+**User story:** As a workspace member, I want the coordinator to propose tasks
+in chat when I ask it to, so that nothing starts without my approval.
+
+#### Acceptance criteria
+
+- **AC-ORCHESTRATION-DELEGATION-007.1:** When the assignment asks before
+  creating tasks, `create_task` shall store a proposal, show it in the
+  conversation and create no task. When the setting is off, `create_task` shall
+  behave as before.
+- **AC-ORCHESTRATION-DELEGATION-007.2:** The same request in the same turn shall
+  return the same proposal. A pending proposal for the same source issue shall
+  be returned instead of a new one, and a source issue that already has a task
+  shall return that task.
+- **AC-ORCHESTRATION-DELEGATION-007.3:** Approving shall create the task exactly
+  as proposed, or with the person's edits, and start it as `create_task` would.
+  Approving again shall return the same task and create no other.
+- **AC-ORCHESTRATION-DELEGATION-007.4:** Dismissing shall record the decision
+  and an optional reason. A dismissed proposal cannot be approved and an
+  approved one cannot be dismissed. An invalid edit or a failed create shall
+  leave the proposal pending.
+- **AC-ORCHESTRATION-DELEGATION-007.5:** After each decision the coordinator
+  shall be woken with the outcome: approved with the task, approved with
+  edits, or dismissed with the reason. A paused coordinator shall not be woken
+  and the decision shall stand.
+- **AC-ORCHESTRATION-DELEGATION-007.6:** Reading proposals shall need workspace
+  read access; deciding shall need workspace-manage access.
+
+### REQ-ORCHESTRATION-DELEGATION-008: Acceptance criteria
+
+**Intent:** Make "done" mean the agreed outcomes were checked.
+
+#### Acceptance criteria
+
+- **AC-ORCHESTRATION-DELEGATION-008.1:** A delegated task, or a proposal, shall
+  accept up to 10 acceptance criteria of 1 to 300 characters each.
+- **AC-ORCHESTRATION-DELEGATION-008.2:** The coordinator shall record, per
+  criterion, whether it is met with evidence of at most 1,000 characters. A
+  request with an unknown criterion, a missing verdict or missing evidence
+  shall change nothing. Only the task's delegating coordinator can set or
+  verify its criteria.
+- **AC-ORCHESTRATION-DELEGATION-008.3:** Setting a task done through the broker,
+  or moving it into a step that completes it, shall be refused, listing the
+  unmet criteria, until every criterion is met. The coordinator shall not clear
+  criteria while any is unmet.
+- **AC-ORCHESTRATION-DELEGATION-008.4:** Task updates, task details and the
+  Coordinator view shall show the criteria and their status.
+
 ## Out of scope
 
 - A second task engine, board or copy of task state.
@@ -151,3 +205,6 @@ something to act on.
 - Permission modes that bypass native permission review.
 - Tracker write-back and cross-path intake deduplication; see
   [tracker intake](tracker-intake.md).
+- Gating workflow-driven completion on acceptance criteria. Only the
+  coordinator's `task_status done` and its moves into a completing step are
+  gated.

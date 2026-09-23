@@ -35,7 +35,7 @@ func (h *Handler) importAgent(c *gin.Context) {
 		fail(c, err)
 		return
 	}
-	if err = h.persistConfiguration(ctx, a, req); err != nil {
+	if err = h.persistConfiguration(ctx, a, req, true); err != nil {
 		fail(c, err)
 		return
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	shared "github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/task/models"
@@ -84,5 +85,31 @@ func TestWorkspaceMoveHonorsReviewAndTargetPolicy(t *testing.T) {
 	cmd.WorkflowStepID = "automatic"
 	require.ErrorContains(t, a.ManageWorkspaceTask(ctx, cmd), "manual moves")
 	cmd.WorkflowStepID = "done"
+	require.NoError(t, a.ManageWorkspaceTask(ctx, cmd))
+}
+
+func TestWorkspaceMoveIntoACompletingStepRequiresMetCriteria(t *testing.T) {
+	a, svc := newOfficeTaskAdapterHarness(t)
+	ctx := context.Background()
+	wf, err := svc.CreateWorkflow(ctx, &taskservice.CreateWorkflowRequest{WorkspaceID: "ws-1", Name: "Delivery"})
+	require.NoError(t, err)
+	require.NoError(t, a.workflow.CreateStep(ctx, &wfmodels.WorkflowStep{ID: "progress", WorkflowID: wf.ID, Name: "progress", Position: 0, AllowManualMove: true}))
+	require.NoError(t, a.workflow.CreateStep(ctx, &wfmodels.WorkflowStep{ID: "done", WorkflowID: wf.ID, Name: "Done", Position: 1, AllowManualMove: true, CompleteTaskOnEnter: true}))
+	goal, err := shared.NewTaskGoal([]string{"Tests pass"}, time.Now())
+	require.NoError(t, err)
+	task := &models.Task{ID: "gated", WorkspaceID: "ws-1", WorkflowID: wf.ID, WorkflowStepID: "progress", Title: "Gated", State: "IN_PROGRESS",
+		Metadata: map[string]interface{}{shared.MetaTaskGoal: goal}}
+	require.NoError(t, a.taskRepo.CreateTask(ctx, task))
+	cmd := shared.WorkspaceTaskCommand{WorkspaceID: "ws-1", TaskID: task.ID, Action: "move", WorkflowStepID: "done"}
+	err = a.ManageWorkspaceTask(ctx, cmd)
+	require.ErrorIs(t, err, shared.ErrCriteriaUnmet)
+	require.ErrorContains(t, err, "c1")
+	current, err := svc.GetTask(ctx, task.ID)
+	require.NoError(t, err)
+	require.Equal(t, "progress", current.WorkflowStepID)
+	met := true
+	require.NoError(t, goal.Verify([]shared.CriterionVerification{{ID: "c1", Met: &met, Evidence: "go test passed"}}, "run", time.Now()))
+	_, err = a.taskRepo.SetTaskMetadataKeyIfNotArchived(ctx, task.ID, shared.MetaTaskGoal, goal)
+	require.NoError(t, err)
 	require.NoError(t, a.ManageWorkspaceTask(ctx, cmd))
 }

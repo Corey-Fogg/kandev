@@ -7,6 +7,7 @@ requirements:
   - REQ-ORCHESTRATION-COORDINATOR-003
   - REQ-ORCHESTRATION-COORDINATOR-004
   - REQ-ORCHESTRATION-COORDINATOR-005
+  - REQ-ORCHESTRATION-COORDINATOR-006
 ---
 
 # Coordinator System Design
@@ -37,6 +38,7 @@ Delegation operations and callbacks are described in
 | `REQ-ORCHESTRATION-COORDINATOR-003` | [Turn lifecycle and recovery](#turn-lifecycle-and-recovery) |
 | `REQ-ORCHESTRATION-COORDINATOR-004` | [Runtime security](#runtime-security) |
 | `REQ-ORCHESTRATION-COORDINATOR-005` | [Feature gate](#feature-gate) |
+| `REQ-ORCHESTRATION-COORDINATOR-006` | [Roles and assignments](#roles-and-assignments) |
 
 ## Components and responsibilities
 
@@ -59,9 +61,29 @@ edits survive restarts. Deleting a role referenced by `workspace_orchestrators`
 is rejected.
 
 `workspace_orchestrators` maps a core agent profile (`agent_id`) to a
-`workspace_id` and `role_id`. The profile's settings hold the execution profile
+`workspace_id` and `role_id`, and stores the instance `display_name` and the
+settings `ask_before_create`, `auto_comment_source` and
+`auto_move_source_done`. The profile's settings hold the execution profile
 ID, executor preference and workspace context. The prompt reads the role at
-turn start, so saved role edits apply from the next turn.
+turn start, so saved role edits apply from the next turn, and states the
+instance name and settings.
+
+A workspace can have several assignments, each with its own instance name,
+settings and conversation, so work can be split across orchestrators.
+`RegisterOrchestrator` accepts any assistant profile of the workspace, and the
+migration drops the `ux_workspace_orchestrators_one_per_workspace` index an
+earlier build created (`DROP INDEX IF EXISTS`, so replays are safe). Proposals,
+acceptance criteria, write-back settings and metrics belong to one
+orchestrator: proposals are keyed by `agent_id`, a delegated task names its
+owner in `orchestration_chief_id`, and write-back reads that owner's
+settings. Each prompt names the workspace's other orchestrators so a
+coordinator leaves their tasks to them.
+
+The effective name is `display_name`, or the role name when it is empty.
+`personas.GetAgentInstance` reports it, so chat identity and automation targets
+follow a rename. `SetOrchestratorDisplayName` updates the assignment, the core
+profile name and the conversation title in one transaction, and a role save
+renames only assignments without an instance name.
 
 Human routes, all under `/api/v1/orchestration`:
 
@@ -71,6 +93,10 @@ Human routes, all under `/api/v1/orchestration`:
 | `GET /workspaces/:wsId/profiles` | Execution profiles available to assignments |
 | `GET/POST /workspaces/:wsId/orchestrators` | List and create assignments |
 | `GET/PUT/DELETE /workspaces/:wsId/orchestrators/:id` | Read, update, delete one assignment |
+| `PATCH /workspaces/:wsId/orchestrators/:id` | Change the instance name or settings, also while a turn runs |
+| `GET /workspaces/:wsId/orchestrators/:id/metrics?days=7\|30` | Delegated outcomes; never creates the conversation |
+| `GET /workspaces/:wsId/orchestrators/:id/proposals[/:proposalId]` | Task proposals ([delegation](delegation.md#task-proposals)) |
+| `POST /workspaces/:wsId/orchestrators/:id/proposals/:proposalId/approve\|dismiss` | Decide a proposal |
 | `GET /workspaces/:wsId/orchestrators/:id/tasks` | The assignment's delegated tasks |
 | `POST /workspaces/:wsId/orchestrators/:id/conversation` | Ensure and return the conversation |
 | `POST /workspaces/:wsId/orchestrators/:id/status` | Pause or resume |
@@ -199,7 +225,9 @@ route are hidden behind the same flag.
 Orchestration migrations are idempotent and replay on every start. Live tables:
 `orchestration_roles`, `workspace_orchestrators`, `orchestration_conversations`,
 `orchestration_instructions`, `orchestration_memory`, `orchestration_intake`,
-`orchestration_conversation_intents` and `orchestration_legacy_imports`. Fresh
+`orchestration_conversation_intents`, `orchestration_legacy_imports`,
+`orchestration_task_proposals` and `orchestration_source_writebacks`. New
+columns are appended with guarded `ADD COLUMN` statements. Fresh
 installs create no other orchestration tables. Tables left by earlier
 development builds are not dropped and are never read.
 

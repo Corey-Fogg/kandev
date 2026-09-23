@@ -7,7 +7,7 @@ import (
 )
 
 func (r *Repository) ListKanbanTasksByWorkspace(ctx context.Context, workspaceID string, q models.KanbanTaskQuery) ([]*models.Task, int, error) {
-	return r.listWorkspaceTasks(ctx, workspaceID, q.WorkflowID, q.RepositoryID, q.Query, q.Page, q.PageSize, q.Sort, false, false, false, true, false, true, false)
+	return r.listWorkspaceTasks(ctx, workspaceID, q.WorkflowID, q.RepositoryID, q.Query, q.Page, q.PageSize, q.Sort, q.IncludeArchived, false, false, true, q.OnlyArchived, true, false)
 }
 
 const kanbanWorkflowFilter = ` AND workflow_id IN (

@@ -17,6 +17,10 @@ type WorkspaceTaskSummary struct {
 	PullRequest *TaskPullRequest `json:"pr,omitempty"`
 	// PendingAction is "permission" or "question" while a session waits on one.
 	PendingAction string `json:"pending_action,omitempty"`
+	// Criteria counts met acceptance criteria when the task has any.
+	Criteria *CriteriaProgress `json:"criteria,omitempty"`
+	// Stall is the task's last stall episode.
+	Stall *TaskStall `json:"stall,omitempty"`
 }
 
 // WorkspaceDirectory is the compact ID directory a coordinator needs to

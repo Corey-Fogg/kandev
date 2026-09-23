@@ -45,9 +45,9 @@ watches and issue metadata that those operations use.
   tracker offers no transition to the requested state category, the system
   shall reject the request, list the available transitions when known, and
   change nothing.
-- **AC-ORCHESTRATION-TRACKER-001.4:** Write-back shall happen only when the
-  coordinator requests it. Task callbacks shall not post tracker comments by
-  themselves.
+- **AC-ORCHESTRATION-TRACKER-001.4:** Apart from the automatic write-back in
+  `REQ-ORCHESTRATION-TRACKER-003`, write-back shall happen only when the
+  coordinator requests it.
 
 ### REQ-ORCHESTRATION-TRACKER-002: Intake deduplication
 
@@ -62,8 +62,33 @@ watches and issue metadata that those operations use.
   already has the same source issue, the system shall return that task and
   mark the response as a duplicate instead of creating a second task.
 
+### REQ-ORCHESTRATION-TRACKER-003: Automatic write-back
+
+**Intent:** Keep the source issue current without the coordinator spending a
+turn on it.
+
+#### Acceptance criteria
+
+- **AC-ORCHESTRATION-TRACKER-003.1:** When a delegated task with a source issue
+  enters review or completes, and the assignment's automatic comment setting is
+  on (the default), the system shall post one short comment naming the task,
+  its pull request when known and its acceptance criteria progress.
+- **AC-ORCHESTRATION-TRACKER-003.2:** When such a task completes and the
+  assignment's automatic move setting is on (off by default), the system shall
+  also move the issue to the done category.
+- **AC-ORCHESTRATION-TRACKER-003.3:** Each transition shall write at most once.
+  A redelivered event shall write nothing; leaving review and returning shall
+  write again. Turning a setting on shall not post past transitions. A task
+  that was already in review or complete when the system first observes it
+  (for example, after an upgrade) shall not be written until it changes state.
+- **AC-ORCHESTRATION-TRACKER-003.4:** When the write fails, the coordinator
+  shall be told once, including when the tracker call times out. When the
+  tracker integration is not configured, the
+  system shall skip silently. A paused assignment's tasks shall not be written.
+
 ## Out of scope
 
-- Automatic tracker comments on every state change.
+- Automatic tracker comments on state changes other than review and
+  completion.
 - Trackers other than Jira and Linear.
 - Creating tracker issues from Kandev tasks.

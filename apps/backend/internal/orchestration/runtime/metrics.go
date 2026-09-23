@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"math"
 	"net/http"
 	"sort"
@@ -9,33 +10,18 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/kandev/kandev/internal/orchestration/models"
 	v1 "github.com/kandev/kandev/pkg/api/v1"
 )
 
 // metricsTaskLimit bounds the delegated tasks one metrics read covers.
 const metricsTaskLimit = 1000
 
+// errInvalidMetricsDays rejects a metrics window other than 7 or 30 days.
+var errInvalidMetricsDays = errors.New("days must be 7 or 30")
+
 // subcentsPerDollar converts usage cost subcents to US dollars.
 const subcentsPerDollar = 10000
-
-// coordinatorMetrics summarises a coordinator's delegated outcomes over a
-// window. Rates and times are nil when there is nothing to measure.
-type coordinatorMetrics struct {
-	Days                 int      `json:"days"`
-	Since                string   `json:"since"`
-	Delegated            int      `json:"delegated"`
-	Completed            int      `json:"completed"`
-	Failed               int      `json:"failed"`
-	Truncated            bool     `json:"truncated,omitempty"`
-	SuccessRate          *float64 `json:"success_rate"`
-	MergedPullRequests   *int     `json:"merged_prs"`
-	CycleTimeSamples     int      `json:"cycle_time_samples"`
-	CycleTimeMedianHours *float64 `json:"cycle_time_median_hours"`
-	CycleTimeP90Hours    *float64 `json:"cycle_time_p90_hours"`
-	CostUSD              float64  `json:"cost_usd"`
-	CostPerMergedPRUSD   *float64 `json:"cost_per_merged_pr_usd"`
-	UnpricedEvents       int      `json:"unpriced_event_count"`
-}
 
 // metrics reports the calling coordinator's delegated outcomes over the last
 // 7 or 30 days. Cycle time runs from creation to the first merged pull
@@ -52,7 +38,7 @@ func (h *Handler) metrics(c *gin.Context) {
 	case "30":
 		days = 30
 	default:
-		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{errorResponseKey: "days must be 7 or 30"})
+		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{errorResponseKey: errInvalidMetricsDays.Error()})
 		return
 	}
 	result, err := h.Service.coordinatorMetrics(c.Request.Context(), claims.WorkspaceID, claims.AgentProfileID, claims.TaskID, days, time.Now().UTC())
@@ -63,9 +49,25 @@ func (h *Handler) metrics(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-func (s *Service) coordinatorMetrics(ctx context.Context, workspaceID, agentID, conversationID string, days int, now time.Time) (coordinatorMetrics, error) {
+// CoordinatorMetrics reports an orchestrator's delegated outcomes for a
+// person reading its workspace. It never creates the conversation.
+func (s *Service) CoordinatorMetrics(ctx context.Context, workspaceID, agentID string, days int) (models.CoordinatorMetrics, error) {
+	if days != 7 && days != 30 {
+		return models.CoordinatorMetrics{}, errInvalidMetricsDays
+	}
+	if err := s.scopeOrchestrator(ctx, workspaceID, agentID); err != nil {
+		return models.CoordinatorMetrics{}, err
+	}
+	conversationID, err := s.Repo.ConversationTaskID(ctx, agentID)
+	if err != nil {
+		return models.CoordinatorMetrics{}, err
+	}
+	return s.coordinatorMetrics(ctx, workspaceID, agentID, conversationID, days, s.now())
+}
+
+func (s *Service) coordinatorMetrics(ctx context.Context, workspaceID, agentID, conversationID string, days int, now time.Time) (models.CoordinatorMetrics, error) {
 	since := now.Add(-time.Duration(days) * 24 * time.Hour)
-	result := coordinatorMetrics{Days: days, Since: since.Format(time.RFC3339)}
+	result := models.CoordinatorMetrics{Days: days, Since: since.Format(time.RFC3339)}
 	tasks, err := s.Repo.DelegatedTasksSince(ctx, workspaceID, agentID, since, metricsTaskLimit)
 	if err != nil {
 		return result, err
@@ -98,7 +100,10 @@ func (s *Service) coordinatorMetrics(ctx context.Context, workspaceID, agentID, 
 	}
 	result.CycleTimeSamples = len(cycles)
 	result.CycleTimeMedianHours, result.CycleTimeP90Hours = percentile(cycles, 0.5), percentile(cycles, 0.9)
-	cost, unpriced, err := s.Repo.UsageCost(ctx, append(ids, conversationID), since)
+	if conversationID != "" {
+		ids = append(ids, conversationID)
+	}
+	cost, unpriced, err := s.Repo.UsageCost(ctx, ids, since)
 	if err != nil {
 		return result, err
 	}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 	"unicode/utf8"
 
 	"github.com/kandev/kandev/internal/agent/runtimeauth"
@@ -43,6 +44,7 @@ type Launch struct {
 }
 type Service struct {
 	retiredExecutions       sync.Map
+	goalLocks               [goalLockStripes]sync.Mutex
 	RecoveryStarting        func(context.Context, string)
 	FailureHandlerInstalled bool
 	Enabled                 bool
@@ -67,6 +69,27 @@ type Service struct {
 	PullRequests func(context.Context, []string) (map[string]models.TaskPullRequest, error)
 	// SourceIssues writes back to the tracker issue a task was created from.
 	SourceIssues SourceIssueWriter
+	// TaskMetadata writes orchestration-owned task metadata keys and
+	// publishes task.updated.
+	TaskMetadata TaskMetadataWriter
+	// WriteBackRunner runs tracker write-backs off the event goroutine; nil
+	// runs them on a new goroutine. Tests inject a synchronous runner.
+	WriteBackRunner func(func())
+	// Now is the clock; nil is time.Now.
+	Now func() time.Time
+}
+
+// TaskMetadataWriter writes one orchestration-owned metadata key of a live
+// task. It reports false when the task is archived or missing.
+type TaskMetadataWriter interface {
+	SetTaskMetadata(ctx context.Context, taskID, key string, value any) (bool, error)
+}
+
+func (s *Service) now() time.Time {
+	if s.Now != nil {
+		return s.Now().UTC()
+	}
+	return time.Now().UTC()
 }
 
 // SourceIssueWriter comments on and moves a task's source tracker issue. The
@@ -243,6 +266,9 @@ func (s *Service) prompt(ctx context.Context, a *models.AgentInstance, taskID, r
 		return "", err
 	}
 	fmt.Fprintf(&text, "\nRole: %s\n%s\n", role.Name, role.Instructions)
+	if err := s.writeIdentity(ctx, &text, a); err != nil {
+		return "", err
+	}
 	fmt.Fprintf(&text, "\nWorkspace: %s\nPersona: %s\nConversation task: %s\nRouting context: %s\n", a.WorkspaceID, a.ID, taskID, models.DelegationContext(a))
 	if err := s.writeDirectory(ctx, &text, a.WorkspaceID); err != nil {
 		return "", err
@@ -279,6 +305,7 @@ func (s *Service) prompt(ctx context.Context, a *models.AgentInstance, taskID, r
 		fmt.Fprintf(&text, "\nCurrent user message (comment_id=%s, intent_revision=%v): %s\n", comment.ID, payload[intentRevisionKey], comment.Body)
 	}
 	writeTaskUpdates(&text, updatesForPrompt(payload))
+	writeProposalDecisions(&text, payloadProposalDecisions(payload))
 	return text.String(), nil
 }
 

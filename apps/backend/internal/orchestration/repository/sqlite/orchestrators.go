@@ -26,6 +26,7 @@ func (r *Repository) Migrate() error {
 	}
 	for _, migrate := range []func() error{
 		r.migrateIntake, r.ImportLegacyState, r.migrateRoleConfiguration,
+		r.migrateAssignmentSettings, r.migrateProposals, r.migrateSourceWriteBacks, r.migrateDropSingleOrchestratorIndex,
 	} {
 		if err := migrate(); err != nil {
 			return err
@@ -64,18 +65,6 @@ func (r *Repository) DeleteOrchestratorRole(ctx context.Context, id string) erro
 	n, err := result.RowsAffected()
 	if err == nil && n == 0 {
 		return fmt.Errorf("role is in use or unavailable")
-	}
-	return err
-}
-func (r *Repository) RegisterOrchestrator(ctx context.Context, agentID, workspaceID, roleID string) error {
-	defer r.invalidateRegistered()
-	result, err := r.db.ExecContext(ctx, r.db.Rebind(`INSERT INTO workspace_orchestrators (agent_id,workspace_id,role_id) SELECT id,workspace_id,? FROM agent_profiles WHERE id=? AND workspace_id=? AND deleted_at IS NULL AND role='assistant' ON CONFLICT(agent_id) DO UPDATE SET role_id=excluded.role_id`), roleID, agentID, workspaceID)
-	if err != nil {
-		return err
-	}
-	n, err := result.RowsAffected()
-	if err == nil && n != 1 {
-		return fmt.Errorf("orchestrator must belong to this workspace")
 	}
 	return err
 }

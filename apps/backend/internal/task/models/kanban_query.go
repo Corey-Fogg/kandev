@@ -5,4 +5,6 @@ package models
 type KanbanTaskQuery struct {
 	WorkflowID, RepositoryID, Query, Sort string
 	Page, PageSize                        int
+	// IncludeArchived adds archived tasks; OnlyArchived lists only them.
+	IncludeArchived, OnlyArchived bool
 }

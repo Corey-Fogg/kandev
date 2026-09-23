@@ -21,8 +21,9 @@ func (r *Repository) SaveOrchestratorRole(ctx context.Context, role *models.Orch
 	if _, err := tx.ExecContext(ctx, tx.Rebind(`INSERT INTO orchestration_roles(id,name,icon,instructions) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,icon=excluded.icon,instructions=excluded.instructions`), role.ID, role.Name, role.Icon, role.Instructions); err != nil {
 		return err
 	}
-	// Update the core identity cache without touching status, account or execution settings.
-	if _, err := tx.ExecContext(ctx, tx.Rebind(`UPDATE agent_profiles SET name=? WHERE id IN (SELECT agent_id FROM workspace_orchestrators WHERE role_id=?)`), role.Name, role.ID); err != nil {
+	// Update the core identity cache without touching status, account or execution
+	// settings. An orchestrator with its own instance name keeps it.
+	if _, err := tx.ExecContext(ctx, tx.Rebind(`UPDATE agent_profiles SET name=? WHERE id IN (SELECT agent_id FROM workspace_orchestrators WHERE role_id=? AND display_name='')`), role.Name, role.ID); err != nil {
 		return err
 	}
 	return tx.Commit()

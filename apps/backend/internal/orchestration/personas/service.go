@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	settings "github.com/kandev/kandev/internal/agent/settings/models"
+	"github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/orchestration/repository/sqlite"
 )
 
@@ -27,16 +28,16 @@ func (s *Service) GetAgentInstance(ctx context.Context, id string) (*settings.Ag
 	if err != nil {
 		return nil, err
 	}
-	roleID, err := s.Repo.OrchestratorRoleID(ctx, id)
+	assignment, err := s.Repo.OrchestratorAssignment(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	if roleID != "" {
-		role, err := s.Repo.GetOrchestratorRole(ctx, roleID)
+	if assignment != nil {
+		role, err := s.Repo.GetOrchestratorRole(ctx, assignment.RoleID)
 		if err != nil {
 			return nil, err
 		}
-		a.Name = role.Name
+		a.Name = models.EffectiveName(assignment.DisplayName, role.Name)
 	}
 	return a, nil
 }

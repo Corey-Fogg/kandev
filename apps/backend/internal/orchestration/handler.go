@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	errorResponseKey = "error"
+	errorResponseKey        = "error"
+	errOrchestratorNotFound = "orchestrator not found"
 )
 
 type Handler struct {
@@ -29,6 +30,16 @@ type Handler struct {
 	AuthorizeManage  func(context.Context, string) error
 	RoleWrite        gin.HandlerFunc
 	ValidateExecutor func(context.Context, string) error
+	// Runtime serves metrics and task proposals; nil answers those routes 503.
+	Runtime RuntimeFacade
+}
+
+// RuntimeFacade is the coordinator runtime as the human routes use it.
+type RuntimeFacade interface {
+	CoordinatorMetrics(ctx context.Context, workspaceID, agentID string, days int) (models.CoordinatorMetrics, error)
+	ListProposals(ctx context.Context, workspaceID, agentID, status string, limit int) ([]models.TaskProposal, error)
+	GetProposal(ctx context.Context, workspaceID, agentID, id string) (*models.TaskProposal, error)
+	DecideProposal(ctx context.Context, d models.ProposalDecision) (*models.TaskProposal, string, bool, error)
 }
 
 func RegisterRoutes(group *gin.RouterGroup, h *Handler) {
@@ -59,6 +70,12 @@ func RegisterRoutes(group *gin.RouterGroup, h *Handler) {
 	group.GET("/workspaces/:wsId/orchestrators/:id/tasks", h.tasks)
 	group.POST("/workspaces/:wsId/import/:id", h.importAgent)
 	group.PUT("/workspaces/:wsId/orchestrators/:id", h.update)
+	group.PATCH("/workspaces/:wsId/orchestrators/:id", h.patch)
+	group.GET("/workspaces/:wsId/orchestrators/:id/metrics", h.metrics)
+	group.GET("/workspaces/:wsId/orchestrators/:id/proposals", h.listProposals)
+	group.GET("/workspaces/:wsId/orchestrators/:id/proposals/:proposalId", h.getProposal)
+	group.POST("/workspaces/:wsId/orchestrators/:id/proposals/:proposalId/approve", h.approveProposal)
+	group.POST("/workspaces/:wsId/orchestrators/:id/proposals/:proposalId/dismiss", h.dismissProposal)
 	group.DELETE("/workspaces/:wsId/orchestrators/:id", h.remove)
 	group.POST("/workspaces/:wsId/orchestrators/:id/conversation", h.conversation)
 	group.POST("/workspaces/:wsId/orchestrators/:id/status", h.status)
@@ -117,12 +134,12 @@ func (h *Handler) scoped(c *gin.Context) *models.AgentInstance {
 	id := c.Param("id")
 	role, err := h.Registry.OrchestratorRoleID(c.Request.Context(), id)
 	if err != nil || role == "" {
-		c.JSON(http.StatusNotFound, gin.H{errorResponseKey: "orchestrator not found"})
+		c.JSON(http.StatusNotFound, gin.H{errorResponseKey: errOrchestratorNotFound})
 		return nil
 	}
 	a, err := h.Agents.GetAgentInstance(c.Request.Context(), id)
 	if err != nil || a.WorkspaceID != c.Param("wsId") {
-		c.JSON(http.StatusNotFound, gin.H{errorResponseKey: "orchestrator not found"})
+		c.JSON(http.StatusNotFound, gin.H{errorResponseKey: errOrchestratorNotFound})
 		return nil
 	}
 	return a
