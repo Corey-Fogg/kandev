@@ -15,9 +15,21 @@ function scrollContainer() {
 }
 
 describe("task chat scroll intent", () => {
+  it("keeps a shared task chat at its current position by default", () => {
+    const scrollParent = scrollContainer();
+    scrollParent.scrollTop = 100;
+    const view = renderHook((count) => useTaskChatAutoScroll(scrollParent, [], "task-1", count), {
+      initialProps: 0,
+      wrapper: StateProvider,
+    });
+    expect(scrollParent.scrollTop).toBe(100);
+    view.rerender(1);
+    expect(scrollParent.scrollTop).toBe(100);
+  });
+
   it("opens an existing conversation at the bottom and resets when switching tasks", () => {
     const scrollParent = scrollContainer();
-    const view = renderHook((id) => useTaskChatAutoScroll(scrollParent, [], id, 1), {
+    const view = renderHook((id) => useTaskChatAutoScroll(scrollParent, [], id, 1, true), {
       initialProps: "task-1",
       wrapper: StateProvider,
     });
@@ -31,10 +43,13 @@ describe("task chat scroll intent", () => {
   it("follows comments arriving after mount until the user scrolls up", () => {
     const scrollParent = scrollContainer();
     scrollParent.scrollTop = 1800;
-    const view = renderHook((count) => useTaskChatAutoScroll(scrollParent, [], "task-1", count), {
-      initialProps: 0,
-      wrapper: StateProvider,
-    });
+    const view = renderHook(
+      (count) => useTaskChatAutoScroll(scrollParent, [], "task-1", count, true),
+      {
+        initialProps: 0,
+        wrapper: StateProvider,
+      },
+    );
     Object.defineProperty(scrollParent, "scrollHeight", { value: 3000 });
     view.rerender(1);
     expect(scrollParent.scrollTop).toBe(3000);
@@ -49,7 +64,7 @@ describe("task chat scroll intent", () => {
     const scrollParent = scrollContainer();
     window.history.replaceState(null, "", "#comment-earlier");
     try {
-      renderHook(() => useTaskChatAutoScroll(scrollParent, [], "task-1", 0), {
+      renderHook(() => useTaskChatAutoScroll(scrollParent, [], "task-1", 0, true), {
         wrapper: StateProvider,
       });
       expect(scrollParent.scrollTop).toBe(0);

@@ -104,6 +104,7 @@ export function OrchestratorConversationPane({
                   timeline={[]}
                   scrollParent={scrollParent}
                   onCommentsChanged={onCommentsChanged}
+                  openAtLatest
                 />
               </CommentTransportContext.Provider>
             </RecoveryTransportContext.Provider>

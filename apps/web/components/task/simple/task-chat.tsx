@@ -66,6 +66,8 @@ type TaskChatProps = {
   taskDescription?: string;
   statusSummary?: TaskStatusSummary | null;
   repositories?: TaskRepository[];
+  /** Open at the latest message and follow new comments (conversation panes). */
+  openAtLatest?: boolean;
 };
 
 function partitionGroups(groups: SessionGroup[]): {
@@ -450,8 +452,9 @@ function scrollToBottom(scrollParent: HTMLElement | null): void {
  * time of the change.
  *
  * Triggers on:
- *   - opening or switching conversations (unless linking to a comment)
- *   - comments arriving, including history loaded after mount
+ *   - with `openAtLatest`: opening or switching conversations (unless
+ *     linking to a comment) and comments arriving, including history loaded
+ *     after mount
  *   - a new active session entry first appearing (active count grows)
  *   - new messages arriving in any session for this task
  *
@@ -464,6 +467,7 @@ export function useChatAutoScroll(
   sessions: TaskSession[],
   taskId: string,
   commentCount: number,
+  openAtLatest = false,
 ): void {
   const activeSessionCount = sessions.filter(
     (s) => s.state === "RUNNING" || s.state === "WAITING_FOR_INPUT",
@@ -484,13 +488,19 @@ export function useChatAutoScroll(
 
   useEffect(() => {
     if (!scrollParent) return;
+    const handler = () => {
+      if (!openAtLatest || scrollParent.clientHeight > 0)
+        wasAtBottomRef.current = isAtBottom(scrollParent);
+    };
+    if (!openAtLatest) {
+      handler();
+      scrollParent.addEventListener("scroll", handler, { passive: true });
+      return () => scrollParent.removeEventListener("scroll", handler);
+    }
     // A newly opened conversation follows the latest messages. Its initial
     // scrollTop is a browser default, not an intent to read older history.
     wasAtBottomRef.current = !window.location.hash.startsWith("#comment-");
     if (wasAtBottomRef.current) scrollToBottom(scrollParent);
-    const handler = () => {
-      if (scrollParent.clientHeight > 0) wasAtBottomRef.current = isAtBottom(scrollParent);
-    };
     // A hidden tab can mount the conversation before its container has a size.
     const observer =
       typeof ResizeObserver === "undefined"
@@ -505,7 +515,9 @@ export function useChatAutoScroll(
       observer?.disconnect();
       scrollParent.removeEventListener("scroll", handler);
     };
-  }, [scrollParent, taskId]);
+  }, [scrollParent, taskId, openAtLatest]);
+
+  const commentSignal = openAtLatest ? commentCount : 0;
 
   useEffect(() => {
     if (wasAtBottomRef.current) {
@@ -513,7 +525,7 @@ export function useChatAutoScroll(
       // After programmatic scroll, we are still "at bottom" by definition.
       wasAtBottomRef.current = true;
     }
-  }, [scrollParent, activeSessionCount, totalContentSignal, taskId, commentCount]);
+  }, [scrollParent, activeSessionCount, totalContentSignal, taskId, commentSignal]);
 }
 
 /**
@@ -611,6 +623,7 @@ export function TaskChat({
   taskTitle,
   taskDescription,
   repositories,
+  openAtLatest = false,
 }: TaskChatProps) {
   const { t } = useTranslation();
   const [showOlder, setShowOlder] = useState(false);
@@ -649,7 +662,7 @@ export function TaskChat({
     [comments, timeline, renderedGroups, decisions, turnCtx, runErrors, laterAgentReplyMap],
   );
 
-  useChatAutoScroll(scrollParent ?? null, sessions, taskId, comments.length);
+  useChatAutoScroll(scrollParent ?? null, sessions, taskId, comments.length, openAtLatest);
   useCommentHashScroll(comments);
 
   const showOlderToggle = olderGroups.length > 0 && !showOlder;
