@@ -67,16 +67,11 @@ function useTiles(metrics: CoordinatorMetrics): Tile[] {
   ];
 }
 
-/** Phones keep the tiles folded so the task list stays in view. */
 function MetricsTiles({ metrics }: { metrics: CoordinatorMetrics }) {
   const { t } = useTranslation();
-  const { isMobile } = useResponsiveBreakpoint();
   const tiles = useTiles(metrics);
   return (
-    <details open={!isMobile} className="space-y-2">
-      <summary className="md:hidden cursor-pointer min-h-11 flex items-center text-sm">
-        {t("orchestration:metricsHeading")}
-      </summary>
+    <>
       <dl className="flex flex-wrap gap-2">
         {tiles.map((tile) => (
           <div
@@ -93,7 +88,7 @@ function MetricsTiles({ metrics }: { metrics: CoordinatorMetrics }) {
       {metrics.truncated && (
         <p className="text-xs text-muted-foreground">{t("orchestration:metricsTruncated")}</p>
       )}
-    </details>
+    </>
   );
 }
 
@@ -118,7 +113,7 @@ function WindowToggle({ days, setDays }: { days: 7 | 30; setDays: (days: 7 | 30)
   );
 }
 
-/** Outcome metrics for the selected orchestrator over the last 7 or 30 days. */
+/** Outcome metrics for the selected orchestrator over the last 7 or 30 days; folded on phones. */
 export function CoordinatorMetricsStrip({
   workspaceId,
   orchestratorId,
@@ -127,6 +122,7 @@ export function CoordinatorMetricsStrip({
   orchestratorId: string;
 }) {
   const { t } = useTranslation();
+  const { isMobile } = useResponsiveBreakpoint();
   const [days, setDays] = useState<7 | 30>(7);
   const { data, error, loading, refresh } = useCoordinatorMetrics(
     workspaceId,
@@ -136,34 +132,39 @@ export function CoordinatorMetricsStrip({
   return (
     <section
       aria-labelledby="coordinator-metrics-heading"
-      className="space-y-2 border-b px-4 py-3"
+      className="border-b px-4 py-2 md:py-3"
       data-testid="coordinator-metrics"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="coordinator-metrics-heading" className="hidden text-sm font-semibold md:block">
+      <details open={!isMobile} className="space-y-2">
+        <summary className="md:hidden cursor-pointer min-h-11 flex items-center text-sm">
           {t("orchestration:metricsHeading")}
-        </h2>
-        <WindowToggle days={days} setDays={setDays} />
-      </div>
-      {error ? (
-        <div role="alert" className="flex flex-wrap items-center gap-2 text-sm">
-          <span>{t("orchestration:metricsUnavailable")}</span>
-          <Button
-            size="sm"
-            variant="outline"
-            className="cursor-pointer max-md:min-h-11"
-            onClick={refresh}
-          >
-            {t("task:retry")}
-          </Button>
+        </summary>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="coordinator-metrics-heading" className="hidden text-sm font-semibold md:block">
+            {t("orchestration:metricsHeading")}
+          </h2>
+          <WindowToggle days={days} setDays={setDays} />
         </div>
-      ) : null}
-      {loading && (
-        <p role="status" className="text-xs text-muted-foreground">
-          {t("common:loading")}
-        </p>
-      )}
-      {data && !error && <MetricsTiles metrics={data} />}
+        {error ? (
+          <div role="alert" className="flex flex-wrap items-center gap-2 text-sm">
+            <span>{t("orchestration:metricsUnavailable")}</span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="cursor-pointer max-md:min-h-11"
+              onClick={refresh}
+            >
+              {t("task:retry")}
+            </Button>
+          </div>
+        ) : null}
+        {loading && (
+          <p role="status" className="text-xs text-muted-foreground">
+            {t("common:loading")}
+          </p>
+        )}
+        {data && !error && <MetricsTiles metrics={data} />}
+      </details>
     </section>
   );
 }
