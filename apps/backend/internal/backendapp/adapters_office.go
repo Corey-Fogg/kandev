@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/kandev/kandev/internal/orchestrator"
 
 	settingsmodels "github.com/kandev/kandev/internal/agent/settings/models"
 	"github.com/kandev/kandev/internal/github"
@@ -19,6 +18,7 @@ import (
 	officeroutines "github.com/kandev/kandev/internal/office/routines"
 	officeservice "github.com/kandev/kandev/internal/office/service"
 	officewakeup "github.com/kandev/kandev/internal/office/wakeup"
+	"github.com/kandev/kandev/internal/orchestrator"
 	runsservice "github.com/kandev/kandev/internal/runs/service"
 	"github.com/kandev/kandev/internal/task/models"
 	tasksqlite "github.com/kandev/kandev/internal/task/repository/sqlite"

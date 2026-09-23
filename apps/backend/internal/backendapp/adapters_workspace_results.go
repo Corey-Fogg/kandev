@@ -5,13 +5,14 @@ import (
 	"unicode/utf8"
 
 	"fmt"
+	"sort"
+	"strings"
+
 	"github.com/kandev/kandev/internal/authz"
 	"github.com/kandev/kandev/internal/common/redaction"
 	shared "github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/task/models"
 	taskservice "github.com/kandev/kandev/internal/task/service"
-	"sort"
-	"strings"
 )
 
 const (

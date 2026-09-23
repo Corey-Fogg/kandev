@@ -2,11 +2,13 @@ package orchestrator
 
 import (
 	"context"
-	"github.com/kandev/kandev/internal/orchestrator/watcher"
-	"github.com/kandev/kandev/internal/task/models"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/kandev/kandev/internal/orchestrator/watcher"
+	"github.com/kandev/kandev/internal/task/models"
 )
 
 func TestManagedFailureParksSessionWithoutTerminalError(t *testing.T) {

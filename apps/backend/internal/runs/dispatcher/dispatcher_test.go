@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/kandev/kandev/internal/runs/models"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/kandev/kandev/internal/runs/models"
 )
 
 type queueFake struct {

@@ -2,9 +2,11 @@ package sqlite
 
 import (
 	"context"
-	"github.com/kandev/kandev/internal/task/models"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/kandev/kandev/internal/task/models"
 )
 
 func TestCoordinatorListingExcludesHiddenTasksBeforePaging(t *testing.T) {

@@ -8,7 +8,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	rundispatcher "github.com/kandev/kandev/internal/runs/dispatcher"
 	"net"
 	"net/http"
 	"os"
@@ -113,6 +112,7 @@ import (
 	v1 "github.com/kandev/kandev/pkg/api/v1"
 
 	// Runs queue (Phase 3 of task-model-unification)
+	rundispatcher "github.com/kandev/kandev/internal/runs/dispatcher"
 	runsscheduler "github.com/kandev/kandev/internal/runs/scheduler"
 	runsservice "github.com/kandev/kandev/internal/runs/service"
 	schedulercron "github.com/kandev/kandev/internal/scheduler/cron"
@@ -2044,7 +2044,7 @@ func (a *engineStepEntryDispatcherAdapter) DispatchStepEntry(ctx context.Context
 	eng := a.engineProvider.WorkflowEngine()
 	if eng == nil {
 		a.log.Warn("step entry dispatch skipped: workflow engine not initialised",
-			zap.String(taskIDPayloadKey, taskID),
+			zap.String("task_id", taskID),
 			zap.String("workflow_id", workflowID),
 			zap.String("step_id", stepID),
 			zap.String("entry_id", entryID))
@@ -2053,7 +2053,7 @@ func (a *engineStepEntryDispatcherAdapter) DispatchStepEntry(ctx context.Context
 	results := eng.DispatchStepEntry(ctx, taskID, workflowID, stepID, entryID, markerEntryID)
 	for _, result := range results {
 		fields := []zap.Field{
-			zap.String(taskIDPayloadKey, taskID),
+			zap.String("task_id", taskID),
 			zap.String("workflow_id", workflowID),
 			zap.String("step_id", stepID),
 			zap.String("entry_id", entryID),

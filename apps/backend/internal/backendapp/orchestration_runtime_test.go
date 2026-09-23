@@ -2,12 +2,14 @@ package backendapp
 
 import (
 	"context"
+	"testing"
+
 	"github.com/jmoiron/sqlx"
+	"github.com/stretchr/testify/require"
+
 	taskmodels "github.com/kandev/kandev/internal/task/models"
 	workflowmodels "github.com/kandev/kandev/internal/workflow/models"
 	workflowrepo "github.com/kandev/kandev/internal/workflow/repository"
-	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestOrchestratedCompletionRespectsReviewAndReopen(t *testing.T) {

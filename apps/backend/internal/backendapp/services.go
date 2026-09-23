@@ -261,7 +261,7 @@ func initCoreTaskServices(
 		taskservice.RepositoryDiscoveryConfig{
 			Roots:             cfg.RepositoryDiscovery.Roots,
 			MaxDepth:          cfg.RepositoryDiscovery.MaxDepth,
-			TaskWorktreeRoots: []string{filepath.Join(cfg.ResolvedHomeDir(), workspaceTasksKey)},
+			TaskWorktreeRoots: []string{filepath.Join(cfg.ResolvedHomeDir(), "tasks")},
 			DesktopRuntime:    strings.EqualFold(strings.TrimSpace(os.Getenv("KANDEV_DESKTOP_RUNTIME")), "true"),
 		},
 	)

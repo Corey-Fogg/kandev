@@ -2,10 +2,12 @@ package runtimeauth
 
 import (
 	"context"
-	"github.com/gin-gonic/gin"
-	"github.com/kandev/kandev/internal/agent/settings/models"
 	"net/http"
 	"strings"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/kandev/kandev/internal/agent/settings/models"
 )
 
 const (

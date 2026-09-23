@@ -3,8 +3,9 @@ package sqlite
 import (
 	"context"
 	"fmt"
-	"github.com/kandev/kandev/internal/orchestration/models"
 	"strings"
+
+	"github.com/kandev/kandev/internal/orchestration/models"
 )
 
 func (r *Repository) SaveOrchestratorRole(ctx context.Context, role *models.OrchestratorRole) error {

@@ -4,7 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"testing"
+
 	"github.com/jmoiron/sqlx"
+	_ "github.com/mattn/go-sqlite3"
+	"github.com/stretchr/testify/require"
+
 	"github.com/kandev/kandev/internal/agent/runtimeauth"
 	settings "github.com/kandev/kandev/internal/agent/settings/models"
 	settingsstore "github.com/kandev/kandev/internal/agent/settings/store"
@@ -19,9 +24,6 @@ import (
 	taskmodels "github.com/kandev/kandev/internal/task/models"
 	taskstore "github.com/kandev/kandev/internal/task/repository/sqlite"
 	workflow "github.com/kandev/kandev/internal/workflow/repository"
-	_ "github.com/mattn/go-sqlite3"
-	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 type testTasks struct {

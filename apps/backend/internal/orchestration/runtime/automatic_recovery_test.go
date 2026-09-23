@@ -4,13 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/kandev/kandev/internal/events"
 	"github.com/kandev/kandev/internal/events/bus"
 	"github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/orchestrator/watcher"
-	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 const cancelledRunStatus = "cancelled"

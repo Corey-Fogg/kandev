@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
+	_ "github.com/mattn/go-sqlite3"
+
 	settingsmodels "github.com/kandev/kandev/internal/agent/settings/models"
 	settingsstore "github.com/kandev/kandev/internal/agent/settings/store"
-
 	"github.com/kandev/kandev/internal/orchestration/personas"
 	"github.com/kandev/kandev/internal/orchestration/repository/sqlite"
 
-	_ "github.com/mattn/go-sqlite3"
 	"net/http"
 	"net/http/httptest"
 	"testing"

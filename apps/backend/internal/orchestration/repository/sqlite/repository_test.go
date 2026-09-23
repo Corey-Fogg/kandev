@@ -2,10 +2,12 @@ package sqlite
 
 import (
 	"context"
-	"github.com/jmoiron/sqlx"
-	"github.com/kandev/kandev/internal/orchestration/models"
-	_ "github.com/mattn/go-sqlite3"
 	"testing"
+
+	"github.com/jmoiron/sqlx"
+	_ "github.com/mattn/go-sqlite3"
+
+	"github.com/kandev/kandev/internal/orchestration/models"
 )
 
 func TestRegistryWithoutOfficePreservesExistingRows(t *testing.T) {

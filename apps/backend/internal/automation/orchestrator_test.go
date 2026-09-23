@@ -3,8 +3,9 @@ package automation
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 type testOrchestratorTarget struct {

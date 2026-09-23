@@ -3,10 +3,11 @@ package backendapp
 import (
 	"context"
 	"fmt"
+	"maps"
+
 	shared "github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/task/models"
 	taskservice "github.com/kandev/kandev/internal/task/service"
-	"maps"
 )
 
 func (a *taskCreatorAdapter) directWorkerProfile(ctx context.Context, spec shared.WorkspaceTaskSpec, metadata map[string]interface{}) (string, error) {

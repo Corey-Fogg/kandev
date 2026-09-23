@@ -3,8 +3,10 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/kandev/kandev/internal/task/models"
+
 	"go.uber.org/zap"
+
+	"github.com/kandev/kandev/internal/task/models"
 )
 
 type kanbanWorkspaceLister interface {

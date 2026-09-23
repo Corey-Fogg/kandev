@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+
 	"github.com/kandev/kandev/internal/db/dialect"
 )
 

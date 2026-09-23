@@ -3,10 +3,10 @@ package models
 
 import (
 	"encoding/json"
-	runmodels "github.com/kandev/kandev/internal/runs/models"
 	"time"
 
 	settingsmodels "github.com/kandev/kandev/internal/agent/settings/models"
+	runmodels "github.com/kandev/kandev/internal/runs/models"
 )
 
 // AgentRole and AgentStatus are aliases for the canonical types declared

@@ -5,6 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"sync"
+	"unicode/utf8"
+
 	"github.com/kandev/kandev/internal/agent/runtimeauth"
 	"github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/orchestration/personas"
@@ -13,9 +17,6 @@ import (
 	runstore "github.com/kandev/kandev/internal/runs/repository/sqlite"
 	runservice "github.com/kandev/kandev/internal/runs/service"
 	taskmodels "github.com/kandev/kandev/internal/task/models"
-	"strings"
-	"sync"
-	"unicode/utf8"
 )
 
 type Tasks interface {

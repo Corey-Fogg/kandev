@@ -4,13 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net/http/httptest"
+	"testing"
+
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/require"
+
 	"github.com/kandev/kandev/internal/agent/runtimeauth"
 	"github.com/kandev/kandev/internal/orchestration/models"
 	taskmodels "github.com/kandev/kandev/internal/task/models"
-	"github.com/stretchr/testify/require"
-	"net/http/httptest"
-	"testing"
 )
 
 func runtimeRequest(t *testing.T, router *gin.Engine, method, path, token, runID string, body any) *httptest.ResponseRecorder {

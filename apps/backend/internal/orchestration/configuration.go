@@ -3,11 +3,13 @@ package orchestration
 import (
 	"context"
 	"fmt"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
+
 	"github.com/kandev/kandev/internal/orchestration/instructions"
 	"github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/orchestration/personas"
-	"net/http"
 )
 
 type configuration struct {

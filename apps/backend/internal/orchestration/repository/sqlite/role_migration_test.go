@@ -2,9 +2,10 @@ package sqlite
 
 import (
 	"context"
+	"testing"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestGlobalRoleMigrationPreservesDistinctAssignments(t *testing.T) {

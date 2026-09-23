@@ -2,9 +2,11 @@ package sqlite
 
 import (
 	"context"
-	"github.com/google/uuid"
-	"github.com/kandev/kandev/internal/orchestration/models"
 	"time"
+
+	"github.com/google/uuid"
+
+	"github.com/kandev/kandev/internal/orchestration/models"
 )
 
 const commentSelect = `SELECT c.id,c.task_id,c.author_type,c.author_id,c.body,c.source,c.reply_channel_id,c.created_at,

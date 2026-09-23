@@ -3,12 +3,12 @@ package agents
 import (
 	"encoding/json"
 	"errors"
-	"github.com/kandev/kandev/internal/agent/runtimeauth"
 	"io"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kandev/kandev/internal/agent/runtimeauth"
 	"github.com/kandev/kandev/internal/common/logger"
 	"github.com/kandev/kandev/internal/office/models"
 	"github.com/kandev/kandev/internal/office/routing"

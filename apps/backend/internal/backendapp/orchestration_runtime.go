@@ -3,6 +3,10 @@ package backendapp
 import (
 	"context"
 	"fmt"
+	"strings"
+
+	"go.uber.org/zap"
+
 	"github.com/kandev/kandev/internal/agent/runtimeauth"
 	"github.com/kandev/kandev/internal/common/config"
 	"github.com/kandev/kandev/internal/common/logger"
@@ -15,8 +19,6 @@ import (
 	taskservice "github.com/kandev/kandev/internal/task/service"
 	"github.com/kandev/kandev/internal/workflow/stepevents"
 	v1 "github.com/kandev/kandev/pkg/api/v1"
-	"go.uber.org/zap"
-	"strings"
 )
 
 func newOrchestrationRuntime(cfg *config.Config, repos *Repositories, services *Services, orch *orchestrator.Service, eventBus bus.EventBus, log *logger.Logger) *orchestrationruntime.Service {

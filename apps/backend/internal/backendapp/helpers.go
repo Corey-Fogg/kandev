@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	orchestrationstore "github.com/kandev/kandev/internal/orchestration/repository/sqlite"
 	"io/fs"
 	"net/http"
 	"net/url"
@@ -69,6 +68,7 @@ import (
 	officesqlite "github.com/kandev/kandev/internal/office/repository/sqlite"
 	"github.com/kandev/kandev/internal/office/retention"
 	officetestharness "github.com/kandev/kandev/internal/office/testharness"
+	orchestrationstore "github.com/kandev/kandev/internal/orchestration/repository/sqlite"
 	"github.com/kandev/kandev/internal/orchestrator"
 	"github.com/kandev/kandev/internal/org"
 	"github.com/kandev/kandev/internal/orgunit"
@@ -461,7 +461,7 @@ func buildGitStatusNotification(sessionID, taskEnvironmentID, repositoryName str
 	}
 	gitEventData := map[string]interface{}{
 		"type":                "status_update",
-		sessionIDPayloadKey:   sessionID,
+		"session_id":          sessionID,
 		"task_environment_id": taskEnvironmentID,
 		"timestamp":           status.Timestamp,
 		"status":              statusPayload,
@@ -552,7 +552,7 @@ func buildGitSnapshotNotification(sessionID, repositoryName string, snapshot *mo
 	}
 	gitEventData := map[string]interface{}{
 		"type":                "status_update",
-		sessionIDPayloadKey:   sessionID,
+		"session_id":          sessionID,
 		"task_environment_id": snapshot.TaskEnvironmentID,
 		"timestamp":           metadata["timestamp"],
 		"status":              statusPayload,
@@ -580,9 +580,9 @@ func appendContextWindowMessage(sessionID string, session *models.TaskSession, r
 		metadata[models.SessionMetaKeyContextCompactionCount] = count
 	}
 	notification, err := ws.NewNotification(ws.ActionSessionStateChanged, map[string]interface{}{
-		sessionIDPayloadKey: sessionID,
-		taskIDPayloadKey:    session.TaskID,
-		"metadata":          metadata,
+		"session_id": sessionID,
+		"task_id":    session.TaskID,
+		"metadata":   metadata,
 	})
 	if err == nil {
 		result = append(result, notification)
@@ -600,8 +600,8 @@ func appendAvailableCommandsMessage(sessionID string, session *models.TaskSessio
 		return result
 	}
 	notification, err := ws.NewNotification(ws.ActionSessionAvailableCommands, map[string]interface{}{
-		sessionIDPayloadKey:  sessionID,
-		taskIDPayloadKey:     session.TaskID,
+		"session_id":         sessionID,
+		"task_id":            session.TaskID,
 		"available_commands": commands,
 	})
 	if err == nil {
@@ -1224,7 +1224,7 @@ func resolvePrimaryTaskRepositoryID(ctx context.Context, taskRepo *sqliterepo.Re
 	repo, err := taskRepo.GetPrimaryTaskRepository(ctx, taskID)
 	if err != nil {
 		log.Warn("primary task repository lookup failed",
-			zap.String(taskIDPayloadKey, taskID), zap.Error(err))
+			zap.String("task_id", taskID), zap.Error(err))
 		return ""
 	}
 	if repo == nil {
@@ -1245,7 +1245,7 @@ func resolveRepositoryIDForSubpath(ctx context.Context, taskRepo *sqliterepo.Rep
 	repos, err := taskRepo.ListTaskRepositories(ctx, taskID)
 	if err != nil {
 		log.Warn("task repositories lookup failed",
-			zap.String(taskIDPayloadKey, taskID), zap.Error(err))
+			zap.String("task_id", taskID), zap.Error(err))
 		return ""
 	}
 	for _, link := range repos {
@@ -1258,7 +1258,7 @@ func resolveRepositoryIDForSubpath(ctx context.Context, taskRepo *sqliterepo.Rep
 		}
 	}
 	log.Warn("no task repository matches subpath",
-		zap.String(taskIDPayloadKey, taskID), zap.String("subpath", subpath))
+		zap.String("task_id", taskID), zap.String("subpath", subpath))
 	return ""
 }
 
@@ -1266,7 +1266,7 @@ func resolveRepositoryIDForSessionSubpath(ctx context.Context, taskRepo *sqliter
 	worktrees, err := taskRepo.ListTaskSessionWorktrees(ctx, sessionID)
 	if err != nil {
 		log.Warn("session worktrees lookup failed",
-			zap.String(sessionIDPayloadKey, sessionID), zap.Error(err))
+			zap.String("session_id", sessionID), zap.Error(err))
 		return ""
 	}
 	if subpath == "" {
@@ -1274,7 +1274,7 @@ func resolveRepositoryIDForSessionSubpath(ctx context.Context, taskRepo *sqliter
 			return worktrees[0].RepositoryID
 		}
 		log.Warn("branch rename did not specify repo for multi-repo session",
-			zap.String(sessionIDPayloadKey, sessionID), zap.Int("worktree_count", len(worktrees)))
+			zap.String("session_id", sessionID), zap.Int("worktree_count", len(worktrees)))
 		return ""
 	}
 	for _, wt := range worktrees {
@@ -1290,7 +1290,7 @@ func resolveRepositoryIDForSessionSubpath(ctx context.Context, taskRepo *sqliter
 		}
 	}
 	log.Warn("no session worktree repository matches subpath",
-		zap.String(sessionIDPayloadKey, sessionID), zap.String("subpath", subpath))
+		zap.String("session_id", sessionID), zap.String("subpath", subpath))
 	return ""
 }
 
@@ -1335,14 +1335,14 @@ func registerTaskRoutes(p routeParams, planService *taskservice.PlanService, han
 			repositoryID := resolvePrimaryTaskRepositoryID(ctx, p.taskRepo, taskID, p.log)
 			task, taskErr := p.taskRepo.GetTask(ctx, taskID)
 			if taskErr != nil || task == nil || task.WorkspaceID == "" {
-				p.log.Warn("cannot associate GitHub PR without task workspace", zap.String(taskIDPayloadKey, taskID), zap.Error(taskErr))
+				p.log.Warn("cannot associate GitHub PR without task workspace", zap.String("task_id", taskID), zap.Error(taskErr))
 				return
 			}
 			if err := ghSvc.AssociatePRByURLForWorkspace(
 				ctx, task.WorkspaceID, github.DefaultUserID,
 				sessionID, taskID, repositoryID, prURL, branch,
 			); err != nil {
-				p.log.Warn("failed to associate task GitHub PR", zap.String(taskIDPayloadKey, taskID), zap.Error(err))
+				p.log.Warn("failed to associate task GitHub PR", zap.String("task_id", taskID), zap.Error(err))
 			}
 		})
 	}
@@ -1672,7 +1672,7 @@ func integrationWorkspaceScopeMiddleware(authSvc *auth.Service, taskSvc *taskser
 			return
 		}
 		if err := taskSvc.AuthorizeWorkspaceAccess(c.Request.Context(), wsID); err != nil {
-			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{errKey: "workspace not found"})
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "workspace not found"})
 			return
 		}
 		c.Next()
@@ -1756,7 +1756,7 @@ func dockerTaskTitleProvider(taskRepo *sqliterepo.Repository, log *logger.Logger
 		task, err := taskRepo.GetTask(ctx, taskID)
 		if err != nil {
 			log.Debug("docker container task title lookup failed",
-				zap.String(taskIDPayloadKey, taskID), zap.Error(err))
+				zap.String("task_id", taskID), zap.Error(err))
 			return "", false
 		}
 		return task.Title, task.Title != ""
@@ -2175,7 +2175,7 @@ func externalMCPAuthMiddleware(authSvc *auth.Service) gin.HandlerFunc {
 		}
 		c.Header("WWW-Authenticate", "Bearer")
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-			errKey: "external MCP requires a personal access token (Settings > Account > API tokens)",
+			"error": "external MCP requires a personal access token (Settings > Account > API tokens)",
 		})
 	}
 }

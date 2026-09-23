@@ -3,16 +3,18 @@ package backendapp
 import (
 	"context"
 	"fmt"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+
 	settingsmodels "github.com/kandev/kandev/internal/agent/settings/models"
 	shared "github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/orchestrator"
 	"github.com/kandev/kandev/internal/task/models"
 	taskservice "github.com/kandev/kandev/internal/task/service"
 	wfmodels "github.com/kandev/kandev/internal/workflow/models"
-	"github.com/stretchr/testify/require"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestWorkspaceTaskDetailsPreservesMultipleSessionResults(t *testing.T) {

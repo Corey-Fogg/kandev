@@ -197,7 +197,7 @@ func officeWorkspaceScopeMiddleware(
 			return
 		}
 		if err := authorizeOfficeRequest(c, taskSvc, officeRepo, resolvers); err != nil {
-			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{errKey: "workspace not found"})
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "workspace not found"})
 			return
 		}
 		if requiresOfficeWorkspaceManage(c) && officeagents.CallerFromContext(c) == nil {

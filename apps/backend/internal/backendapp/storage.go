@@ -3,8 +3,6 @@ package backendapp
 import (
 	"context"
 	"fmt"
-	orchestrationstore "github.com/kandev/kandev/internal/orchestration/repository/sqlite"
-	runstore "github.com/kandev/kandev/internal/runs/repository/sqlite"
 
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
@@ -16,9 +14,11 @@ import (
 	"github.com/kandev/kandev/internal/common/config"
 	"github.com/kandev/kandev/internal/common/logger"
 	"github.com/kandev/kandev/internal/db"
+	orchestrationstore "github.com/kandev/kandev/internal/orchestration/repository/sqlite"
 	"github.com/kandev/kandev/internal/persistence"
 	"github.com/kandev/kandev/internal/persistence/requiredstores"
 	quickterminalrepository "github.com/kandev/kandev/internal/quickterminal/repository"
+	runstore "github.com/kandev/kandev/internal/runs/repository/sqlite"
 	"github.com/kandev/kandev/internal/secrets"
 	"github.com/kandev/kandev/internal/startup"
 	systemsettings "github.com/kandev/kandev/internal/system/settings"
