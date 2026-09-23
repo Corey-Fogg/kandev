@@ -17,7 +17,6 @@ import { AgentRouteStrip } from "./components/agent-route-strip";
 import { AgentRecoveryControl } from "./components/agent-recovery-control";
 import { isRoutineFiring } from "../../lib/routine-status";
 import { Trans, useTranslation } from "react-i18next";
-import { OpenConversationButton } from "./components/open-conversation-button";
 
 type AgentDetailLayoutProps = {
   children: ReactNode;
@@ -93,14 +92,7 @@ export default function AgentDetailLayout({ children, params }: AgentDetailLayou
         </div>
       </div>
 
-      <Link
-        className="text-sm underline cursor-pointer"
-        href={`/settings/workspaces/${agent.workspaceId}/agents`}
-      >
-        {t("office:backToWorkspaceAgents")}
-      </Link>
       <AgentRouteStrip agentId={id} />
-      <OpenConversationButton agentId={id} workspaceId={agent.workspaceId} />
 
       <nav className="flex border-b border-border gap-1" aria-label={t("office:agentSections")}>
         {TABS.map((tab) => (

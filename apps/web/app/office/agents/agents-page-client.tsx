@@ -9,11 +9,11 @@ import { useRoutingPreview } from "@/hooks/domains/office/use-routing-preview";
 import { useWorkspaceRouting } from "@/hooks/domains/office/use-workspace-routing";
 import type { AgentProfile } from "@/lib/state/slices/office/types";
 import { AgentCard } from "./components/agent-card";
+import { CreateAgentDialog } from "./components/create-agent-dialog";
 import { EmptyState } from "../components/shared/empty-state";
 import { PageHeader } from "../components/shared/page-header";
 import { useTranslation } from "react-i18next";
 import { controlSizingClassName } from "@kandev/ui/control-sizing";
-import { CreateAgentDialog } from "./components/create-agent-dialog";
 
 type AgentsPageClientProps = {
   initialAgents: AgentProfile[];
@@ -85,6 +85,7 @@ export function AgentsPageClient({ initialAgents, initialWorkspaceId }: AgentsPa
           ))}
         </div>
       )}
+
       <CreateAgentDialog open={showCreate} onOpenChange={setShowCreate} />
     </div>
   );

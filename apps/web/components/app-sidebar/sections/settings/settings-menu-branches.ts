@@ -127,10 +127,9 @@ export type BranchExecutor = {
 };
 
 export type WorkspaceBranchOptions = {
-  office?: boolean;
-  orchestration?: boolean;
   pluginIntegrationEnabled?: (integrationId: string, workspaceId: string) => boolean | undefined;
   canvasesEnabled?: boolean;
+  orchestration?: boolean;
 };
 
 /** The menu rows that grow a branch. */
@@ -221,12 +220,12 @@ export function buildWorkspacesBranch(
    */
   visibleIntegrationSlugsFor?: (workspaceId: string) => ReadonlySet<IntegrationSlug> | undefined,
   integrationContributions: ReadonlyArray<BranchIntegrationContribution> = [],
-  { pluginIntegrationEnabled, canvasesEnabled = false, ...features }: WorkspaceBranchOptions = {},
+  { pluginIntegrationEnabled, canvasesEnabled = false, orchestration }: WorkspaceBranchOptions = {},
 ): SettingsMenuNode[] {
   return orderWorkspacesForDisplay(workspaces, activeWorkspaceId).map((workspace) => {
     const integrationsHref = workspaceSettingsHref(workspace.id, "integrations");
     const workspaceTabs = getWorkspaceSettingsTabs(canvasesEnabled)
-      .filter(({ tab }) => tab !== "overview" && workspaceTabVisible(tab, features))
+      .filter(({ tab }) => tab !== "overview" && workspaceTabVisible(tab, { orchestration }))
       .map(({ tab, labelKey, icon }) => ({
         key: `workspace:${workspace.id}:${tab}`,
         href: workspaceSettingsHref(workspace.id, tab),

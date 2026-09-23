@@ -24,10 +24,7 @@ const { useKanbanDisplaySettingsMock, breakpointMocks, storeMocks, pluginFilterM
 
 vi.mock("@/components/state-provider", () => ({
   useAppStore: (selector: (state: unknown) => unknown) =>
-    selector({
-      features: { orchestration: false },
-      mobileKanban: { focusedWorkflowId: storeMocks.focusedWorkflowId },
-    }),
+    selector({ mobileKanban: { focusedWorkflowId: storeMocks.focusedWorkflowId } }),
 }));
 
 afterEach(cleanup);

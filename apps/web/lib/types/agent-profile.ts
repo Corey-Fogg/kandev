@@ -94,8 +94,6 @@ export type AgentRole =
 export type AgentStatus = "idle" | "working" | "paused" | "stopped" | "pending_approval";
 
 export type AgentProfile = {
-  executionProfileId?: string;
-  delegationContext?: string;
   // --- Identity ---
   id: AgentProfileId;
   /** The execution family. Dynamic profiles own routing, not a subprocess. */
@@ -185,7 +183,6 @@ export type AgentProfile = {
   maxConcurrentSessions?: number;
   desiredSkills?: string[];
   executorPreference?: {
-    executor_profile_id?: string;
     type?: string;
     image?: string;
     resource_limits?: Record<string, unknown>;
