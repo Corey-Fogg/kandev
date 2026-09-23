@@ -54,11 +54,12 @@
     "plugins-manifest",
     "canvases",
     "---Office---",
-    "orchestration-personas",
     "office-provider-routing",
     "office-config-sync",
+    "---Orchestration---",
+    "orchestration-personas",
+    "orchestration-api",
     "---Protocol Reference---",
-    "personal-assistant-api",
     "websocket-api"
   ]
 }

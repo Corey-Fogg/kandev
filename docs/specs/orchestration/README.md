@@ -1,73 +1,92 @@
 ---
-status: draft
+status: active
 system: orchestration
 specification_version: 1
-migration: in_progress
+migration: complete
 owners:
   - Kandev
 ---
 
-# Orchestrator
+# Orchestration
 
-The Orchestrator is Kandev's single central coordination and assistant product.
-Workspace assignments, the central task view, owner-level objectives, attention,
-memory, capability discovery and managed work are one feature set behind
-`features.orchestration`. The older Personal Assistant name remains in some
-requirement IDs and file paths for compatibility, but it is not a second product
-or rollout gate. Office remains the separate legacy autonomous-agent fleet.
+## Purpose
 
-## Purpose and ownership
+Orchestration gives a workspace one or more conversational coordinators. A
+coordinator is a workspace assignment of a reusable role that runs under an
+existing execution profile. People talk to it in a persistent chat, and it
+delegates, monitors and steers ordinary Kanban tasks through a restricted
+broker. The central Coordinator view shows the workspace's tasks beside that
+chat.
 
-Orchestration owns reusable coordinator roles, workspace assignments, persistent
-coordinator conversations and the coordinator's view of workspace work. It has
-its own lifecycle and runtime contract, as recorded in the
-[ownership decision](../../decisions/2026-09-07-workspace-orchestration.md).
-This system owns the central task overview because it combines a workspace
-coordinator assignment with task observations; the task system remains the
-source of truth for every task and session state.
+Every coordinator conversation uses the same runtime path: the
+`orchestrator-broker-v1` MCP surface, a runtime credential with the
+`workspace_coordinator` audience, and broker tools scoped to the assignment's
+workspace. The whole feature is gated by `features.orchestration`.
 
-## Specification map
+## Ownership
 
-- [Coordinator view requirements](requirements/coordinator-view.md): authoritative
-  draft for the newly proposed central workspace task view and side conversation.
-- [Coordinator view system design](system-design/coordinator-view.md): implementation
-  boundaries grounded in v0.94.0 and the existing local coordinator prototype.
-- [Delivery plan](../../plans/workspace-coordinator-view/plan.md): pending work orders.
-- [Personal assistant requirements](requirements/personal-assistant.md) and
-  [system design](system-design/personal-assistant.md): authoritative contracts
-  for completing the partly implemented assistant, replacing the legacy spec.
-- [Complete delivery plan](../../plans/orchestration-delivery/plan.md): repository
-  review, rollout isolation, candidate validation, dogfooding and upstream export.
+Orchestration owns:
 
-The view is not implemented. Draft status concerns this design package; it does
-not reclassify the previously implemented coordinator foundation as new work.
+- Global coordinator roles and workspace coordinator assignments.
+- Persistent coordinator conversations, durable message intake and turn
+  scheduling for those conversations.
+- The coordinator runtime: prompt assembly, runtime credentials, broker tool
+  catalog, automatic turn recovery and session repair.
+- Delegation links between coordinators and the tasks they create or adopt,
+  and the callbacks that wake a coordinator about those tasks.
+- Relay of pending questions and permission requests from delegated tasks.
+- Workspace-scoped coordinator memory.
+- The Coordinator view, which combines task observations with the selected
+  coordinator's conversation.
+- The automation delivery target that queues a prompt into a coordinator
+  conversation.
 
-## Legacy contracts and migration boundary
+## Exclusions
 
-The following documents remain authoritative for their existing capabilities
-until migrated. This package adds the task overview; it does not copy or replace
-their editable requirements:
+- [Tasks](../tasks/README.md) owns task and session state, workflow moves,
+  completion gates, pending questions and permission requests. Orchestration
+  reads and requests changes through native task services and never keeps a
+  second copy of task state.
+- [Workspaces](../workspaces/README.md) owns workspace membership and access.
+- [Agents](../agents/README.md) owns execution profiles, providers, accounts
+  and executors. A coordinator selects an existing profile; it does not define
+  one.
+- [Office](../office/README.md) owns its autonomous agent fleet. Orchestration
+  does not depend on Office packages, tables or routes.
+- [Plugins](../plugins/README.md) owns plugin tools. Coordinator sessions do
+  not receive plugin or external MCP tools.
+- Automations owns schedules and delivery history. Orchestration supplies only
+  the coordinator delivery target.
 
-- [Workspace orchestrators](../workspace-orchestrators/spec.md): global roles,
-  assignments, runtime, conversation, task callbacks and feature gating.
-- [Unified workspace orchestration](../unified-workspace-orchestration/spec.md):
-  existing Kanban execution and workspace identity.
-- [Chief of staff](../chief-of-staff/spec.md) and
-  [workspace agents](../workspace-agents/spec.md): earlier Office integration,
-  superseded by workspace orchestrators for the first-class coordinator surface.
-- [Personal assistant legacy pointer](../personal-assistant/spec.md): redirects
-  to the requirements/design above. Its app-level UI and automatic input
-  resolution remain outside the workspace task-view package.
+## Find specifications
 
-## Related systems and exclusions
+Use the catalog command to list this system's current documents:
 
-- [Tasks](../tasks/README.md) owns workflow state, sessions, pending input,
-  status projections, queues, delivery and review gates.
-- [Workspaces](../workspaces/README.md) owns workspace access and selection.
-- [Agents](../agents/README.md) owns execution profiles and provider configuration.
-- [Office](../office/README.md) retains its product, personas and heartbeat.
-- [Plugins](../plugins/README.md) owns host/plugin capabilities. No plugin API
-  expansion or plugin installation is implied by this package.
+    python3 scripts/list-docs.py specs --system orchestration --format markdown
+    python3 scripts/list-docs.py specs --system orchestration --kind requirement --format paths
+    python3 scripts/list-docs.py specs --system orchestration --kind system-design --format paths
 
-Automations remain the existing optional schedule/delivery mechanism. The view
-introduces no scheduler, task engine, grant model or durable task-state copy.
+Do not copy the command output into this README. Keep this file focused on the
+system boundary, migration record, and related systems.
+
+## Migration record
+
+The free-form workspace-orchestrators specification, the Office-era chief of
+staff and workspace-agents specifications, and the unified workspace
+orchestration notes were replaced by the requirement and system-design
+documents in this directory. No editable legacy source remains.
+
+## Related systems
+
+- [Tasks](../tasks/README.md): the source of truth for every delegated task,
+  including the managed-parent completion guard.
+- [Agents](../agents/README.md): execution profiles used by coordinators and
+  delegated tasks.
+- [Workspaces](../workspaces/README.md): the scope of every coordinator call.
+- [Integrations](../integrations/README.md): issue trackers used by planned
+  tracker write-back and intake deduplication.
+
+Related decisions:
+
+- [Workspace orchestration owns its coordination runtime](../../decisions/2026-09-07-workspace-orchestration.md).
+- [One coordinator path](../../decisions/2026-09-18-orchestrator-product-boundary.md).

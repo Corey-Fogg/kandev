@@ -1,5 +1,5 @@
 ---
-status: draft
+status: current
 system: orchestration
 requirements:
   - REQ-ORCHESTRATION-COORDINATOR-VIEW-001
@@ -14,19 +14,15 @@ requirements:
 
 ## Context and boundary
 
-Design baseline: Kandev v0.94.0 plus local coordinator commit `b1cd0d2e`.
-The task view is new. Existing roles, assignments, conversations, runtime,
-automations and ownership remain their current contracts.
-
 Orchestration owns this vertical view; canonical task state stays in
-`internal/task`, including its `statussummary` projector. The current
-`OrchestratedTasks` query in `internal/orchestration/repository/sqlite` returns
-only linked ID/title/state rows, capped at 100. Do not extend it into a duplicate
-task projection or use it as the source for the all-workspace view.
+`internal/task`, including its `statussummary` projector. The coordinator's
+own linked-task query (`OrchestratedTasks` in
+`internal/orchestration/repository/sqlite`) returns only linked ID, title and
+state rows and is not a source for the all-workspace view.
 
-No schema or plugin SDK change is needed for this package. The related plugin's
-host-managed conversation APIs and `WorkspaceAgentChat` export are absent at
-this baseline; its implementation cannot be substituted for the existing runtime.
+The view adds no schema and no plugin SDK surface. Conversation, runtime,
+role and assignment contracts are described in the
+[coordinator design](coordinators.md).
 
 ## Requirement mapping
 
@@ -37,23 +33,19 @@ this baseline; its implementation cannot be substituted for the existing runtime
 | REQ-ORCHESTRATION-COORDINATOR-VIEW-003 | Conversation and navigation        |
 | REQ-ORCHESTRATION-COORDINATOR-VIEW-004 | Freshness and recovery             |
 | REQ-ORCHESTRATION-COORDINATOR-VIEW-005 | Presentation                       |
-| REQ-ORCHESTRATION-COORDINATOR-VIEW-006 | Authority and privacy              |
+| REQ-ORCHESTRATION-COORDINATOR-VIEW-006 | Authority and scope                |
 
 ## Task data and paging
 
-Use `GET /api/v1/workspaces/:id/tasks` through
-`apps/web/lib/api/domains/kanban-api.ts:listTasksByWorkspace`. The handler already
-has bounded page/page_size (maximum 100), search, workflow/repository filters and
-batched session/status enrichment. Add the already-supported `exclude_config`
-parameter to the typed client. The implementation audit found that the existing
-list includes hidden and Office workflows. An explicit `view=kanban` option now
-selects a native task-repository query that excludes those workflows before
-counting, searching and paging. Existing list callers keep their current contract.
-This view performs text search without the separate command palette's best-effort
-PR-number augmentation. Keep `include_ephemeral` and `include_archived`
-false. Exclude native conversations and Office-owned workflow tasks from this
-Kanban overview; verify exclusion server-side before counts/data leave the task
-boundary when not already guaranteed by canonical task-list filtering.
+The view reads `GET /api/v1/workspaces/:id/tasks?view=kanban` through
+`apps/web/lib/api/domains/kanban-api.ts:listTasksByWorkspace`. The handler has
+bounded page/page_size (maximum 100), search, workflow/repository filters and
+batched session/status enrichment. `view=kanban` selects a native
+task-repository query that excludes hidden, configuration, conversation and
+Office workflows before counting, searching and paging. Callers that omit
+`view=kanban` keep their existing contract. Text search in this view does not
+add the command palette's pull-request-number results. `include_ephemeral` and
+`include_archived` stay false.
 
 Read task `status_summary`, workflow/step, identifier, profile, repositories and
 coordinator-link metadata. Reuse native task mapping and status presentation
@@ -66,21 +58,21 @@ task ID, cancel outstanding loads on workspace/filter change, and retain
 server-supported deterministic sorting. Search/workflow/repository filters run
 at the server. Selected-coordinator/group filters apply to loaded eligible rows,
 with explicit partial coverage until all matching pages have been read. A small
-result set can complete in the initial read; larger sets must never silently stop
-at the old 100-task coordinator-list limit.
+result set can complete in the initial read; larger sets never silently stop
+at 100 tasks.
 
 The header distinguishes loaded eligible tasks from the underlying task-list
 total and says “counts for loaded tasks” until complete. If canonical exclusions
 reduce a page, do not mislabel the unfiltered total as a Kanban/group total.
 Counts of open PRs or changed files are likewise sums for loaded rows with known
-values, with unknown coverage shown. The initial package does not promise an
+values, with unknown coverage shown. The view does not promise an
 atomic workspace-wide statistics snapshot. It must not present complete-sounding
 totals or a definitive empty group while unseen pages may contain matches.
 
 ## Group projection
 
-Implement a pure, tested projection over task DTOs plus the freshest canonical
-status summaries. Rows retain all relevant badges; this table only selects their
+`lib/orchestration/coordinator-task-groups.ts` is a pure, tested projection over
+task DTOs plus the freshest canonical status summaries. Rows retain all relevant badges; this table only selects their
 one primary group, evaluated in order:
 
 | Order | Canonical signal                                                    | Group       |
@@ -104,26 +96,27 @@ fallbacks but never an inferred healthy/stalled state.
 Display quiet time only from semantic `last_activity_at`, not projection
 `updated_at` or wall-clock guesswork. Do not create a new inactivity threshold.
 PR merged state remains a PR badge; native task completion determines Done.
-This projection is presentation state, not a persisted assistant attention record.
+This projection is presentation state and is not persisted.
 
 ## Conversation and navigation
 
-Add `/workspaces/:workspaceId/coordinator` to SPA routing and workspace navigation,
-gated by the existing Orchestration feature. A coordinator selection can be
-represented by `orchestratorId` in the route query; validate it against the
-workspace assignments. Use a previously valid selection for that workspace, or
-the sole assignment; otherwise show an explicit selector. Do not choose another
-account as fallback when an assignment becomes unavailable.
+The SPA route `/workspaces/:workspaceId/coordinator` (`app/coordinator`) is
+reachable from workspace navigation and gated by `features.orchestration`. The
+selected assignment is carried as `orchestratorId` in the route query and
+validated against the workspace's assignments by `use-coordinator-selection`.
+The view uses a previously valid selection for that workspace, or the sole
+assignment; otherwise it shows an explicit selector. It never falls back to
+another account when an assignment becomes unavailable.
 
-Keep existing `/orchestration` conversation/configuration URLs working. Provide
-links into the central view with the same workspace/assignment identity. Global
-role settings and workspace assignment settings remain the configuration owners.
+The `/workspace/conversations/:taskId` conversation route and the Orchestration
+settings pages keep working and link into the central view with the same
+workspace and assignment identity. Global role settings and workspace
+assignment settings remain the configuration owners.
 
-Refactor `app/settings/orchestration/conversation-route.tsx` and
-`conversation-pane.tsx` into reusable conversation content plus their existing
-route shell as needed. Reuse `TaskChat`, identity, comment/recovery transports,
-active-session context and streaming reconciliation. Avoid embedding a routed
-page with duplicate headers or scroll owners.
+`coordinator-chat.tsx` reuses `ConversationContent` from
+`app/settings/orchestration/conversation-route.tsx`, `TaskChat`, identity,
+comment/recovery transports, active-session context and streaming
+reconciliation, without a second routed page, header or scroll owner.
 
 Opening an assignment may ensure its deterministic existing conversation mapping;
 it must not queue a turn. Hide/show chat and mobile tab changes keep the composer
@@ -131,18 +124,18 @@ mounted or preserve drafts in memory keyed by workspace and assignment. Switchin
 assignment clears the visible old content before loading the next. Do not persist
 draft text in a new localStorage key or expose it to task filters/report generation.
 
-The initial page offers observation, chat and links to existing task controls.
+The view offers observation, chat and links to existing task controls.
 It has no new Sweep now/Run build action. Existing automation Run now remains
 available in Automations, with its established dispatch semantics.
 
 ## Freshness and recovery
 
-Integrate with the canonical task cache and WebSocket status/lifecycle handlers;
-do not assume the active board cache contains every workflow on this page.
-Either register the scoped overview projection in the shared update path or
-invalidate/refetch its loaded pages on relevant workspace events. Include
-task create/update/delete, status summary, pending input, PR and connection events.
-Coalesce read invalidations; do not poll an agent or launch a model for status.
+The view integrates with the canonical task cache and WebSocket
+status/lifecycle handlers and does not assume the active board cache contains
+every workflow on this page. Task create/update/delete, status summary, pending
+input, PR and connection events refresh or invalidate its loaded pages.
+Read invalidations are coalesced; no agent is polled and no model is launched
+for status.
 
 Use `pickFreshestStatusSummary`/`isNewerStatusSummary` for HTTP/WS races, preserving
 equal-revision queue-count refresh behavior. Keep an explicit workspace generation
@@ -181,41 +174,34 @@ Workspace / Coordinator                 [assignment] [settings]
 Mobile: [Tasks] [Chat], same selection and state
 ```
 
-## Authority and privacy
+## Authority and scope
 
-Keep workspace authorization and retained conversation ownership checks in their
-existing backend services. Hidden conversation records are excluded at the task
-query boundary, not merely masked with CSS. Add regression evidence for private
-conversations, cross-workspace access, pagination and feature-off paths. Do not
-implement a new unscoped task query to obtain summary totals.
+Workspace authorization stays in the backend task and orchestration services.
+Hidden conversation records are excluded at the task query boundary, not
+masked in the browser. Regression tests cover conversation exclusion,
+cross-workspace access, pagination and feature-off paths. No unscoped task
+query is used to obtain summary totals.
 
-Task observation does not register `orchestration_chief_id`, export context to a
-different profile or grant cross-workspace access. Pending-input links use the
-native task interface; automatic answers/permissions are deferred to the separate
-assistant design. No new API promises read-only agent tool enforcement.
+Task observation does not set `orchestration_chief_id`, export context to a
+different profile or grant cross-workspace access. Pending-input links open the
+native task interface. The coordinator's own question and permission relay is
+described in [coordinator assistance](coordinator-assistance.md).
 
 ## Persistence, observability and validation
 
-No new durable tables or migration. Local view preferences may use existing
-preference patterns for non-content values only. Preserve conversation IDs and
-stored role/context data through the UI change.
+No durable tables or migrations. Local view preferences use existing
+preference patterns for non-content values only.
 
-Use existing task/API diagnostics for failures; UI diagnostics may include
+Failures use existing task/API diagnostics; UI diagnostics can include
 workspace/task IDs and summary revisions, never chat bodies, prompts or secrets.
-No new transcript telemetry. Unit tests cover classification/paging/races; native
-task authorization tests cover server exclusions; browser tests cover tasks plus
-conversation on desktop/mobile, navigation, reconnect and feature gates.
+Unit tests cover classification, paging and races
+(`lib/orchestration/coordinator-task-groups.test.ts`,
+`coordinator-task-totals.test.ts`, `app/coordinator/coordinator-page.test.tsx`);
+native task authorization tests cover server exclusions; browser tests cover
+tasks plus conversation on desktop and mobile, navigation, reconnect and
+feature gates.
 
-Capture screenshots and a short silent video with a disposable fictional
-workspace, synthetic task statuses and a scripted demo provider. Label media as
-demonstration, inspect every frame and publish only after the final feature scope
-is implemented. Never capture production history or real user prompts.
+## Related decisions
 
-## Related decisions and delivery
-
-- [Orchestration ownership](../../../decisions/2026-09-07-workspace-orchestration.md).
-- [Retained private conversation ownership](../../../decisions/2026-09-16-private-conversation-ownership.md).
-- [Plan and work orders](../../../plans/workspace-coordinator-view/plan.md).
-
-Core/plugin packaging and the upstream PR target remain maintainer decisions.
-They do not block this local design at the requested exact v0.94.0 baseline.
+- [Workspace orchestration owns its coordination runtime](../../../decisions/2026-09-07-workspace-orchestration.md).
+- [One coordinator path](../../../decisions/2026-09-18-orchestrator-product-boundary.md).
