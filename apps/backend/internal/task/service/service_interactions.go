@@ -191,7 +191,6 @@ func questionFromMetadata(metadata map[string]interface{}) models.InteractionQue
 			question.ID = v
 		}
 	}
-	question.AssistantDelegable, _ = data["assistant_delegable"].(bool)
 	question.Options = clarificationOptionsFromMetadata(data["options"])
 	return question
 }
@@ -240,22 +239,4 @@ func clarificationOptionsFromMetadata(value interface{}) []models.InteractionOpt
 		out = append(out, models.InteractionOption{ID: id, Label: label, Description: description})
 	}
 	return out
-}
-
-// GetScopedInteraction resolves a full native identity even when a provider
-// reuses its pending ID in another session or request generation.
-func (s *Service) GetScopedInteraction(ctx context.Context, task, session, pending, request string) (*models.Interaction, error) {
-	if err := s.AuthorizeTaskAccess(ctx, task); err != nil {
-		return nil, err
-	}
-	rows, err := s.messages.FindMessagesByPendingID(ctx, pending)
-	if err != nil {
-		return nil, err
-	}
-	for _, row := range assembleInteractions(rows) {
-		if row.TaskID == task && row.SessionID == session && row.RequestID == request {
-			return row, nil
-		}
-	}
-	return nil, nil
 }

@@ -1580,9 +1580,6 @@ func (a *messageCreatorAdapter) CreateClarificationRequestMessages(ctx context.C
 			"options": options,
 		}
 
-		if question.AssistantDelegable {
-			questionData["assistant_delegable"] = true
-		}
 		metadata := map[string]interface{}{
 			"pending_id":     pendingID,
 			"question_id":    question.ID,

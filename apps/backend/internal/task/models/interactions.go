@@ -95,11 +95,10 @@ type InteractionOption struct {
 // InteractionQuestion is one question of a clarification bundle. Every question
 // in a bundle must be answered before the agent unblocks.
 type InteractionQuestion struct {
-	AssistantDelegable bool                `json:"assistant_delegable,omitempty"`
-	ID                 string              `json:"id"`
-	Title              string              `json:"title,omitempty"`
-	Prompt             string              `json:"prompt"`
-	Options            []InteractionOption `json:"options,omitempty"`
+	ID      string              `json:"id"`
+	Title   string              `json:"title,omitempty"`
+	Prompt  string              `json:"prompt"`
+	Options []InteractionOption `json:"options,omitempty"`
 }
 
 // Interaction is the assembled durable projection of one agent interaction: a

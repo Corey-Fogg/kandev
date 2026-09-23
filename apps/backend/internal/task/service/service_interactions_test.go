@@ -180,7 +180,7 @@ func TestInteractionStatusFromMetadataPreservesUnknownTerminalValues(t *testing.
 	}
 }
 
-func TestAssistantInputPermissionIdentityIncludesSessionAndGeneration(t *testing.T) {
+func TestAssembleInteractionsKeepsReusedPendingIDsApartPerSessionAndRequest(t *testing.T) {
 	at := time.Now().UTC()
 	first := permissionRow("reused", "", at)
 	first.Metadata["request_id"] = "generation-one"
