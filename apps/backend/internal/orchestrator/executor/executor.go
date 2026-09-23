@@ -654,7 +654,6 @@ const McpModeOffice = mcpmode.Office
 // McpModeAutomation selects the fixed coordinator MCP surface for tasks
 // created by a user-configured automation.
 const McpModeAutomation = mcpmode.Automation
-const McpModeConversation = mcpmode.Conversation
 
 // LaunchOptions contains optional parameters for LaunchPreparedSession.
 type LaunchOptions struct {

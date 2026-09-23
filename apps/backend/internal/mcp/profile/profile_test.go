@@ -62,8 +62,8 @@ func TestLegacyAssistantSurfaceResolvesToBroker(t *testing.T) {
 	if !(Context{Surface: "assistant-broker-v1"}).IsBroker() || !New(SurfaceOrchestratorBroker, nil, nil).IsBroker() {
 		t.Fatal("broker surfaces must report IsBroker")
 	}
-	if New(SurfaceConversation, nil, nil).IsBroker() {
-		t.Fatal("conversation surface is not a broker")
+	if New(SurfaceOfficeTask, nil, nil).IsBroker() {
+		t.Fatal("office surface is not a broker")
 	}
 }
 

@@ -92,6 +92,12 @@ func TestResolveTaskSessionMCPProfile_SelectsSurfaceAndQuestionCapability(t *tes
 			wantSurface: mcpprofile.SurfaceOrchestratorBroker,
 		},
 		{
+			name:        "coordinator conversation without a recorded policy uses the broker",
+			task:        &models.Task{ID: "task", Origin: "native_conversation", IsFromOffice: true},
+			session:     &models.TaskSession{ID: "session", TaskID: "task"},
+			wantSurface: mcpprofile.SurfaceOrchestratorBroker,
+		},
+		{
 			name:        "legacy broker session keeps the broker",
 			task:        &models.Task{ID: "task", Origin: "native_conversation"},
 			session:     &models.TaskSession{ID: "session", TaskID: "task", Metadata: map[string]interface{}{"assistant_broker_policy": "assistant-broker-v1"}},

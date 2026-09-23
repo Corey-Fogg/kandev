@@ -10,9 +10,8 @@ import (
 )
 
 const (
-	SurfaceKanban       = "kanban-task"
-	SurfaceOffice       = "office-task"
-	SurfaceConversation = "conversation"
+	SurfaceKanban = "kanban-task"
+	SurfaceOffice = "office-task"
 )
 
 const maxExposedNameLength = 64

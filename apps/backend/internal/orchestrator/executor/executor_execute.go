@@ -52,9 +52,6 @@ func (e *Executor) resolveTaskSessionMCPMode(ctx context.Context, taskID string,
 	if task != nil && task.Origin == models.TaskOriginAutomationRun {
 		return McpModeAutomation, nil
 	}
-	if task != nil && task.Origin == "native_conversation" {
-		return McpModeConversation, nil
-	}
 	if task != nil && task.IsFromOffice {
 		return McpModeOffice, nil
 	}
@@ -64,9 +61,17 @@ func (e *Executor) resolveTaskSessionMCPMode(ctx context.Context, taskID string,
 	return "", nil
 }
 
+// coordinatorConversationOrigin marks the standing conversation task of a
+// workspace coordinator.
+const coordinatorConversationOrigin = "native_conversation"
+
+func brokerProfile() mcpprofile.Context {
+	return mcpprofile.New(mcpprofile.SurfaceOrchestratorBroker, nil, nil)
+}
+
 func (e *Executor) resolveTaskSessionMCPProfile(ctx context.Context, taskID string, session *models.TaskSession, allowTitleTool bool) (mcpprofile.Context, error) {
 	if session != nil && mcpprofile.SessionUsesBroker(session.Metadata) {
-		return mcpprofile.New(mcpprofile.SurfaceOrchestratorBroker, nil, nil), nil
+		return brokerProfile(), nil
 	}
 	if isConfigModeSession(session) {
 		capabilities := []mcpprofile.Capability{mcpprofile.CapabilityUserQuestion}
@@ -90,12 +95,14 @@ func (e *Executor) resolveTaskSessionMCPProfile(ctx context.Context, taskID stri
 	if task.Origin == models.TaskOriginAutomationRun {
 		return e.withCanvasCapability(mcpprofile.NewAutomation()), nil
 	}
+	if task.Origin == coordinatorConversationOrigin {
+		// A coordinator conversation never runs outside the broker, even when
+		// its session predates the recorded broker policy.
+		return brokerProfile(), nil
+	}
 	surface := mcpprofile.SurfaceKanbanTask
 	if task.IsFromOffice {
 		surface = mcpprofile.SurfaceOfficeTask
-	}
-	if task.Origin == "native_conversation" {
-		surface = mcpprofile.SurfaceConversation
 	}
 	capabilities := make([]mcpprofile.Capability, 0, 2)
 	if task.Autopilot {

@@ -86,12 +86,11 @@ type Manifest struct {
 }
 
 const (
-	AgentToolSurfaceKanban       = "kanban-task"
-	AgentToolSurfaceOffice       = "office-task"
-	AgentToolSurfaceConversation = "conversation"
+	AgentToolSurfaceKanban = "kanban-task"
+	AgentToolSurfaceOffice = "office-task"
 )
 
-// AgentTool is an MCP tool a plugin contributes to matching session surfaces.
+// AgentTool is an MCP tool a plugin contributes to matching task sessions.
 // The exposed MCP name is derived by the host and is not author-controlled.
 type AgentTool struct {
 	Name         string               `yaml:"name" json:"name"`
