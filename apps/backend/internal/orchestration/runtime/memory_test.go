@@ -40,7 +40,7 @@ func TestCoordinatorRemembersAndForgetsWorkspaceMemory(t *testing.T) {
 
 	a, err := s.Personas.GetAgentInstance(ctx, "chief")
 	require.NoError(t, err)
-	prompt, err := s.prompt(ctx, a, task, map[string]any{})
+	prompt, err := s.prompt(ctx, a, task, "", map[string]any{})
 	require.NoError(t, err)
 	require.Contains(t, prompt, "branch-policy (id="+row.ID+"): Branch from main.")
 

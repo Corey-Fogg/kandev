@@ -93,7 +93,7 @@ func (s *Service) CancelRecovery(ctx context.Context, taskID, sessionID string) 
 // A delayed retry must not absorb messages posted after its original dispatch.
 func (s *Service) promptForRun(ctx context.Context, persona *models.AgentInstance, taskID string, payload map[string]any, run *runmodels.Run) (string, error) {
 	if run.RetryCount == 0 {
-		return s.prompt(ctx, persona, taskID, payload)
+		return s.prompt(ctx, persona, taskID, run.ID, payload)
 	}
 	if run.AssembledPrompt == "" {
 		return "", fmt.Errorf("original conversation request is unavailable for automatic recovery")

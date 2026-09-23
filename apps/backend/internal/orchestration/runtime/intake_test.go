@@ -142,7 +142,7 @@ func TestConversationIntentExactSourceSurvivesNewerComments(t *testing.T) {
 	}
 	a, err := s.Personas.GetAgentInstance(ctx, "chief")
 	require.NoError(t, err)
-	prompt, err := s.prompt(ctx, a, task, map[string]any{"comment_id": original.ID})
+	prompt, err := s.prompt(ctx, a, task, "", map[string]any{"comment_id": original.ID})
 	require.NoError(t, err)
 	require.Contains(t, prompt, original.Body)
 }

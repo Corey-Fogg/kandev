@@ -21,7 +21,7 @@ func TestPromptUsesEmbeddedInstructionsAndWorkspaceDirectory(t *testing.T) {
 	}}
 	persona, err := s.Personas.GetAgentInstance(ctx, "chief")
 	require.NoError(t, err)
-	prompt, err := s.prompt(ctx, persona, task, nil)
+	prompt, err := s.prompt(ctx, persona, task, "", nil)
 	require.NoError(t, err)
 	require.True(t, strings.HasPrefix(prompt, instructions.Default), "the embedded instructions open every turn")
 	require.NotContains(t, prompt, "kandev task create", "a stored instruction copy is never injected")
@@ -40,7 +40,7 @@ func TestPromptDirectoryIsBounded(t *testing.T) {
 	s.Manager = manager
 	persona, err := s.Personas.GetAgentInstance(ctx, "chief")
 	require.NoError(t, err)
-	prompt, err := s.prompt(ctx, persona, task, nil)
+	prompt, err := s.prompt(ctx, persona, task, "", nil)
 	require.NoError(t, err)
 	require.Contains(t, prompt, "directory truncated; read workspace for the rest")
 	start := strings.Index(prompt, "Workspace directory")

@@ -213,7 +213,8 @@ func clip(value string, max int) string {
 
 // prompt assembles a coordinator turn. The product instructions always come
 // from the embedded default; the role carries workspace-specific policy.
-func (s *Service) prompt(ctx context.Context, a *models.AgentInstance, taskID string, payload map[string]any) (string, error) {
+// runID names the turn being rendered, or is empty outside a launch.
+func (s *Service) prompt(ctx context.Context, a *models.AgentInstance, taskID, runID string, payload map[string]any) (string, error) {
 	var text strings.Builder
 	text.WriteString(instructions.Default)
 	role, err := s.Repo.AssignedRole(ctx, a.ID)
@@ -251,10 +252,52 @@ func (s *Service) prompt(ctx context.Context, a *models.AgentInstance, taskID st
 		if err != nil {
 			return "", err
 		}
+		if err := s.writeUnansweredMessages(ctx, &text, a.ID, taskID, runID, comment); err != nil {
+			return "", err
+		}
 		fmt.Fprintf(&text, "\nCurrent user message (comment_id=%s, intent_revision=%v): %s\n", comment.ID, payload[intentRevisionKey], comment.Body)
 	}
 	writeTaskUpdates(&text, updatesForPrompt(payload))
 	return text.String(), nil
+}
+
+const (
+	// unansweredMessageLimit bounds how many unanswered messages a turn looks up.
+	unansweredMessageLimit = 200
+	// unansweredMessageBodies is how many of them are quoted in full.
+	unansweredMessageBodies = 20
+)
+
+// writeUnansweredMessages renders the user messages sent after the last
+// completed user-message turn and before current. Their own turns were
+// superseded or failed, so this turn is the only one that can answer them.
+// The newest are quoted, clipped; older ones are listed by id.
+func (s *Service) writeUnansweredMessages(ctx context.Context, text *strings.Builder, persona, taskID, runID string, current *models.TaskComment) error {
+	if current.Sequence == 0 {
+		return nil
+	}
+	rows, err := s.Repo.UnansweredMessages(ctx, persona, taskID, runID, current.Sequence, unansweredMessageLimit)
+	if err != nil || len(rows) == 0 {
+		return err
+	}
+	text.WriteString("\nEarlier user messages not yet answered (sent while you were busy; answer them together with the current message):\n")
+	quoted := rows
+	if len(rows) > unansweredMessageBodies {
+		older := rows[:len(rows)-unansweredMessageBodies]
+		quoted = rows[len(older):]
+		ids := make([]string, len(older))
+		for i, row := range older {
+			ids[i] = row.ID
+		}
+		fmt.Fprintf(text, "%d older unanswered messages, read them with comments: %s\n", len(older), strings.Join(ids, ", "))
+		if len(rows) == unansweredMessageLimit {
+			text.WriteString("More unanswered messages may exist before these; read them with comments.\n")
+		}
+	}
+	for _, row := range quoted {
+		fmt.Fprintf(text, "- (comment_id=%s): %s\n", row.ID, clip(row.Body, 1000))
+	}
+	return nil
 }
 
 func (s *Service) executionSelection(ctx context.Context, a *models.AgentInstance) (string, string, error) {

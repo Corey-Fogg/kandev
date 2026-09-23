@@ -18,7 +18,7 @@ func TestEachTurnUsesCurrentGlobalRoleAndWorkspaceContext(t *testing.T) {
 		require.NoError(t, service.Repo.SaveOrchestratorRole(ctx, role))
 		persona, err := service.Personas.GetAgentInstance(ctx, "chief")
 		require.NoError(t, err)
-		prompt, err := service.prompt(ctx, persona, task, nil)
+		prompt, err := service.prompt(ctx, persona, task, "", nil)
 		require.NoError(t, err)
 		require.Contains(t, prompt, policy)
 		require.NotContains(t, prompt, "Stale copied instructions")

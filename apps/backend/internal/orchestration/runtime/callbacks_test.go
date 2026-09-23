@@ -4,12 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/kandev/kandev/internal/events"
 	"github.com/kandev/kandev/internal/events/bus"
+	"github.com/kandev/kandev/internal/orchestration/models"
 	taskmodels "github.com/kandev/kandev/internal/task/models"
 	v1 "github.com/kandev/kandev/pkg/api/v1"
 	"github.com/stretchr/testify/require"
@@ -160,4 +163,66 @@ func TestSupersededMessageTurnIsSkippedAtLaunch(t *testing.T) {
 	require.EqualValues(t, "finished", stored.Status)
 	require.NotNil(t, stored.Outcome)
 	require.Equal(t, supersededOutcome, *stored.Outcome)
+}
+
+func TestSupersededMessagesReachTheCoalescedTurn(t *testing.T) {
+	s, _, task := newRuntime(t)
+	ctx := context.Background()
+	router := conversationRouter(s)
+	path := "/api/v1/orchestration/tasks/" + task + "/comments"
+	send := func(body string) {
+		require.Equal(t, 201, runtimeRequest(t, router, "POST", path, "", "", map[string]string{"body": body}).Code)
+	}
+	var prompts []string
+	s.Start = func(ctx context.Context, l Launch) error {
+		prompts = append(prompts, l.Prompt)
+		return l.OnSessionPrepared(ctx, "session")
+	}
+	send("answered message")
+	first, err := s.Runs.ClaimNextEligibleRun(ctx)
+	require.NoError(t, err)
+	_, err = s.Process(ctx, first)
+	require.NoError(t, err)
+	_, err = s.Runs.FinishRun(ctx, first.ID, "finished", nil)
+	require.NoError(t, err)
+
+	for i := 1; i <= 6; i++ {
+		send(fmt.Sprintf("queued message %d", i))
+		require.NoError(t, s.Repo.PutComment(ctx, &models.TaskComment{TaskID: task, AuthorType: "agent", AuthorID: "chief", Body: "note", Source: "agent"}))
+	}
+	for {
+		run, err := s.Runs.ClaimNextEligibleRun(ctx)
+		if errors.Is(err, sql.ErrNoRows) {
+			break
+		}
+		require.NoError(t, err)
+		_, err = s.Process(ctx, run)
+		require.NoError(t, err)
+	}
+	require.Len(t, prompts, 2, "only the newest message launches a turn")
+	prompt := prompts[1]
+	for i := 1; i <= 5; i++ {
+		require.Contains(t, prompt, fmt.Sprintf("queued message %d", i), "superseded message %d reaches the coalesced turn", i)
+	}
+	require.Contains(t, prompt, "Current user message")
+	require.NotContains(t, prompt, "): answered message", "a message whose turn completed is not repeated")
+}
+
+func TestUnansweredMessagesAreBounded(t *testing.T) {
+	s, _, task := newRuntime(t)
+	ctx := context.Background()
+	router := conversationRouter(s)
+	path := "/api/v1/orchestration/tasks/" + task + "/comments"
+	for i := 0; i < unansweredMessageBodies+3; i++ {
+		require.Equal(t, 201, runtimeRequest(t, router, "POST", path, "", "", map[string]string{"body": fmt.Sprintf("message %02d", i)}).Code)
+	}
+	comments, err := s.Repo.ListComments(ctx, task, 1)
+	require.NoError(t, err)
+	a, err := s.Personas.GetAgentInstance(ctx, "chief")
+	require.NoError(t, err)
+	prompt, err := s.prompt(ctx, a, task, "", map[string]any{"comment_id": comments[0].ID})
+	require.NoError(t, err)
+	require.Contains(t, prompt, "2 older unanswered messages, read them with comments:")
+	require.NotContains(t, prompt, ": message 00\n")
+	require.Contains(t, prompt, ": message 02\n")
 }
