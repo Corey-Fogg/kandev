@@ -116,6 +116,9 @@ type ProposalDecision struct {
 var (
 	ErrProposalNotFound = errors.New("proposal_not_found")
 	ErrProposalDecided  = errors.New("proposal_already_decided")
+	// ErrProposalApproving means another approval of the proposal is still
+	// creating its task.
+	ErrProposalApproving = errors.New("proposal_approval_in_progress")
 )
 
 // ProposalInputError means an approval was refused: the final spec is

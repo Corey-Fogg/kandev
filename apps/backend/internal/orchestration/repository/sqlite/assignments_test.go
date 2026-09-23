@@ -200,15 +200,35 @@ func TestProposalStoreIsIdempotentAndCascades(t *testing.T) {
 		pending, err := repo.PendingProposalForSource(ctx, "chief", "jira:ABC-1")
 		require.NoError(t, err)
 		require.Equal(t, "p1", pending.ID)
-		claimed, err := repo.ClaimProposalApproval(ctx, "p1")
+		other := proposal("p3")
+		other.RunID, other.RequestHash = "run-2", "different"
+		duplicate, created, err := repo.CreateProposal(ctx, other, &models.TaskComment{TaskID: "conversation", AuthorType: "agent", AuthorID: "chief", Body: "Proposed", Source: "proposal"})
+		require.NoError(t, err)
+		require.False(t, created, "an undecided proposal for the source issue already exists")
+		require.Equal(t, "p1", duplicate.ID)
+		require.NoError(t, database.Get(&comments, `SELECT COUNT(*) FROM task_comments WHERE id='p3'`))
+		require.Zero(t, comments)
+
+		now := time.Now()
+		claimed, err := repo.ClaimProposalApproval(ctx, "p1", "first", now, now.Add(-5*time.Minute))
 		require.NoError(t, err)
 		require.True(t, claimed)
+		claimed, err = repo.ClaimProposalApproval(ctx, "p1", "second", now, now.Add(-5*time.Minute))
+		require.NoError(t, err)
+		require.False(t, claimed, "an approval in flight is not claimed twice")
+		require.NoError(t, repo.ReleaseProposalClaim(ctx, "p1", "second"))
+		held, err := repo.GetProposal(ctx, "chief", "p1")
+		require.NoError(t, err)
+		require.Equal(t, models.ProposalApproving, held.Status, "only the claim holder releases it")
 		dismissed, err := repo.DismissProposal(ctx, "p1", "", "user", time.Now())
 		require.NoError(t, err)
 		require.False(t, dismissed, "an approval in flight cannot be dismissed")
 		final := spec
 		final.Title = "Fix the login form"
-		done, err := repo.CompleteProposalApproval(ctx, "p1", "task", false, true, &final, "user", time.Now())
+		done, err := repo.CompleteProposalApproval(ctx, "p1", "second", "task", false, true, &final, "user", time.Now())
+		require.NoError(t, err)
+		require.False(t, done, "a request without the claim cannot complete it")
+		done, err = repo.CompleteProposalApproval(ctx, "p1", "first", "task", false, true, &final, "user", time.Now())
 		require.NoError(t, err)
 		require.True(t, done)
 		stored, err := repo.GetProposal(ctx, "chief", "p1")
@@ -225,6 +245,29 @@ func TestProposalStoreIsIdempotentAndCascades(t *testing.T) {
 		rows, err := repo.ListProposals(ctx, "chief", "", 50)
 		require.NoError(t, err)
 		require.Empty(t, rows, "deleting the orchestrator deletes its proposals")
+	})
+}
+
+func TestStaleProposalClaimCanBeTakenOver(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, dsn string) {
+		repo, _ := assignmentRepo(t, dsn)
+		ctx := context.Background()
+		require.NoError(t, repo.RegisterOrchestrator(ctx, "chief", "ws", "chief-of-staff"))
+		spec := models.ProposalSpec{Title: "Fix login"}
+		_, _, err := repo.CreateProposal(ctx, &models.TaskProposal{ID: "p1", OrchestratorID: "chief", WorkspaceID: "ws", ConversationTaskID: "conversation",
+			RunID: "run", RequestHash: spec.RequestHash(), Spec: spec}, &models.TaskComment{TaskID: "conversation", AuthorType: "agent", AuthorID: "chief", Body: "Proposed", Source: "proposal"})
+		require.NoError(t, err)
+		start := time.Now().Add(-10 * time.Minute)
+		claimed, err := repo.ClaimProposalApproval(ctx, "p1", "interrupted", start, start.Add(-5*time.Minute))
+		require.NoError(t, err)
+		require.True(t, claimed)
+		now := time.Now()
+		claimed, err = repo.ClaimProposalApproval(ctx, "p1", "retry", now, now.Add(-5*time.Minute))
+		require.NoError(t, err)
+		require.True(t, claimed, "an interrupted approval can be taken over once stale")
+		done, err := repo.CompleteProposalApproval(ctx, "p1", "interrupted", "task", false, false, nil, "user", now)
+		require.NoError(t, err)
+		require.False(t, done, "the interrupted approval no longer holds the claim")
 	})
 }
 

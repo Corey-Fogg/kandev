@@ -25,6 +25,9 @@ const (
 	proposalOutcomeApproved = "approved"
 	proposalOutcomeEdited   = "edited"
 	proposalListLimit       = 50
+	// proposalClaimStaleAge is how long an approval may hold its claim before
+	// another approve may take it over as interrupted.
+	proposalClaimStaleAge = 5 * time.Minute
 )
 
 // proposalDecisionUpdate tells a coordinator what the user decided about one
@@ -45,10 +48,6 @@ func (s *Service) ProposeTask(ctx context.Context, claims *runtimeauth.AgentClai
 	sourceKey := ""
 	if spec.Source != nil {
 		sourceKey = spec.Source.ExternalID()
-		pending, err := s.Repo.PendingProposalForSource(ctx, claims.AgentProfileID, sourceKey)
-		if err != nil || pending != nil {
-			return pending, false, pending != nil, err
-		}
 	}
 	p := &models.TaskProposal{ID: uuid.NewString(), OrchestratorID: claims.AgentProfileID, WorkspaceID: claims.WorkspaceID,
 		ConversationTaskID: claims.TaskID, RunID: claims.RunID, RequestHash: spec.RequestHash(), SourceKey: sourceKey,
@@ -56,7 +55,13 @@ func (s *Service) ProposeTask(ctx context.Context, claims *runtimeauth.AgentClai
 	comment := &models.TaskComment{TaskID: claims.TaskID, AuthorType: authorTypeAgent, AuthorID: claims.AgentProfileID,
 		Source: proposalCommentSource, Body: proposalFallbackBody(spec)}
 	stored, created, err := s.Repo.CreateProposal(ctx, p, comment)
-	return stored, created, false, err
+	if err != nil || created {
+		return stored, created, false, err
+	}
+	// Anything other than a replay of this request is the source issue's
+	// undecided proposal.
+	replay := stored.RunID == p.RunID && stored.RequestHash == p.RequestHash
+	return stored, false, !replay, nil
 }
 
 // proposalFallbackBody is the chat text of a proposal for clients that do
@@ -144,7 +149,8 @@ func (s *Service) approveProposal(ctx context.Context, p *models.TaskProposal, d
 	if settled, ok := settledApproval(p); ok {
 		return settled, settled.TaskID, settled.Duplicate, decidedError(settled)
 	}
-	claimed, err := s.Repo.ClaimProposalApproval(ctx, p.ID)
+	token, now := uuid.NewString(), s.now()
+	claimed, err := s.Repo.ClaimProposalApproval(ctx, p.ID, token, now, now.Add(-proposalClaimStaleAge))
 	if err != nil {
 		return p, "", false, err
 	}
@@ -154,7 +160,7 @@ func (s *Service) approveProposal(ctx context.Context, p *models.TaskProposal, d
 	final, edited := p.Spec.Apply(d.Edits)
 	taskID, duplicate, err := s.createProposedTask(ctx, p, &final)
 	if err != nil {
-		if releaseErr := s.Repo.ReleaseProposalClaim(ctx, p.ID); releaseErr != nil {
+		if releaseErr := s.Repo.ReleaseProposalClaim(ctx, p.ID, token); releaseErr != nil {
 			return p, "", false, releaseErr
 		}
 		p.Status = models.ProposalPending
@@ -164,8 +170,13 @@ func (s *Service) approveProposal(ctx context.Context, p *models.TaskProposal, d
 	if edited {
 		finalSpec = &final
 	}
-	if _, err := s.Repo.CompleteProposalApproval(ctx, p.ID, taskID, duplicate, edited, finalSpec, d.UserID, s.now()); err != nil {
+	completed, err := s.Repo.CompleteProposalApproval(ctx, p.ID, token, taskID, duplicate, edited, finalSpec, d.UserID, s.now())
+	if err != nil {
 		return p, "", false, err
+	}
+	if !completed {
+		// A stale claim was taken over and settled by another approval.
+		return s.reloadDecided(ctx, p)
 	}
 	stored, err := s.Repo.GetProposal(ctx, p.OrchestratorID, p.ID)
 	if err != nil {
@@ -188,16 +199,22 @@ func decidedError(p *models.TaskProposal) error {
 	return nil
 }
 
-// reloadDecided answers an approval that lost its claim to another decision.
+// reloadDecided answers an approval that lost its claim to another
+// decision: an approved proposal returns its result, a dismissed one is
+// refused as decided, and one another approval still holds is refused as in
+// progress, never approved a second time.
 func (s *Service) reloadDecided(ctx context.Context, p *models.TaskProposal) (*models.TaskProposal, string, bool, error) {
 	current, err := s.Repo.GetProposal(ctx, p.OrchestratorID, p.ID)
 	if err != nil {
 		return p, "", false, err
 	}
-	if current.Status == models.ProposalApproved {
+	switch current.Status {
+	case models.ProposalApproved:
 		return current, current.TaskID, current.Duplicate, nil
+	case models.ProposalDismissed:
+		return current, "", false, models.ErrProposalDecided
 	}
-	return current, "", false, models.ErrProposalDecided
+	return current, "", false, models.ErrProposalApproving
 }
 
 // createProposedTask validates the final spec and creates its task exactly

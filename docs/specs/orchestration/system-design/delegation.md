@@ -106,16 +106,24 @@ pins are not applied to `orchestration_managed` tasks.
 When the caller's assignment has `ask_before_create`, the `create_task`
 handler runs its usual title, mode, source and criteria validation, including
 the existing-task check for a source issue, and then calls
-`Service.ProposeTask` instead of `CreateWorkspaceTask`. A pending or approving
-proposal for the same source key is returned with `duplicate_proposal: true`.
-Otherwise one transaction inserts an `orchestration_task_proposals` row and a
-conversation comment whose ID is the proposal ID and whose `source` is
-`proposal`; the web renders that comment as a card. The row is unique on
-`(agent_id, run_id, request_hash)`, so a replay in the same run returns the
-stored proposal (200) instead of a new one (202).
+`Service.ProposeTask` instead of `CreateWorkspaceTask`. One transaction inserts
+an `orchestration_task_proposals` row and a conversation comment whose ID is
+the proposal ID and whose `source` is `proposal`; the web renders that comment
+as a card. The row is unique on `(agent_id, run_id, request_hash)`, so a replay
+in the same run returns the stored proposal (200) instead of a new one (202).
+Inside the same transaction, after the insert, a pending or approving proposal
+for the same source key rolls the insert back and is returned with
+`duplicate_proposal: true`. A partial unique index on `(agent_id, source_key)`
+over undecided rows backs this; it is created only when no duplicates exist,
+so parallel `create_task` calls for one issue store one card.
 
 `DecideProposal` backs the human routes. Approval claims the row
-(`pending|approving -> approving`), applies the edits, validates the final spec
+(`pending -> approving`) under a random `claim_token` with `claimed_at`; an
+`approving` row is claimed again only once its claim is more than five minutes
+old (an interrupted approval). A concurrent approve therefore gets 409
+`proposal_approval_in_progress` with the current proposal instead of creating
+a second task, and only the claim holder can release or complete the claim.
+Approval then applies the edits, validates the final spec
 (human titles are never shortened) and creates the task with
 `ChiefID` = the assignment and the external ID of the spec, the source issue or
 `orchestration-proposal:<id>`. A `DuplicateTaskError` counts as success, so a

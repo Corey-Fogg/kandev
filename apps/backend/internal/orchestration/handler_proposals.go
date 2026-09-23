@@ -136,8 +136,8 @@ func proposalFailure(c *gin.Context, p *models.TaskProposal, err error) {
 	switch {
 	case errors.Is(err, models.ErrProposalNotFound):
 		c.JSON(http.StatusNotFound, gin.H{errorResponseKey: proposalNotFound})
-	case errors.Is(err, models.ErrProposalDecided):
-		c.JSON(http.StatusConflict, gin.H{errorResponseKey: models.ErrProposalDecided.Error(), proposalKey: p})
+	case errors.Is(err, models.ErrProposalDecided), errors.Is(err, models.ErrProposalApproving):
+		c.JSON(http.StatusConflict, gin.H{errorResponseKey: err.Error(), proposalKey: p})
 	case errors.As(err, &input):
 		c.JSON(http.StatusUnprocessableEntity, gin.H{errorResponseKey: input.Error()})
 	default:

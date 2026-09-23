@@ -41,7 +41,9 @@ empty inherits the role name). Every response reports the effective name as
 
 Approving is idempotent: a repeated approval returns the same task. Approving a
 dismissed proposal, or dismissing an approved one, returns 409
-`proposal_already_decided` with the current proposal. An invalid edit or a
+`proposal_already_decided` with the current proposal. Approving while another
+approval of the same proposal is still creating its task returns 409
+`proposal_approval_in_progress` with the current proposal. An invalid edit or a
 failed create returns 422 and leaves the proposal pending. A workspace that
 already has several orchestrators from an earlier build keeps them all working.
 

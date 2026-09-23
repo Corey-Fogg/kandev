@@ -7,6 +7,10 @@ import (
 	"errors"
 	"time"
 
+	"go.uber.org/zap"
+
+	"github.com/kandev/kandev/internal/common/logger"
+	"github.com/kandev/kandev/internal/db"
 	"github.com/kandev/kandev/internal/orchestration/models"
 )
 
@@ -39,14 +43,52 @@ func (r *Repository) migrateProposals() error {
 			return err
 		}
 	}
-	return nil
+	for _, column := range []struct{ name, definition string }{
+		{"claim_token", `TEXT NOT NULL DEFAULT ''`},
+		{"claimed_at", `TIMESTAMP`},
+	} {
+		exists, err := db.ColumnExists(r.db, "orchestration_task_proposals", column.name)
+		if err != nil {
+			return err
+		}
+		if exists {
+			continue
+		}
+		statement := `ALTER TABLE orchestration_task_proposals ADD COLUMN ` + column.name + ` ` + column.definition
+		if _, err := r.db.Exec(statement); err != nil && !db.IsDuplicateColumnError(err) {
+			return err
+		}
+	}
+	return r.migrateUndecidedSourceIndex()
+}
+
+// migrateUndecidedSourceIndex allows one undecided proposal per source issue
+// and orchestrator. A database that already holds duplicates keeps working
+// without the index; CreateProposal still checks inside its transaction.
+func (r *Repository) migrateUndecidedSourceIndex() error {
+	var duplicated int
+	if err := r.db.Get(&duplicated, `SELECT COUNT(*) FROM (SELECT agent_id,source_key FROM orchestration_task_proposals
+		WHERE source_key<>'' AND status IN ('pending','approving') GROUP BY agent_id,source_key HAVING COUNT(*)>1) d`); err != nil {
+		return err
+	}
+	if duplicated > 0 {
+		logger.Default().Info("orchestration: skipping the undecided-proposal source index while duplicates exist",
+			zap.Int("sources", duplicated))
+		return nil
+	}
+	_, err := r.db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_orchestration_task_proposals_undecided_source
+		ON orchestration_task_proposals(agent_id, source_key) WHERE source_key<>'' AND status IN ('pending','approving')`)
+	return err
 }
 
 const proposalColumns = `id,agent_id,workspace_id,conversation_task_id,run_id,request_hash,source_key,spec,final_spec,edited,status,task_id,duplicate,dismiss_reason,decided_by,created_at,decided_at`
 
 // CreateProposal stores a proposal and its conversation comment together.
 // The comment's id is the proposal id. A replay of the same request in the
-// same run returns the stored proposal with created=false.
+// same run returns the stored proposal with created=false, and so does an
+// undecided proposal for the same source issue: the check runs inside the
+// insert's transaction (and against a partial unique index), so parallel
+// requests for one issue store one proposal.
 func (r *Repository) CreateProposal(ctx context.Context, p *models.TaskProposal, comment *models.TaskComment) (*models.TaskProposal, bool, error) {
 	spec, err := json.Marshal(p.Spec)
 	if err != nil {
@@ -61,9 +103,11 @@ func (r *Repository) CreateProposal(ctx context.Context, p *models.TaskProposal,
 		return nil, false, err
 	}
 	defer func() { _ = tx.Rollback() }()
+	// Write first so SQLite takes its write lock before the source check.
+	// DO NOTHING without a target also absorbs the undecided-source index.
 	result, err := tx.ExecContext(ctx, tx.Rebind(`INSERT INTO orchestration_task_proposals
 		(id,agent_id,workspace_id,conversation_task_id,run_id,request_hash,source_key,spec,status,created_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(agent_id,run_id,request_hash) DO NOTHING`),
+		VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING`),
 		p.ID, p.OrchestratorID, p.WorkspaceID, p.ConversationTaskID, p.RunID, p.RequestHash, p.SourceKey, p.SpecJSON, models.ProposalPending, p.CreatedAt)
 	if err != nil {
 		return nil, false, err
@@ -72,11 +116,21 @@ func (r *Repository) CreateProposal(ctx context.Context, p *models.TaskProposal,
 	if err != nil {
 		return nil, false, err
 	}
+	if n == 1 && p.SourceKey != "" {
+		var other int
+		if err := tx.GetContext(ctx, &other, tx.Rebind(`SELECT COUNT(*) FROM orchestration_task_proposals
+			WHERE agent_id=? AND source_key=? AND status IN (?,?) AND id<>?`),
+			p.OrchestratorID, p.SourceKey, models.ProposalPending, models.ProposalApproving, p.ID); err != nil {
+			return nil, false, err
+		}
+		if other > 0 {
+			n = 0
+		}
+	}
 	if n == 0 {
-		// Release the write transaction before reading the stored replay.
+		// Release the write transaction before reading the stored proposal.
 		_ = tx.Rollback()
-		existing, err := r.proposalWhere(ctx, `agent_id=? AND run_id=? AND request_hash=?`, p.OrchestratorID, p.RunID, p.RequestHash)
-		return existing, false, err
+		return r.existingProposal(ctx, p)
 	}
 	comment.ID, comment.CreatedAt = p.ID, p.CreatedAt
 	if _, err := tx.ExecContext(ctx, tx.Rebind(`INSERT INTO task_comments(id,task_id,author_type,author_id,body,source,created_at) VALUES(?,?,?,?,?,?,?)`),
@@ -88,6 +142,21 @@ func (r *Repository) CreateProposal(ctx context.Context, p *models.TaskProposal,
 	}
 	p.Status = models.ProposalPending
 	return p, true, nil
+}
+
+// existingProposal is the stored proposal that kept p from being inserted:
+// the same request replayed in the same run, else the undecided proposal for
+// p's source issue.
+func (r *Repository) existingProposal(ctx context.Context, p *models.TaskProposal) (*models.TaskProposal, bool, error) {
+	existing, err := r.proposalWhere(ctx, `agent_id=? AND run_id=? AND request_hash=?`, p.OrchestratorID, p.RunID, p.RequestHash)
+	if !errors.Is(err, models.ErrProposalNotFound) || p.SourceKey == "" {
+		return existing, false, err
+	}
+	pending, err := r.PendingProposalForSource(ctx, p.OrchestratorID, p.SourceKey)
+	if err == nil && pending == nil {
+		err = models.ErrProposalNotFound
+	}
+	return pending, false, err
 }
 
 // PendingProposalForSource returns the orchestrator's undecided proposal for
@@ -140,22 +209,27 @@ func (r *Repository) proposalWhere(ctx context.Context, where string, args ...an
 	return &row, row.DecodeSpecs()
 }
 
-// ClaimProposalApproval marks an undecided proposal as being approved. An
-// interrupted approval can be claimed again.
-func (r *Repository) ClaimProposalApproval(ctx context.Context, id string) (bool, error) {
-	return r.changed(ctx, `UPDATE orchestration_task_proposals SET status=? WHERE id=? AND status IN (?,?)`,
-		models.ProposalApproving, id, models.ProposalPending, models.ProposalApproving)
+// ClaimProposalApproval marks a pending proposal as being approved under
+// token. An approval already in flight is not claimed again, so a second
+// approve cannot create a task alongside it; only a claim older than
+// staleBefore (an interrupted approval) can be taken over.
+func (r *Repository) ClaimProposalApproval(ctx context.Context, id, token string, now, staleBefore time.Time) (bool, error) {
+	return r.changed(ctx, `UPDATE orchestration_task_proposals SET status=?,claim_token=?,claimed_at=?
+		WHERE id=? AND (status=? OR (status=? AND (claimed_at IS NULL OR claimed_at<?)))`,
+		models.ProposalApproving, token, now.UTC(), id, models.ProposalPending, models.ProposalApproving, staleBefore.UTC())
 }
 
-// ReleaseProposalClaim returns a failed approval to pending.
-func (r *Repository) ReleaseProposalClaim(ctx context.Context, id string) error {
-	_, err := r.changed(ctx, `UPDATE orchestration_task_proposals SET status=? WHERE id=? AND status=?`,
-		models.ProposalPending, id, models.ProposalApproving)
+// ReleaseProposalClaim returns a failed approval to pending. Only the
+// holder of the claim can release it.
+func (r *Repository) ReleaseProposalClaim(ctx context.Context, id, token string) error {
+	_, err := r.changed(ctx, `UPDATE orchestration_task_proposals SET status=?,claim_token='',claimed_at=NULL WHERE id=? AND status=? AND claim_token=?`,
+		models.ProposalPending, id, models.ProposalApproving, token)
 	return err
 }
 
-// CompleteProposalApproval records the approved proposal's task.
-func (r *Repository) CompleteProposalApproval(ctx context.Context, id, taskID string, duplicate, edited bool, finalSpec *models.ProposalSpec, userID string, at time.Time) (bool, error) {
+// CompleteProposalApproval records the approved proposal's task. It reports
+// false when token no longer holds the claim.
+func (r *Repository) CompleteProposalApproval(ctx context.Context, id, token, taskID string, duplicate, edited bool, finalSpec *models.ProposalSpec, userID string, at time.Time) (bool, error) {
 	final := ""
 	if finalSpec != nil {
 		data, err := json.Marshal(finalSpec)
@@ -164,8 +238,9 @@ func (r *Repository) CompleteProposalApproval(ctx context.Context, id, taskID st
 		}
 		final = string(data)
 	}
-	return r.changed(ctx, `UPDATE orchestration_task_proposals SET status=?,task_id=?,duplicate=?,edited=?,final_spec=?,decided_by=?,decided_at=? WHERE id=? AND status=?`,
-		models.ProposalApproved, taskID, duplicate, edited, final, userID, at.UTC(), id, models.ProposalApproving)
+	return r.changed(ctx, `UPDATE orchestration_task_proposals SET status=?,task_id=?,duplicate=?,edited=?,final_spec=?,decided_by=?,decided_at=?,claim_token=''
+		WHERE id=? AND status=? AND claim_token=?`,
+		models.ProposalApproved, taskID, duplicate, edited, final, userID, at.UTC(), id, models.ProposalApproving, token)
 }
 
 // DismissProposal records the user's dismissal of a pending proposal.

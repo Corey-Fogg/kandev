@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/jmoiron/sqlx"
@@ -202,6 +204,47 @@ func TestFailedApprovalLeavesTheProposalPending(t *testing.T) {
 		Action: models.ProposalActionApprove, Edits: &models.ProposalEdits{Title: &blank}})
 	require.ErrorAs(t, err, &input, "a title is required")
 	require.EqualValues(t, 1, manager.creates.Load())
+}
+
+func TestApproveWhileAnotherApprovalRunsIsRefused(t *testing.T) {
+	s, _, conversation := newRuntime(t)
+	manager := &fakeTaskManager{}
+	s.Manager = manager
+	askBeforeCreate(t, s)
+	_, body := proposeViaBroker(t, s, conversation, map[string]any{"title": "Fix login"})
+	id := body[proposalIDKey].(string)
+	now := s.now()
+	claimed, err := s.Repo.ClaimProposalApproval(context.Background(), id, "in-flight", now, now.Add(-proposalClaimStaleAge))
+	require.NoError(t, err)
+	require.True(t, claimed)
+	title := "Fix the login form"
+	p, _, _, err := s.DecideProposal(context.Background(), models.ProposalDecision{WorkspaceID: "ws", OrchestratorID: "chief", ProposalID: id,
+		Action: models.ProposalActionApprove, Edits: &models.ProposalEdits{Title: &title}})
+	require.ErrorIs(t, err, models.ErrProposalApproving)
+	require.Equal(t, models.ProposalApproving, p.Status, "the answer carries the current proposal")
+	require.Zero(t, manager.creates.Load(), "a second approve never creates a task alongside the first")
+}
+
+func TestParallelProposalsForOneSourceStoreOne(t *testing.T) {
+	s, db, conversation := newRuntime(t)
+	s.Manager = &fakeTaskManager{}
+	askBeforeCreate(t, s)
+	router, token, run := workspaceControlCaller(t, s, conversation)
+	source := map[string]any{"tracker": "jira", "key": "ABC-7"}
+	var wg sync.WaitGroup
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			runtimeRequest(t, router, "POST", tasksPath, token, run, map[string]any{"title": fmt.Sprintf("Fix login %d", i), "source": source})
+		}(i)
+	}
+	wg.Wait()
+	var count int
+	require.NoError(t, db.Get(&count, `SELECT COUNT(*) FROM orchestration_task_proposals`))
+	require.Equal(t, 1, count)
+	require.NoError(t, db.Get(&count, `SELECT COUNT(*) FROM task_comments WHERE source='proposal'`))
+	require.Equal(t, 1, count)
 }
 
 func TestDismissIsIdempotentAndBlocksApproval(t *testing.T) {
