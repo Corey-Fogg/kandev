@@ -29,7 +29,7 @@ func (s *Service) Subscribe(eb bus.EventBus) (func(), error) {
 			_ = id.Unsubscribe()
 		}
 	}
-	for _, subject := range []string{events.TaskStateChanged, events.TaskMoved, events.AgentTurnMessageSaved, events.AgentCompleted, events.AgentStopped, events.AgentFailed} {
+	for _, subject := range []string{events.TaskStateChanged, events.TaskMoved, events.SessionPendingActionChanged, events.AgentTurnMessageSaved, events.AgentCompleted, events.AgentStopped, events.AgentFailed} {
 		id, err := eb.Subscribe(subject, s.onEvent)
 		if err != nil {
 			cleanup()
@@ -48,7 +48,15 @@ func (s *Service) onEvent(ctx context.Context, event *bus.Event) error {
 	if taskID == "" {
 		return nil
 	}
-	if event.Type == events.TaskStateChanged || event.Type == events.TaskMoved {
+	switch event.Type {
+	case events.TaskStateChanged, events.TaskMoved:
+		return s.taskCallback(ctx, taskID)
+	case events.SessionPendingActionChanged:
+		// A delegated session that starts waiting on a permission or question
+		// wakes its coordinator even when the task state does not change.
+		if action, _ := data["pending_action"].(string); action == "" {
+			return nil
+		}
 		return s.taskCallback(ctx, taskID)
 	}
 	owner, _, err := s.Repo.ConversationOwner(ctx, taskID)
@@ -103,36 +111,6 @@ func matchesClaimedTurn(event *bus.Event, data map[string]any, run *runmodels.Ru
 		return false
 	}
 	return run.ClaimedAt == nil || event.Timestamp.IsZero() || !event.Timestamp.Before(*run.ClaimedAt)
-}
-
-func (s *Service) taskCallback(ctx context.Context, taskID string) error {
-	task, err := s.Tasks.GetTask(ctx, taskID)
-	if err != nil {
-		return err
-	}
-	id, _ := task.Metadata["orchestration_chief_id"].(string)
-	if id == "" {
-		return nil
-	}
-	switch string(task.State) {
-	case "REVIEW", "COMPLETED", "FAILED", "WAITING_FOR_INPUT", "BLOCKED":
-	default:
-		return nil
-	}
-	a, err := s.Personas.GetAgentInstance(ctx, id)
-	if err != nil || a.WorkspaceID != task.WorkspaceID {
-		return nil
-	}
-	conversation, err := s.Repo.EnsureAgentConversation(ctx, a)
-	if err != nil {
-		return err
-	}
-	if conversation.TaskID == taskID {
-		return nil
-	}
-	payload := map[string]any{"callback": map[string]string{taskIDKey: taskID, "title": clip(task.Title, 300), "state": string(task.State)}}
-	key := fmt.Sprintf("workspace-task-callback:%s:%s:%s:%s", id, taskID, task.State, task.UpdatedAt.UTC().Format("2006-01-02T15:04:05.999999999Z07:00"))
-	return s.QueueTurn(ctx, id, conversation.TaskID, "workspace_task_callback", key, payload)
 }
 
 func (s *Service) bridgeReply(ctx context.Context, event *bus.Event, data map[string]any, taskID, owner string) error {

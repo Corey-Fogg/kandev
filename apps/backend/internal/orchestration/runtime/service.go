@@ -23,6 +23,7 @@ type Tasks interface {
 	ListTaskSessions(context.Context, string) ([]*taskmodels.TaskSession, error)
 	GetLastAgentMessage(context.Context, string) (string, error)
 	GetLastAgentMessageForTurn(context.Context, string) (string, error)
+	ListPendingInteractions(context.Context, taskmodels.PendingInteractionFilter) ([]*taskmodels.Interaction, error)
 }
 type Manager interface {
 	CreateWorkspaceTask(context.Context, models.WorkspaceTaskSpec) (string, error)
@@ -132,6 +133,19 @@ func (s *Service) launch(ctx context.Context, run *runmodels.Run) error {
 	if err != nil || owner != a.ID || ws != a.WorkspaceID {
 		return fmt.Errorf("run must belong to the coordinator conversation")
 	}
+	superseded, err := s.supersededTurn(ctx, run, taskID, payload)
+	if err != nil {
+		return err
+	}
+	if superseded {
+		s.retiredExecutions.Delete(run.ID)
+		outcome := supersededOutcome
+		_, err := s.Runs.FinishRun(ctx, run.ID, "finished", &outcome)
+		return err
+	}
+	if payload, err = s.absorbQueuedCallbacks(ctx, run, payload); err != nil {
+		return err
+	}
 	profile, executorID, err := s.executionSelection(ctx, a)
 	if err != nil {
 		return err
@@ -218,10 +232,7 @@ func (s *Service) prompt(ctx context.Context, a *models.AgentInstance, taskID st
 		}
 		fmt.Fprintf(&text, "\nCurrent user message (comment_id=%s, intent_revision=%v): %s\n", comment.ID, payload[intentRevisionKey], comment.Body)
 	}
-	if callback, ok := payload["callback"]; ok {
-		data, _ := json.Marshal(callback)
-		fmt.Fprintf(&text, "\nTask update: %s\nInspect this task's current state/result and post only new information in this chat. Review is not completion; do not repeat an answered question or restart work. If the task's session stopped on a provider login or OAuth refresh error, call manage_task with action repair_session once, then report the outcome.\n", data)
-	}
+	writeTaskUpdates(&text, updatesForPrompt(payload))
 	appendRuntimeToolGuidance(&text)
 	return text.String(), nil
 }
