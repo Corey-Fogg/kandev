@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, renderHook } from "@testing-library/react";
 import { StateProvider } from "@/components/state-provider";
-import { useTaskChatAutoScroll } from "./use-task-chat-auto-scroll";
+import { useChatAutoScroll as useTaskChatAutoScroll } from "./task-chat";
 
 afterEach(() => cleanup());
 

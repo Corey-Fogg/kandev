@@ -1,10 +1,10 @@
 "use client";
 
-import { ImplicitTaskLinksContext } from "./task-link-context";
 import { memo, useContext } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import { remarkPlugins, markdownComponents } from "@/components/shared/markdown-components";
+import { ImplicitTaskLinksContext } from "./task-link-context";
 import { remarkTaskLinks } from "./task-identifier-link";
 
 type MarkdownCommentProps = {

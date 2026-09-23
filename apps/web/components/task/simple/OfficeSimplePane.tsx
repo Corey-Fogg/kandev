@@ -52,7 +52,7 @@ import type {
   TaskActivityEntry,
   TaskSession,
   TimelineEvent,
-} from "@/components/task/simple/types";
+} from "@/app/office/tasks/[id]/types";
 import { toast } from "@/lib/toast/sonner";
 import { useTaskStatusSummary } from "@/hooks/domains/task/use-task-status-summary";
 
