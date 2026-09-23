@@ -19,6 +19,7 @@ func TestMiddlewareLeavesResolvedUserBearersToTheUser(t *testing.T) {
 	}{
 		{name: "personal access token", identity: &authn.Identity{UserID: "user", TokenID: "pat"}, want: http.StatusOK},
 		{name: "auth disabled", identity: &authn.Identity{UserID: "local", Synthetic: true}, want: http.StatusUnauthorized},
+		{name: "browser session", identity: &authn.Identity{UserID: "user", SessionID: "session"}, want: http.StatusUnauthorized},
 		{name: "unresolved bearer", want: http.StatusUnauthorized},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

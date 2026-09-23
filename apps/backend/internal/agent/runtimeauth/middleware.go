@@ -30,14 +30,14 @@ func Middleware(auth TokenValidator, identities IdentityReader) gin.HandlerFunc 
 			c.Next()
 			return
 		}
-		// A bearer the auth middleware already resolved to a user (a
-		// personal access token) is that user's request, not a runtime JWT.
-		if id, ok := authn.FromGin(c); ok && !id.Synthetic {
-			c.Next()
-			return
-		}
 		claims, err := auth.ValidateAgentJWT(strings.TrimPrefix(header, "Bearer "))
 		if err != nil {
+			// A bearer the auth middleware already resolved to a personal
+			// access token is that user's request, not a runtime JWT.
+			if id, ok := authn.FromGin(c); ok && !id.Synthetic && id.TokenID != "" {
+				c.Next()
+				return
+			}
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{errorResponseKey: "invalid token"})
 			return
 		}
