@@ -15,6 +15,7 @@ import { CoordinatorTaskList } from "./coordinator-task-list";
 import { CoordinatorChat } from "./coordinator-chat";
 import { CoordinatorTabs } from "./coordinator-tabs";
 import { CoordinatorSelect } from "./coordinator-select";
+import { CoordinatorMetricsStrip } from "./coordinator-metrics-strip";
 
 export function CoordinatorPage({ workspaceId }: { workspaceId: string }) {
   const { t } = useTranslation();
@@ -65,18 +66,7 @@ function CoordinatorContent({ catalog }: { catalog: CoordinatorWorkspace }) {
             {t("orchestration:coordinatorHint")}
           </p>
         </div>
-        <div className="min-w-0 flex-1 md:flex-none md:w-56">
-          <CoordinatorSelect
-            label={t("orchestration:selectCoordinator")}
-            value={selected || "none"}
-            onChange={choose}
-            options={[
-              { id: "none", name: t("orchestration:chooseCoordinator") },
-              ...catalog.assignments,
-            ]}
-            testId="coordinator-selector"
-          />
-        </div>
+        <CoordinatorIdentity catalog={catalog} selected={selected} choose={choose} />
         <Link
           href={orchestratorsHref(catalog.workspace.id)}
           className="underline text-xs md:text-sm cursor-pointer max-md:min-h-11 inline-flex items-center"
@@ -94,6 +84,13 @@ function CoordinatorContent({ catalog }: { catalog: CoordinatorWorkspace }) {
           </Button>
         )}
       </header>
+      {selected && (
+        <CoordinatorMetricsStrip
+          key={selected}
+          workspaceId={catalog.workspace.id}
+          orchestratorId={selected}
+        />
+      )}
       {catalog.assignments.length === 0 && (
         <p className="px-4 py-3 text-sm">{t("orchestration:noOrchestrators")}</p>
       )}
@@ -127,6 +124,41 @@ function CoordinatorContent({ catalog }: { catalog: CoordinatorWorkspace }) {
           <CoordinatorTaskList catalog={catalog} selected={selected} />
         </aside>
       </div>
+    </div>
+  );
+}
+
+/** One orchestrator shows its name; legacy workspaces with several keep the selector. */
+function CoordinatorIdentity({
+  catalog,
+  selected,
+  choose,
+}: {
+  catalog: CoordinatorWorkspace;
+  selected: string;
+  choose: (id: string) => void;
+}) {
+  const { t } = useTranslation();
+  if (catalog.assignments.length <= 1) {
+    const name = catalog.assignments.find((item) => item.id === selected)?.name;
+    return name ? (
+      <h2 className="min-w-0 truncate font-semibold" data-testid="coordinator-name">
+        {name}
+      </h2>
+    ) : null;
+  }
+  return (
+    <div className="min-w-0 flex-1 md:flex-none md:w-56">
+      <CoordinatorSelect
+        label={t("orchestration:selectCoordinator")}
+        value={selected || "none"}
+        onChange={choose}
+        options={[
+          { id: "none", name: t("orchestration:chooseCoordinator") },
+          ...catalog.assignments,
+        ]}
+        testId="coordinator-selector"
+      />
     </div>
   );
 }

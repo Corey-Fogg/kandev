@@ -26,17 +26,19 @@ import {
   listOrchestratorRoles,
   listOrchestrationProfiles,
   saveOrchestrator,
+  patchOrchestrator,
   deleteOrchestrator,
   orchestratorsHref,
   orchestratorHref,
   type Orchestrator,
   type OrchestratorRole,
   type OrchestrationProfile,
-  type OrchestratorConfiguration,
 } from "@/lib/api/domains/orchestration-api";
 import { OrchestrationGate } from "./orchestration-gate";
 import { OpenOrchestratorConversation, OrchestratorTasks } from "./orchestrator-connections";
 import { OrchestratorFields } from "./orchestrator-fields";
+import { validDisplayName } from "./orchestrator-identity-fields";
+import { initialConfiguration, normalizedConfiguration, patchFor } from "./orchestrator-save";
 export function OrchestratorEditor({ workspaceId, id }: { workspaceId: string; id: string }) {
   return (
     <OrchestrationGate>
@@ -73,29 +75,21 @@ function useEditorForm({
   const { t } = useTranslation();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [value, setValue] = useState<OrchestratorConfiguration>(
-    item
-      ? {
-          role_id: item.role_id,
-          profile_id: item.profile_id,
-          executor_preference: item.executor_preference,
-          context: item.context,
-        }
-      : {
-          role_id: roles[0]?.id ?? "",
-          profile_id: "",
-          executor_preference: "",
-          context: "",
-        },
-  );
+  const [value, setValue] = useState(() => initialConfiguration(item, roles[0]?.id ?? ""));
   const [saved, setSaved] = useState(value);
+  const [name, setName] = useState(item?.name ?? "");
   const valid =
     profiles.some((p) => p.id === value.profile_id) &&
     roles.some((r) => r.id === value.role_id) &&
-    !!selectedExecutor(value.executor_preference);
+    !!selectedExecutor(value.executor_preference) &&
+    validDisplayName(value.display_name);
   const save = async () => {
-    const result = await saveOrchestrator(workspaceId, item?.id, value);
+    const patch = item ? patchFor(saved, value) : null;
+    const result = patch
+      ? await patchOrchestrator(workspaceId, item!.id, patch)
+      : await saveOrchestrator(workspaceId, item?.id, normalizedConfiguration(value));
     setSaved(value);
+    setName(result.name);
     notifyOrchestrationChanged(workspaceId);
     if (!item) router.replace(orchestratorHref(workspaceId, result.id));
   };
@@ -126,7 +120,7 @@ function useEditorForm({
       toast.error(String(e));
     }
   };
-  return { t, value, setValue, busy, valid, create, remove };
+  return { t, value, setValue, busy, valid, create, remove, name };
 }
 function EditorForm({
   workspaceId,
@@ -139,7 +133,7 @@ function EditorForm({
   roles: OrchestratorRole[];
   profiles: OrchestrationProfile[];
 }) {
-  const { t, value, setValue, busy, valid, create, remove } = useEditorForm({
+  const { t, value, setValue, busy, valid, create, remove, name } = useEditorForm({
     workspaceId,
     item,
     roles,
@@ -155,11 +149,7 @@ function EditorForm({
           {t("orchestration:manageRoles")}
         </Link>
       </div>
-      <h2 className="text-xl font-semibold">
-        {item
-          ? roles.find((role) => role.id === value.role_id)?.name
-          : t("orchestration:addOrchestrator")}
-      </h2>
+      <h2 className="text-xl font-semibold">{item ? name : t("orchestration:addOrchestrator")}</h2>
       {item && <OpenOrchestratorConversation workspaceId={workspaceId} id={item.id} />}
       <OrchestratorFields value={value} onChange={setValue} roles={roles} profiles={profiles} />
       {!item && (

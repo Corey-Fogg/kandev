@@ -169,6 +169,21 @@ describe("coordinator task list updates", () => {
     view.dispose();
   });
 
+  it("re-reads with archived tasks when an archive filter changes", async () => {
+    const load = vi.fn().mockResolvedValue(page([row("a")]));
+    const view = new CoordinatorTaskObservation("ws", {}, load);
+    view.setFilters({ query: "" });
+    await vi.waitFor(() => expect(load).toHaveBeenCalledTimes(1));
+    view.setFilters({ query: "", onlyArchived: true });
+    await vi.waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+    expect(load.mock.calls[1][1]).toMatchObject({ onlyArchived: true, view: "kanban" });
+    view.setFilters({ query: "", onlyArchived: true });
+    view.setFilters({ query: "", includeArchived: true });
+    await vi.waitFor(() => expect(load).toHaveBeenCalledTimes(3));
+    expect(load.mock.calls[2][1]).toMatchObject({ includeArchived: true });
+    view.dispose();
+  });
+
   it("commits a read that raced a lifecycle event, then reads once more", async () => {
     vi.useFakeTimers();
     const pending = deferred();

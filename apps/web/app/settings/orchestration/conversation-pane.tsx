@@ -6,9 +6,12 @@ import { ChatIdentityContext } from "@/components/task/simple/chat-identity-cont
 import { ImplicitTaskLinksContext } from "@/components/task/simple/task-link-context";
 import { CommentTransportContext } from "@/components/task/simple/comment-transport";
 import { RecoveryTransportContext } from "@/components/task/simple/recovery-transport";
+import { CommentRendererContext } from "@/components/task/simple/comment-renderer-context";
 import { ActiveSessionRefProvider } from "@/components/task/simple/components/active-session-ref-context";
 import { TopbarWorkingIndicator } from "@/components/task/simple/components/topbar-working-indicator";
 import { useWorkspaceOrchestrators } from "@/hooks/domains/orchestration/use-orchestrator-conversation";
+import { useProposalCatalog } from "@/hooks/domains/orchestration/use-proposal-catalog";
+import { ProposalCatalogContext } from "@/lib/orchestration/proposal-catalog";
 import {
   createConversationSender,
   retryConversation,
@@ -20,6 +23,7 @@ import {
   type Orchestrator,
 } from "@/lib/api/domains/orchestration-api";
 import type { Task, TaskComment, TaskSession } from "@/app/office/tasks/[id]/types";
+import { ProposalsBanner, useProposalRenderer } from "./conversation-proposals";
 
 function usePersona(workspaceId: string, orchestratorId: string, provided?: Orchestrator) {
   const { data } = useWorkspaceOrchestrators(provided ? "" : workspaceId);
@@ -55,6 +59,15 @@ function ConversationLinks({
   );
 }
 
+function ConversationHeading({ title, persona }: { title: string; persona?: Orchestrator }) {
+  const { t } = useTranslation();
+  return (
+    <h1 className="text-xl font-semibold my-4">
+      {persona ? t("orchestration:conversationWith", { name: persona.name }) : title}
+    </h1>
+  );
+}
+
 export function OrchestratorConversationPane({
   task,
   comments,
@@ -80,37 +93,46 @@ export function OrchestratorConversationPane({
     [persona],
   );
   const transport = useMemo(() => createConversationSender(task.id), [task.id]);
+  const proposals = useProposalRenderer(task.workspaceId, orchestratorId, comments);
+  // The Coordinator view provides its catalog; the standalone route loads one
+  // once a proposal card needs names.
+  const { catalog } = useProposalCatalog(task.workspaceId, proposals.hasProposals);
   const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
   return (
-    <ChatIdentityContext.Provider value={identity}>
-      <ImplicitTaskLinksContext.Provider value={false}>
-        <ActiveSessionRefProvider>
-          <section
-            ref={setScrollParent}
-            className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6"
-            data-testid="orchestrator-conversation"
-          >
-            {!embedded && (
-              <ConversationLinks workspaceId={task.workspaceId} orchestratorId={orchestratorId} />
-            )}
-            <h1 className="text-xl font-semibold my-4">{task.title}</h1>
-            <TopbarWorkingIndicator taskId={task.id} comments={comments} />
-            <RecoveryTransportContext.Provider value={retryConversation}>
-              <CommentTransportContext.Provider value={transport}>
-                <TaskChat
-                  taskId={task.id}
-                  comments={comments}
-                  sessions={sessions}
-                  timeline={[]}
-                  scrollParent={scrollParent}
-                  onCommentsChanged={onCommentsChanged}
-                  openAtLatest
-                />
-              </CommentTransportContext.Provider>
-            </RecoveryTransportContext.Provider>
-          </section>
-        </ActiveSessionRefProvider>
-      </ImplicitTaskLinksContext.Provider>
-    </ChatIdentityContext.Provider>
+    <ProposalCatalogContext.Provider value={catalog}>
+      <ChatIdentityContext.Provider value={identity}>
+        <ImplicitTaskLinksContext.Provider value={false}>
+          <ActiveSessionRefProvider>
+            <section
+              ref={setScrollParent}
+              className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6"
+              data-testid="orchestrator-conversation"
+            >
+              {!embedded && (
+                <ConversationLinks workspaceId={task.workspaceId} orchestratorId={orchestratorId} />
+              )}
+              <ConversationHeading title={task.title} persona={persona} />
+              <TopbarWorkingIndicator taskId={task.id} comments={comments} />
+              <ProposalsBanner count={proposals.pendingCount} targetId={proposals.firstPendingId} />
+              <RecoveryTransportContext.Provider value={retryConversation}>
+                <CommentTransportContext.Provider value={transport}>
+                  <CommentRendererContext.Provider value={proposals.renderer}>
+                    <TaskChat
+                      taskId={task.id}
+                      comments={comments}
+                      sessions={sessions}
+                      timeline={[]}
+                      scrollParent={scrollParent}
+                      onCommentsChanged={onCommentsChanged}
+                      openAtLatest
+                    />
+                  </CommentRendererContext.Provider>
+                </CommentTransportContext.Provider>
+              </RecoveryTransportContext.Provider>
+            </section>
+          </ActiveSessionRefProvider>
+        </ImplicitTaskLinksContext.Provider>
+      </ChatIdentityContext.Provider>
+    </ProposalCatalogContext.Provider>
   );
 }

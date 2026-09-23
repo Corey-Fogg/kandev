@@ -15,7 +15,7 @@ export function useCoordinatorTasks(workspaceId: string, filters: CoordinatorFil
   const user = useAppStore((s) => s.auth.user?.id);
   const client = useWebSocketClient();
   const query = useDebounce(filters.query, SEARCH_DEBOUNCE_MS);
-  const { workflowId, repositoryId } = filters;
+  const { workflowId, repositoryId, includeArchived, onlyArchived } = filters;
   const observation = useMemo(
     () => new CoordinatorTaskObservation(workspaceId, {}),
     // A new viewer must never see the previous viewer's rows.
@@ -31,8 +31,8 @@ export function useCoordinatorTasks(workspaceId: string, filters: CoordinatorFil
     return observation.dispose;
   }, [observation]);
   useEffect(() => {
-    observation.setFilters({ query, workflowId, repositoryId });
-  }, [observation, query, workflowId, repositoryId]);
+    observation.setFilters({ query, workflowId, repositoryId, includeArchived, onlyArchived });
+  }, [observation, query, workflowId, repositoryId, includeArchived, onlyArchived]);
   useEffect(() => {
     if (connection === "connected") observation.scheduleRefresh();
   }, [connection, observation]);

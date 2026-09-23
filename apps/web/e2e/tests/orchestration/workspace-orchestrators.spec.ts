@@ -63,17 +63,16 @@ test("orchestrators connect workspace navigation, profiles, roles and clean conv
     await testPage.request.get(`${base}/workspaces/${ws}/orchestrators/${firstId}`)
   ).json();
   expect(first.profile_id).toBeTruthy();
-  const secondRole = await (
-    await testPage.request.post(`${base}/roles`, {
-      data: { name: "Second coordinator", instructions: "Coordinate other tasks" },
-    })
-  ).json();
+  // A workspace can have several orchestrators, each with its own name.
   const created = await testPage.request.post(`${base}/workspaces/${ws}/orchestrators`, {
-    data: { ...first, role_id: secondRole.id },
+    data: { ...first, display_name: "Val" },
   });
-  expect(created.ok()).toBeTruthy();
+  expect(created.status()).toBe(201);
+  const secondId = (await created.json()).id as string;
+  expect(secondId).not.toBe(firstId);
   await testPage.goto(settings);
   await expect(testPage.getByTestId("orchestrator-card")).toHaveCount(2);
+  await expect(testPage.getByRole("link", { name: "Add orchestrator", exact: true })).toBeVisible();
   await testPage
     .getByTestId("orchestrator-card")
     .filter({ hasText: "Personal coordinator" })
@@ -120,15 +119,32 @@ test("orchestrators connect workspace navigation, profiles, roles and clean conv
   const conversationUrl = testPage.url();
   await testPage.getByTestId("app-nav-trigger").click();
   const drawer = testPage.getByTestId("app-nav-sheet");
-  await drawer.getByTestId("workspace-coordinator-link").click();
-  await expect(drawer).not.toBeVisible();
-  await expect(testPage).toHaveURL(new RegExp(`/workspaces/${ws}/coordinator`));
-  await testPage.setViewportSize({ width: 1440, height: 1000 });
-  await expect(testPage.getByTestId("workspace-coordinator-link")).toHaveAttribute(
-    "href",
-    `/workspaces/${ws}/coordinator`,
+  // The navigation lists every orchestrator by name.
+  await expect(drawer.getByTestId(`workspace-coordinator-link-${firstId}`)).toHaveText(
+    "Personal coordinator",
   );
+  await expect(drawer.getByTestId(`workspace-coordinator-link-${secondId}`)).toHaveText("Val");
+  await drawer.getByTestId(`workspace-coordinator-link-${firstId}`).click();
+  await expect(drawer).not.toBeVisible();
+  await expect(testPage).toHaveURL(
+    new RegExp(`/workspaces/${ws}/coordinator\\?orchestratorId=${firstId}`),
+  );
+  await testPage.setViewportSize({ width: 1440, height: 1000 });
+  await expect(testPage.getByTestId(`workspace-coordinator-link-${firstId}`)).toHaveAttribute(
+    "href",
+    `/workspaces/${ws}/coordinator?orchestratorId=${firstId}`,
+  );
+  // Renaming one orchestrator renames only its entry.
+  const renamedSecond = await testPage.request.patch(
+    `${base}/workspaces/${ws}/orchestrators/${secondId}`,
+    { data: { display_name: "Vera" } },
+  );
+  expect(renamedSecond.status()).toBe(200);
   await testPage.goto(conversationUrl);
+  await expect(testPage.getByTestId(`workspace-coordinator-link-${secondId}`)).toHaveText("Vera");
+  await expect(testPage.getByTestId(`workspace-coordinator-link-${firstId}`)).toHaveText(
+    "Personal coordinator",
+  );
   await testPage.setViewportSize({ width: 393, height: 852 });
   await testPage.getByRole("link", { name: "Configure orchestrator", exact: true }).click();
   await expect(testPage).toHaveURL(new RegExp(firstId));

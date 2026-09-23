@@ -5,7 +5,7 @@ import { statusSummaryActiveErrorPreview } from "@/lib/task-status-summary";
 import { workflowStepTitle } from "./task-session-sidebar-aggregate";
 import type { WipQueueStatus } from "@/lib/kanban/wip-queue";
 import { resolveTaskRepositorySlugs } from "@/lib/sidebar/sidebar-task-repositories";
-import { taskPRInfoFromSummary } from "./task-pr-info";
+import { repositoryPathFromSummary, taskPRInfoFromSummary } from "@/lib/task-pr-info";
 import type { SidebarTaskColorAutomation } from "@/lib/task-color-automation-settings";
 import { taskColorFacts } from "@/lib/sidebar/task-color-projection";
 import { resolveAutomaticTaskColor } from "@/lib/sidebar/task-color-rules";
@@ -36,20 +36,6 @@ function summaryDiffStats(
   const additions = git.additions ?? 0;
   const deletions = git.deletions ?? 0;
   return additions > 0 || deletions > 0 ? { additions, deletions } : undefined;
-}
-
-function repositoryPathFromSummary(
-  summary: TaskStatusSummary | null | undefined,
-): string | undefined {
-  const url = summary?.pull_request?.url;
-  if (!url) return undefined;
-  try {
-    const path = new URL(url).pathname.split("/").filter(Boolean);
-    if (path.length >= 2) return `${path[0]}/${path[1]}`;
-  } catch {
-    // A malformed provider URL must not make the task switcher disappear.
-  }
-  return undefined;
 }
 
 function pendingFlags(summary: TaskStatusSummary | null | undefined, fallback?: string | null) {

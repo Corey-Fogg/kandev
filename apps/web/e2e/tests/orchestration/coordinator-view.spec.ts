@@ -112,27 +112,34 @@ test("coordinator overview joins canonical tasks and persistent chat without sta
   const first = await (
     await page.request.get(`${base}/workspaces/${ws}/orchestrators/${chief}`)
   ).json();
-  const roleResponse = await page.request.post(`${base}/roles`, {
-    data: { name: "Checklist coordinator", instructions: "Help with example checklists." },
-  });
-  expect(roleResponse.ok()).toBeTruthy();
-  const role = await roleResponse.json();
+  // A second orchestrator in the same workspace gets its own name and nav entry,
+  // and the view offers a selector between the two.
   const secondResponse = await page.request.post(`${base}/workspaces/${ws}/orchestrators`, {
-    data: { ...first, role_id: role.id },
+    data: { ...first, display_name: "Checklist coordinator" },
   });
-  expect(secondResponse.ok()).toBeTruthy();
+  expect(secondResponse.status()).toBe(201);
   const second = await secondResponse.json();
+  const renamed = await page.request.patch(`${base}/workspaces/${ws}/orchestrators/${second.id}`, {
+    data: { display_name: "Checklist lead" },
+  });
+  expect(renamed.status()).toBe(200);
   await apiClient.updateTaskMetadata(queued.id, { orchestration_chief_id: chief });
   await page.reload();
   await expect(chat.locator("textarea")).toBeVisible();
+  await expect(page.getByTestId(`workspace-coordinator-link-${chief}`)).toHaveText(first.name);
+  await expect(page.getByTestId(`workspace-coordinator-link-${second.id}`)).toHaveText(
+    "Checklist lead",
+  );
+  await expect(page.getByTestId("coordinator-name")).toHaveCount(0);
   await chat.locator("textarea").fill("Compare the sample guides.");
   await page.getByTestId("coordinator-selector").click();
-  await page.getByRole("option", { name: "Checklist coordinator", exact: true }).click();
+  await page.getByRole("option", { name: "Checklist lead", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`orchestratorId=${second.id}`));
   await expect(chat.locator("textarea")).toHaveValue("");
   await chat.locator("textarea").fill("Check the sample checklist.");
   await page.getByTestId("coordinator-selector").click();
   await page.getByRole("option", { name: first.name, exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`orchestratorId=${chief}`));
   await expect(chat.locator("textarea")).toHaveValue("Compare the sample guides.");
   await page.getByRole("combobox", { name: "Task scope", exact: true }).click();
   await page.getByRole("option", { name: "Selected coordinator’s tasks", exact: true }).click();

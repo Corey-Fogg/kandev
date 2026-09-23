@@ -18,7 +18,17 @@ type AppSidebarNavItemProps = {
   badgeVariant?: "primary" | "muted";
   /** Appended after the number, e.g. "+" for a capped/truncated count. */
   badgeSuffix?: string;
+  /**
+   * What the badge means, for the accessible name: with a badge shown, the
+   * trigger is announced as "label, badgeDescription" instead of the label alone.
+   */
+  badgeDescription?: string;
   activity?: QuickChatActivityState;
+  /**
+   * A short marker (e.g. an initial letter) drawn on the icon in the collapsed
+   * rail, so entries sharing an icon stay distinguishable there.
+   */
+  marker?: string;
   onClick?: () => void;
   collapsed: boolean;
   /** Override the auto-derived active-state from pathname. */
@@ -96,6 +106,28 @@ function badgeText(badge: number | undefined, suffix: string | undefined): strin
   return `${badge}${suffix ?? ""}`;
 }
 
+/** The collapsed-rail marker drawn on the icon's corner. */
+function IconMarker({
+  marker,
+  collapsed,
+  testId,
+}: {
+  marker?: string;
+  collapsed: boolean;
+  testId?: string;
+}) {
+  if (!collapsed || !marker) return null;
+  return (
+    <span
+      aria-hidden="true"
+      data-testid={testId ? `${testId}-marker` : undefined}
+      className="absolute -bottom-1.5 -right-2 min-w-3 rounded-sm bg-background px-0.5 text-center text-[9px] font-semibold leading-3 text-foreground ring-1 ring-border"
+    >
+      {marker}
+    </span>
+  );
+}
+
 export function AppSidebarNavItem({
   icon: Icon,
   label,
@@ -103,6 +135,7 @@ export function AppSidebarNavItem({
   badge,
   badgeVariant = "primary",
   badgeSuffix,
+  badgeDescription,
   onClick,
   collapsed,
   isActive,
@@ -111,6 +144,7 @@ export function AppSidebarNavItem({
   testId,
   className,
   activity = null,
+  marker,
 }: AppSidebarNavItemProps) {
   const pathname = usePathname();
   const active = isActive ?? isPathActive(pathname, href, exactMatch);
@@ -129,6 +163,7 @@ export function AppSidebarNavItem({
     <>
       <span className="relative flex">
         <Icon className="h-4 w-4 shrink-0" />
+        <IconMarker marker={marker} collapsed={collapsed} testId={testId} />
         <QuickChatActivityIndicator activity={activity} />
       </span>
       {!collapsed && (
@@ -140,7 +175,16 @@ export function AppSidebarNavItem({
     </>
   );
 
-  const buttonOrLink = renderTrigger({ onClick, disabled, baseClass, label, href, inner, testId });
+  const accessibleName = badgeLabel && badgeDescription ? `${label}, ${badgeDescription}` : label;
+  const buttonOrLink = renderTrigger({
+    onClick,
+    disabled,
+    baseClass,
+    label: accessibleName,
+    href,
+    inner,
+    testId,
+  });
 
   if (!collapsed) return buttonOrLink;
   return (

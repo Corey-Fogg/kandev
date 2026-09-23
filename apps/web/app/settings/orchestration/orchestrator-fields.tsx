@@ -5,6 +5,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import Link from "@/components/routing/app-link";
 import { PersonaExecutorField } from "@/components/shared/persona-executor-field";
 import { selectedExecutor } from "@/lib/api/domains/orchestration-api";
+import {
+  OrchestratorBehaviorFields,
+  OrchestratorIdentityFields,
+} from "./orchestrator-identity-fields";
 import type {
   OrchestratorConfiguration,
   OrchestratorRole,
@@ -19,8 +23,10 @@ type OrchestratorFieldsProps = {
 export function OrchestratorFields({ value, onChange, roles, profiles }: OrchestratorFieldsProps) {
   const { t } = useTranslation();
   const patch = (v: Partial<OrchestratorConfiguration>) => onChange({ ...value, ...v });
+  const roleName = roles.find((role) => role.id === value.role_id)?.name ?? "";
   return (
     <div className="space-y-4">
+      <OrchestratorIdentityFields value={value} onChange={patch} roleName={roleName} />
       <div className="space-y-2">
         <Label>{t("orchestration:role")}</Label>
         <Select value={value.role_id} onValueChange={(id) => patch({ role_id: id })}>
@@ -73,6 +79,7 @@ export function OrchestratorFields({ value, onChange, roles, profiles }: Orchest
           onChange={(e) => patch({ context: e.target.value })}
         />
       </div>
+      <OrchestratorBehaviorFields value={value} onChange={patch} />
     </div>
   );
 }
