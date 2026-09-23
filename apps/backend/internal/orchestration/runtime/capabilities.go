@@ -1,7 +1,6 @@
 package runtime
 
 import (
-	"encoding/json"
 	"net/http"
 	"slices"
 	"strings"
@@ -10,7 +9,7 @@ import (
 	"github.com/kandev/kandev/internal/orchestration/models"
 )
 
-// workspaceCapabilities lists the broker controls a coordinator may call.
+// workspaceCapabilities lists the broker tools a coordinator may call.
 func (h *Handler) workspaceCapabilities(c *gin.Context) {
 	claims, ok := h.caller(c)
 	if !ok {
@@ -18,11 +17,6 @@ func (h *Handler) workspaceCapabilities(c *gin.Context) {
 	}
 	limit, ok := boundedPageLimit(c)
 	if !ok {
-		return
-	}
-	kind := c.Query("kind")
-	if kind != "" && kind != "native" {
-		c.JSON(400, gin.H{errorResponseKey: "workspace capabilities supports kind=native; use workspace for resource IDs"})
 		return
 	}
 	scope := cursorScope("workspace-controls-v1", claims.TaskID, claims.WorkspaceID)
@@ -33,7 +27,7 @@ func (h *Handler) workspaceCapabilities(c *gin.Context) {
 	}
 	tools := models.WorkspaceBrokerTools()
 	slices.SortFunc(tools, func(a, b models.WorkspaceBrokerTool) int { return strings.Compare(a.Name, b.Name) })
-	page := models.CapabilityPage{Entries: []models.Capability{}, Generation: "workspace-controls-v1"}
+	page := models.CapabilityPage{Entries: []models.Capability{}}
 	for _, tool := range tools {
 		if tool.Name <= after {
 			continue
@@ -42,15 +36,11 @@ func (h *Handler) workspaceCapabilities(c *gin.Context) {
 			page.NextCursor = encodeScopedCursor(scope, page.Entries[len(page.Entries)-1].Name)
 			break
 		}
-		const workspaceReadEffect = "read"
-		effect := workspaceReadEffect
+		effect := "read"
 		if tool.Method != http.MethodGet {
 			effect = "write"
 		}
-		page.Entries = append(page.Entries, models.Capability{ID: "native/" + tool.Name, Kind: "native", Name: tool.Name,
-			WorkspaceID: claims.WorkspaceID, Effect: effect, Surfaces: []string{"conversation"}, Health: "ready",
-			Configured: true, Attached: true, InspectAllowed: true, Reason: tool.Description, Revision: page.Generation,
-			InputSchema: json.RawMessage(`{"type":"object"}`), SchemaPartial: true})
+		page.Entries = append(page.Entries, models.Capability{Name: tool.Name, Description: tool.Description, Effect: effect})
 	}
-	c.JSON(200, page)
+	c.JSON(http.StatusOK, page)
 }

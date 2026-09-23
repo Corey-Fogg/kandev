@@ -51,14 +51,6 @@ func (r *Repository) EnsureAgentConversation(ctx context.Context, agent *models.
 	return &Conversation{TaskID: taskID}, nil
 }
 
-// IsNativeConversation identifies a persisted native conversation without
-// trusting a caller-supplied flag in a wake payload.
-func (r *Repository) IsNativeConversation(ctx context.Context, taskID string) (bool, error) {
-	var count int
-	err := r.ro.GetContext(ctx, &count, r.ro.Rebind(`SELECT COUNT(*) FROM orchestration_conversations WHERE task_id = ? AND platform = 'web'`), taskID)
-	return count > 0, err
-}
-
 type Conversation struct {
 	TaskID string `json:"task_id"`
 }
