@@ -148,7 +148,7 @@ func (a *taskCreatorAdapter) ManageWorkspaceTask(ctx context.Context, command sh
 
 func (a *taskCreatorAdapter) dispatchWorkspaceTask(ctx context.Context, task *models.Task, command shared.WorkspaceTaskCommand) error {
 	switch command.Action {
-	case "session_mode", "resolve_permission":
+	case workspaceSessionMode, "resolve_permission":
 		return a.controlWorkspacePermission(ctx, task, command)
 	case "answer_question":
 		return a.answerWorkspaceQuestion(ctx, task, command)

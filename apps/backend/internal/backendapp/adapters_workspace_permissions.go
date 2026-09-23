@@ -90,7 +90,7 @@ func (a *taskCreatorAdapter) controlWorkspacePermission(ctx context.Context, tas
 	if command.SessionID == "" {
 		return fmt.Errorf("session_id is required")
 	}
-	if command.Action == "session_mode" {
+	if command.Action == workspaceSessionMode {
 		return a.orch.SetTaskSessionPermissionMode(ctx, task.ID, command.SessionID, command.Mode)
 	}
 	permissions, err := a.orch.ListPendingAgentPermissions(ctx, task.ID, command.SessionID)

@@ -71,10 +71,10 @@ func (a *taskCreatorAdapter) attachLatestWorkspaceMessages(ctx context.Context, 
 			more = true
 			break
 		}
-		row := map[string]any{"id": message.ID, "author_type": message.AuthorType, workspaceResultContentKey: workspaceExportText(message.Content, 4000), "requests_input": message.RequestsInput, "truncated": len(message.Content) > 4000}
+		row := map[string]any{"id": message.ID, workspaceKeyAuthorType: message.AuthorType, workspaceResultContentKey: workspaceExportText(message.Content, 4000), "requests_input": message.RequestsInput, workspaceKeyTruncated: len(message.Content) > 4000}
 		rows = append(rows, row)
 	}
-	result["messages"], result["has_more"], result[sessionIDPayloadKey] = rows, more, latest.ID
+	result[workspaceKeyMessages], result[workspaceKeyHasMore], result[sessionIDPayloadKey] = rows, more, latest.ID
 	return nil
 }
 
@@ -105,9 +105,9 @@ func (a *taskCreatorAdapter) attachWorkspaceSessionResults(ctx context.Context, 
 				more = true
 				break
 			}
-			excerpts = append(excerpts, map[string]any{"id": m.ID, workspaceResultContentKey: workspaceExportText(m.Content, 256), "author_type": m.AuthorType, "truncated": len(m.Content) > 256})
+			excerpts = append(excerpts, map[string]any{"id": m.ID, workspaceResultContentKey: workspaceExportText(m.Content, 256), workspaceKeyAuthorType: m.AuthorType, workspaceKeyTruncated: len(m.Content) > 256})
 		}
-		rows = append(rows, map[string]any{sessionIDPayloadKey: session.ID, "profile_id": session.AgentProfileID, workspaceResultStateKey: session.State, "review_status": session.ReviewStatus, "messages": excerpts, "has_more": more})
+		rows = append(rows, map[string]any{sessionIDPayloadKey: session.ID, "profile_id": session.AgentProfileID, workspaceResultStateKey: session.State, "review_status": session.ReviewStatus, workspaceKeyMessages: excerpts, workspaceKeyHasMore: more})
 	}
 	result["session_results"] = rows
 	return nil

@@ -25,10 +25,10 @@ func (a *taskCreatorAdapter) WorkspaceTaskContent(ctx context.Context, workspace
 	if err != nil || task.WorkspaceID != workspaceID || task.IsEphemeral || task.IsFromOffice {
 		return nil, fmt.Errorf("delivery task unavailable")
 	}
-	if query.Source == "description" {
+	if query.Source == workspaceKeyDescription {
 		return workspaceContentPage(task.Description, query), nil
 	}
-	if query.Source != "" && query.Source != "messages" {
+	if query.Source != "" && query.Source != workspaceKeyMessages {
 		return nil, fmt.Errorf("unsupported source")
 	}
 	if query.MessageID != "" {
@@ -43,7 +43,7 @@ func (a *taskCreatorAdapter) workspaceMessageContent(ctx context.Context, taskID
 		return nil, fmt.Errorf("message must belong to this task and session")
 	}
 	page := workspaceContentPage(workspaceMessageText(message), query)
-	page["message_id"], page["session_id"], page["type"] = message.ID, message.TaskSessionID, message.Type
+	page["message_id"], page[sessionIDPayloadKey], page[workspaceKeyType] = message.ID, message.TaskSessionID, message.Type
 	return page, nil
 }
 
@@ -51,14 +51,14 @@ func workspaceContentPage(content string, query shared.WorkspaceContentQuery) ma
 	text := []rune(redaction.NewRedactor().String(content))
 	start := min(query.Offset, len(text))
 	end := min(start+query.Limit, len(text))
-	return map[string]any{"content": string(text[start:end]), "offset": start, "next_offset": end, "has_more": end < len(text), "total_characters": len(text)}
+	return map[string]any{workspaceResultContentKey: string(text[start:end]), "offset": start, "next_offset": end, workspaceKeyHasMore: end < len(text), "total_characters": len(text)}
 }
 
 func workspaceMessageText(message *models.Message) string {
 	text := message.Content
 	if message.Type == workspaceClarificationRequest {
 		input := map[string]any{}
-		for _, key := range []string{"question", "response", "status"} {
+		for _, key := range []string{"question", "response", statusKey} {
 			input[key] = message.Metadata[key]
 		}
 		if raw, err := json.Marshal(input); err == nil {
@@ -95,18 +95,18 @@ func (a *taskCreatorAdapter) workspaceMessagePage(ctx context.Context, taskID st
 	if !found {
 		return nil, fmt.Errorf("session must belong to this task")
 	}
-	messages, more, err := a.taskSvc.ListMessagesPaginated(ctx, taskservice.ListMessagesRequest{TaskSessionID: query.SessionID, Limit: 4, Before: query.Before, Sort: "desc"})
+	messages, more, err := a.taskSvc.ListMessagesPaginated(ctx, taskservice.ListMessagesRequest{TaskSessionID: query.SessionID, Limit: 4, Before: query.Before, Sort: workspaceResultSortDescending})
 	if err != nil {
 		return nil, err
 	}
 	rows := make([]map[string]any, 0, len(messages))
 	for _, message := range messages {
 		text := workspaceMessageText(message)
-		rows = append(rows, map[string]any{"id": message.ID, "type": message.Type, "author_type": message.AuthorType, "content": workspaceExportText(text, 1200), "truncated": len(text) > 1200, "requests_input": message.RequestsInput})
+		rows = append(rows, map[string]any{"id": message.ID, workspaceKeyType: message.Type, workspaceKeyAuthorType: message.AuthorType, workspaceResultContentKey: workspaceExportText(text, 1200), workspaceKeyTruncated: len(text) > 1200, "requests_input": message.RequestsInput})
 	}
 	next := ""
 	if more && len(messages) > 0 {
 		next = messages[len(messages)-1].ID
 	}
-	return map[string]any{"session_id": query.SessionID, "messages": rows, "has_more": more, "next_before": next}, nil
+	return map[string]any{sessionIDPayloadKey: query.SessionID, workspaceKeyMessages: rows, workspaceKeyHasMore: more, "next_before": next}, nil
 }

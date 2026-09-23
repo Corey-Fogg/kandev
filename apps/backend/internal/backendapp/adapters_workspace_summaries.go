@@ -8,9 +8,9 @@ import (
 
 func workspaceTaskDetailSummary(task *models.Task) map[string]any {
 	return map[string]any{
-		"id": task.ID, "workspace_id": task.WorkspaceID, "title": workspaceExportText(task.Title, 200),
-		"description": workspaceExportText(task.Description, 1600), "description_truncated": len(task.Description) > 1600,
-		"state": task.State, "workflow_id": task.WorkflowID, "workflow_step_id": task.WorkflowStepID,
+		"id": task.ID, workspaceKeyWorkspaceID: task.WorkspaceID, workspaceKeyTitle: workspaceExportText(task.Title, 200),
+		workspaceKeyDescription: workspaceExportText(task.Description, 1600), "description_truncated": len(task.Description) > 1600,
+		workspaceResultStateKey: task.State, "workflow_id": task.WorkflowID, "workflow_step_id": task.WorkflowStepID,
 		"parent_id": task.ParentID, "priority": task.Priority,
 	}
 }
@@ -25,9 +25,9 @@ func workspaceSessionSummaries(sessions []*models.TaskSession) []map[string]any 
 	for _, session := range ordered {
 		mode, _ := session.Metadata[models.SessionMetaKeySessionMode].(string)
 		rows = append(rows, map[string]any{
-			"id": session.ID, "agent_profile_id": session.AgentProfileID, "state": session.State,
-			"error_message": workspaceExportText(session.ErrorMessage, 500), "session_mode": workspaceExportText(mode, 80),
-			"review_status": session.ReviewStatus, "updated_at": session.UpdatedAt,
+			"id": session.ID, workspaceKeyAgentProfileID: session.AgentProfileID, workspaceResultStateKey: session.State,
+			"error_message": workspaceExportText(session.ErrorMessage, 500), workspaceSessionMode: workspaceExportText(mode, 80),
+			"review_status": session.ReviewStatus, sessionUpdatedAtPayloadKey: session.UpdatedAt,
 		})
 	}
 	return rows

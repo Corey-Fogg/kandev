@@ -78,19 +78,30 @@ func (h *Handler) scopedConversation(c *gin.Context) (string, string, bool) {
 			c.AbortWithStatus(403)
 			return "", "", false
 		}
-	} else if h.Authorize != nil {
-		if err := h.Authorize(c.Request.Context(), ws); err != nil {
-			c.AbortWithStatus(404)
-			return "", "", false
-		}
-		if c.Request.Method != http.MethodGet && h.AuthorizeManage != nil {
-			if err := h.AuthorizeManage(c.Request.Context(), ws); err != nil {
-				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{errorResponseKey: "workspace manage access required"})
-				return "", "", false
-			}
-		}
+	} else if !h.authorizeUser(c, ws) {
+		return "", "", false
 	}
 	return owner, ws, true
+}
+
+// authorizeUser admits a person to a conversation of workspace ws: reading
+// needs workspace access, and every write needs workspace-manage access.
+func (h *Handler) authorizeUser(c *gin.Context, ws string) bool {
+	if h.Authorize == nil {
+		return true
+	}
+	if err := h.Authorize(c.Request.Context(), ws); err != nil {
+		c.AbortWithStatus(404)
+		return false
+	}
+	if c.Request.Method == http.MethodGet || h.AuthorizeManage == nil {
+		return true
+	}
+	if err := h.AuthorizeManage(c.Request.Context(), ws); err != nil {
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{errorResponseKey: "workspace manage access required"})
+		return false
+	}
+	return true
 }
 
 func (h *Handler) canReadTask(c *gin.Context) bool {
