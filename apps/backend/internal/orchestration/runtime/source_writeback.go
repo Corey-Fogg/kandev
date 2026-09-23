@@ -15,8 +15,10 @@ import (
 	taskmodels "github.com/kandev/kandev/internal/task/models"
 )
 
+// sourceWriteBackTimeout bounds one tracker call; tests shorten it.
+var sourceWriteBackTimeout = 60 * time.Second
+
 const (
-	sourceWriteBackTimeout  = 60 * time.Second
 	sourceWriteBackErrorMax = 300
 	integrationUnavailable  = "integration is unavailable"
 )
@@ -24,8 +26,11 @@ const (
 // observeSourceWriteBack comments on, and optionally moves, a delegated
 // task's source issue when the task reaches review or completes. The
 // orchestrator's settings choose what is written; the ledger makes each
-// transition write at most once.
-func (s *Service) observeSourceWriteBack(ctx context.Context, taskID string) error {
+// transition write at most once. transitioned reports that the event itself
+// carried a state change; without it, a task the ledger has not seen yet is
+// only recorded, so a task that was already in review before the ledger
+// existed posts nothing on an unrelated event.
+func (s *Service) observeSourceWriteBack(ctx context.Context, taskID string, transitioned bool) error {
 	task, agentID, conversation, err := s.delegatingCoordinator(ctx, taskID)
 	if err != nil || agentID == "" || models.TaskSourceIssue(task.Metadata) == nil {
 		return err
@@ -37,7 +42,7 @@ func (s *Service) observeSourceWriteBack(ctx context.Context, taskID string) err
 	state := string(task.State)
 	wantComment := settings.AutoCommentSource && (state == stateReview || state == stateCompleted)
 	wantMove := settings.AutoMoveSourceDone && state == stateCompleted
-	episode, claimed, err := s.Repo.ObserveTaskState(ctx, task.ID, state, wantComment || wantMove)
+	episode, claimed, err := s.Repo.ObserveTaskState(ctx, task.ID, state, wantComment || wantMove, transitioned)
 	if err != nil || !claimed {
 		return err
 	}
@@ -79,11 +84,12 @@ func (s *Service) runWriteBack(job func()) {
 }
 
 // writeBack performs one claimed write-back and records its outcome. A
-// failure other than a missing integration wakes the coordinator once.
+// failure other than a missing integration wakes the coordinator once. Only
+// the tracker call is bounded by the write-back timeout: a tracker that hangs
+// until the deadline must still leave a failed ledger row and a coordinator
+// wake-up, so the outcome is recorded on the caller's own context.
 func (s *Service) writeBack(ctx context.Context, task *taskmodels.Task, agentID, conversation string, episode int64, update models.SourceIssueUpdate) {
-	ctx, cancel := context.WithTimeout(ctx, sourceWriteBackTimeout)
-	defer cancel()
-	result, err := s.SourceIssues.UpdateSourceIssue(ctx, task.WorkspaceID, task.ID, update)
+	result, err := s.updateSourceIssue(ctx, task, update)
 	status, errText := store.WriteBackPosted, ""
 	switch {
 	case err == nil:
@@ -101,6 +107,13 @@ func (s *Service) writeBack(ctx context.Context, task *taskmodels.Task, agentID,
 	if err := s.reportWriteBackFailure(ctx, task, agentID, conversation, episode, errText); err != nil {
 		logger.Default().Warn("orchestration: reporting a failed source issue write-back failed", zap.String("task_id", task.ID), zap.Error(err))
 	}
+}
+
+// updateSourceIssue calls the tracker with the write-back timeout.
+func (s *Service) updateSourceIssue(ctx context.Context, task *taskmodels.Task, update models.SourceIssueUpdate) (models.SourceIssueResult, error) {
+	ctx, cancel := context.WithTimeout(ctx, sourceWriteBackTimeout)
+	defer cancel()
+	return s.SourceIssues.UpdateSourceIssue(ctx, task.WorkspaceID, task.ID, update)
 }
 
 func (s *Service) reportWriteBackFailure(ctx context.Context, task *taskmodels.Task, agentID, conversation string, episode int64, errText string) error {

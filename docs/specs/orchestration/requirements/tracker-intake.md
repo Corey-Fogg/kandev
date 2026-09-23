@@ -78,9 +78,12 @@ turn on it.
   also move the issue to the done category.
 - **AC-ORCHESTRATION-TRACKER-003.3:** Each transition shall write at most once.
   A redelivered event shall write nothing; leaving review and returning shall
-  write again. Turning a setting on shall not post past transitions.
+  write again. Turning a setting on shall not post past transitions. A task
+  that was already in review or complete when the system first observes it
+  (for example, after an upgrade) shall not be written until it changes state.
 - **AC-ORCHESTRATION-TRACKER-003.4:** When the write fails, the coordinator
-  shall be told once. When the tracker integration is not configured, the
+  shall be told once, including when the tracker call times out. When the
+  tracker integration is not configured, the
   system shall skip silently. A paused assignment's tasks shall not be written.
 
 ## Out of scope

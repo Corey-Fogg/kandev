@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
@@ -36,8 +37,17 @@ func writeBackRuntime(t *testing.T, s *Service, db *sqlx.DB, move bool) *fakeSou
 
 func changeState(t *testing.T, s *Service, id string, state v1.TaskState) {
 	t.Helper()
-	s.Tasks.(*testTasks).tasks[id].State = state
-	require.NoError(t, s.onEvent(context.Background(), bus.NewEvent(events.TaskStateChanged, "test", map[string]string{"task_id": id})))
+	task := s.Tasks.(*testTasks).tasks[id]
+	previous := task.State
+	task.State = state
+	data := map[string]string{"task_id": id, "old_state": string(previous), "new_state": string(state)}
+	require.NoError(t, s.onEvent(context.Background(), bus.NewEvent(events.TaskStateChanged, "test", data)))
+}
+
+// moveTask publishes a task.moved event, which carries no state change.
+func moveTask(t *testing.T, s *Service, id string) {
+	t.Helper()
+	require.NoError(t, s.onEvent(context.Background(), bus.NewEvent(events.TaskMoved, "test", map[string]string{"task_id": id})))
 }
 
 func TestReviewCommentsOncePerTransition(t *testing.T) {
@@ -107,7 +117,7 @@ func TestWriteBackSkipsUnsourcedUndelegatedAndPausedTasks(t *testing.T) {
 	_, err := s.Personas.UpdateAgentStatus(context.Background(), "chief", settings.AgentStatusPaused, "")
 	require.NoError(t, err)
 	s.Tasks.(*testTasks).tasks["sourced"].State = v1.TaskStateCompleted
-	require.NoError(t, s.observeSourceWriteBack(context.Background(), "sourced"))
+	require.NoError(t, s.observeSourceWriteBack(context.Background(), "sourced", true))
 	require.Empty(t, writer.calls)
 	_, err = s.Repo.GetSourceWriteBack(context.Background(), "sourced")
 	require.Error(t, err, "a paused coordinator records no state, so resuming it still reports the transition")
@@ -159,4 +169,51 @@ func TestMissingWriterSkipsTheClaimedWriteBack(t *testing.T) {
 	row, err := s.Repo.GetSourceWriteBack(context.Background(), "sourced")
 	require.NoError(t, err)
 	require.Equal(t, store.WriteBackSkipped, row.Status)
+}
+
+func TestTaskAlreadyInReviewWhenFirstSeenPostsNothing(t *testing.T) {
+	s, db, _ := newRuntime(t)
+	writer := writeBackRuntime(t, s, db, true)
+	// The task reached review before the ledger existed, so no row records it.
+	s.Tasks.(*testTasks).tasks["sourced"].State = v1.TaskStateCompleted
+	moveTask(t, s, "sourced")
+	require.Empty(t, writer.calls, "a reorder of a task already complete is not a transition")
+	row, err := s.Repo.GetSourceWriteBack(context.Background(), "sourced")
+	require.NoError(t, err)
+	require.Equal(t, string(v1.TaskStateCompleted), row.LastState)
+	changeState(t, s, "sourced", v1.TaskStateInProgress)
+	changeState(t, s, "sourced", v1.TaskStateReview)
+	require.Len(t, writer.calls, 1, "a later real transition still posts")
+}
+
+// hangingSourceIssues blocks until its context ends, as a tracker that never
+// answers does.
+type hangingSourceIssues struct{}
+
+func (hangingSourceIssues) UpdateSourceIssue(ctx context.Context, _, _ string, _ models.SourceIssueUpdate) (models.SourceIssueResult, error) {
+	<-ctx.Done()
+	return models.SourceIssueResult{}, ctx.Err()
+}
+
+func TestTrackerTimeoutStillRecordsTheFailureAndWakesTheCoordinator(t *testing.T) {
+	s, db, _ := newRuntime(t)
+	writeBackRuntime(t, s, db, false)
+	s.SourceIssues = hangingSourceIssues{}
+	previous := sourceWriteBackTimeout
+	sourceWriteBackTimeout = 20 * time.Millisecond
+	t.Cleanup(func() { sourceWriteBackTimeout = previous })
+	changeState(t, s, "sourced", v1.TaskStateReview)
+	row, err := s.Repo.GetSourceWriteBack(context.Background(), "sourced")
+	require.NoError(t, err)
+	require.Equal(t, store.WriteBackFailed, row.Status, "the ledger records a timed-out tracker call")
+	require.Contains(t, row.Error, "deadline exceeded")
+	var failures int
+	for _, id := range queuedCallbacks(t, db) {
+		for _, update := range queuedUpdates(t, s, id) {
+			if update.SourceWriteBackError != "" {
+				failures++
+			}
+		}
+	}
+	require.Equal(t, 1, failures, "the coordinator is woken after a tracker timeout")
 }

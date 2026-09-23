@@ -32,7 +32,13 @@ func (r *Repository) migrateSourceWriteBacks() error {
 // new state starts an episode; a redelivered state changes nothing. It
 // claims the new episode's write-back when reportable, so a write-back is
 // attempted at most once per transition.
-func (r *Repository) ObserveTaskState(ctx context.Context, taskID, state string, reportable bool) (int64, bool, error) {
+//
+// The first observation of a task is a baseline: it is claimed only when
+// transitioned says the event itself changed the task's state. A task that
+// was already in review or complete before the ledger saw it (an upgrade, or
+// a transition made while its coordinator was paused) therefore posts
+// nothing when an unrelated event, such as a reorder, arrives.
+func (r *Repository) ObserveTaskState(ctx context.Context, taskID, state string, reportable, transitioned bool) (int64, bool, error) {
 	now := time.Now().UTC()
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -72,7 +78,7 @@ func (r *Repository) ObserveTaskState(ctx context.Context, taskID, state string,
 		row.Episode++
 	}
 	claimed := false
-	if reportable {
+	if reportable && (inserted == 0 || transitioned) {
 		result, err := tx.ExecContext(ctx, tx.Rebind(`UPDATE orchestration_source_writebacks SET status=?,updated_at=? WHERE task_id=? AND episode=? AND status=''`),
 			WriteBackClaimed, now, taskID, row.Episode)
 		if err != nil {

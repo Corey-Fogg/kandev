@@ -64,10 +64,15 @@ and the state is COMPLETED.
 `orchestration_source_writebacks` holds one row per task: the last observed
 state, an episode counter and the outcome. `ObserveTaskState` does nothing when
 the state is unchanged; a changed state starts a new episode, which is claimed
-(`status = claimed`) only when a write is wanted. Claiming happens before
-posting, so a write happens at most once per transition. The claimed write
-runs off the event goroutine with a 60-second timeout through the same
-`SourceIssueWriter` as `update_source_issue`. The comment is at most 4,000
+(`status = claimed`) only when a write is wanted. The first observation of a
+task is a baseline: it is claimed only when the event itself carries a state
+change (`task.state_changed` with differing `old_state` and `new_state`), so a
+task already in REVIEW or COMPLETED before the ledger saw it posts nothing on a
+`task.moved` reorder. Claiming happens before posting, so a write happens at
+most once per transition. The claimed write runs off the event goroutine
+through the same `SourceIssueWriter` as `update_source_issue`; only the tracker
+call has the 60-second timeout, so recording the outcome and queueing the
+failure callback still succeed after a tracker timeout. The comment is at most 4,000
 bytes and redacted. The outcome is recorded as `posted`, `skipped` (no writer,
 or the integration is unavailable) or `failed`; a failure queues one callback
 keyed `source-writeback:<assignment>:<task>:<episode>` carrying

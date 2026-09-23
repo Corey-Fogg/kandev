@@ -236,7 +236,7 @@ func TestObserveTaskStateClaimsOncePerTransition(t *testing.T) {
 		require.NoError(t, err)
 		observe := func(state string, reportable bool) (int64, bool) {
 			t.Helper()
-			episode, claimed, err := repo.ObserveTaskState(ctx, "task", state, reportable)
+			episode, claimed, err := repo.ObserveTaskState(ctx, "task", state, reportable, true)
 			require.NoError(t, err)
 			return episode, claimed
 		}
@@ -255,5 +255,30 @@ func TestObserveTaskStateClaimsOncePerTransition(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, WriteBackClaimed, row.Status)
 		require.False(t, row.Commented, "a new episode resets the previous outcome")
+	})
+}
+
+func TestObserveTaskStateTreatsAnUnseenTaskAsABaseline(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, dsn string) {
+		repo, database := assignmentRepo(t, dsn)
+		ctx := context.Background()
+		_, err := database.Exec(`INSERT INTO tasks(id) VALUES('task')`)
+		require.NoError(t, err)
+		episode, claimed, err := repo.ObserveTaskState(ctx, "task", "COMPLETED", true, false)
+		require.NoError(t, err)
+		require.False(t, claimed, "a task already complete when first seen is only recorded")
+		require.EqualValues(t, 1, episode)
+		row, err := repo.GetSourceWriteBack(ctx, "task")
+		require.NoError(t, err)
+		require.Equal(t, "COMPLETED", row.LastState)
+		require.Empty(t, row.Status)
+		_, claimed, err = repo.ObserveTaskState(ctx, "task", "COMPLETED", true, true)
+		require.NoError(t, err)
+		require.False(t, claimed, "the recorded state is not a transition")
+		_, _, err = repo.ObserveTaskState(ctx, "task", "IN_PROGRESS", false, false)
+		require.NoError(t, err)
+		_, claimed, err = repo.ObserveTaskState(ctx, "task", "REVIEW", true, false)
+		require.NoError(t, err)
+		require.True(t, claimed, "a change from a recorded state is a transition")
 	})
 }

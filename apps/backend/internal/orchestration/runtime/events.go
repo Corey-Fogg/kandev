@@ -57,7 +57,7 @@ func (s *Service) onEvent(ctx context.Context, event *bus.Event) error {
 		return s.stallCallback(ctx, event.Type, taskID, data)
 	case events.TaskStateChanged, events.TaskMoved:
 		// A tracker write-back failure never blocks the coordinator callback.
-		if err := s.observeSourceWriteBack(ctx, taskID); err != nil {
+		if err := s.observeSourceWriteBack(ctx, taskID, stateTransitioned(data)); err != nil {
 			logger.Default().Warn("orchestration: source issue write-back failed", zap.String("task_id", taskID), zap.Error(err))
 		}
 		return s.taskCallback(ctx, taskID)
@@ -82,6 +82,15 @@ func (s *Service) onEvent(ctx context.Context, event *bus.Event) error {
 		return nil
 	}
 	return s.finishTurn(ctx, event, data, taskID, owner)
+}
+
+// stateTransitioned reports whether an event carries a real task state
+// change. task.state_changed carries old_state and new_state; task.moved
+// carries neither, so a move within one state is never a transition.
+func stateTransitioned(data map[string]any) bool {
+	oldState, _ := data["old_state"].(string)
+	newState, _ := data["new_state"].(string)
+	return oldState != "" && newState != "" && oldState != newState
 }
 
 func (s *Service) finishTurn(ctx context.Context, event *bus.Event, data map[string]any, taskID, owner string) error {
