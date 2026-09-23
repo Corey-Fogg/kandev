@@ -41,7 +41,7 @@ func TestOrchestratorBrokerForwardsOnlyNamedOperations(t *testing.T) {
 
 func TestOrchestratorBrokerAdvertisesWorkspaceTools(t *testing.T) {
 	s := newOrchestratorMCP(&kandevClient{})
-	for _, name := range []string{"manage_workspace", "workspace", "workspace_tasks", "task_details", "task_content", "task_permissions", "comments", "capabilities", "memory", "remember", "forget", "create_task", "manage_task", "task_status", "update_source_issue", "comment"} {
+	for _, name := range []string{"manage_workspace", "workspace", "workspace_tasks", "task_details", "task_content", "task_permissions", "comments", "capabilities", "memory", "metrics", "remember", "forget", "create_task", "manage_task", "task_status", "update_source_issue", "comment"} {
 		require.NotNil(t, s.GetTool(name), name)
 	}
 	for _, name := range []string{"create_objective", "objectives", "maintenance", "workspace_links", "context", "attention", "improvements"} {

@@ -42,6 +42,7 @@ func RegisterRoutes(g *gin.RouterGroup, h *Handler) {
 	g.GET("/runtime/workspace", h.catalog)
 	g.POST("/runtime/workspace/manage", h.manageWorkspace)
 	g.GET("/runtime/tasks", h.workspaceTasks)
+	g.GET("/runtime/metrics", h.metrics)
 	g.GET("/runtime/tasks/:id/details", h.details)
 	g.GET("/runtime/tasks/:id/content", h.taskContent)
 	g.GET("/runtime/tasks/:id/permissions", h.taskPermissions)

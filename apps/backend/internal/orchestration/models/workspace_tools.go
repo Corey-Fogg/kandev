@@ -54,6 +54,8 @@ func WorkspaceBrokerTools() []WorkspaceBrokerTool {
 			Query: map[string]any{fieldSessionID: stringSchema("Limit to one session.")}},
 		{Name: "comments", Description: "Read this conversation's older messages, newest last. Bodies over 1500 characters are clipped with truncated=true; read one in full with comment_id.", Method: http.MethodGet, Path: "/tasks/:id/comments",
 			Query: map[string]any{"before": stringSchema("next_cursor from the previous page."), fieldLimit: integerSchema("Messages per page, default 10, at most 50."), "comment_id": stringSchema("Read one message in full.")}},
+		{Name: "metrics", Description: "Report your delegated outcomes: tasks delegated, completed and failed, success rate, merged pull requests, median and p90 cycle time in hours, and cost in USD including this conversation. unpriced_event_count counts usage without a price, so cost is a lower bound when it is above zero.", Method: http.MethodGet, Path: "/runtime/metrics",
+			Query: map[string]any{"days": enumSchema("Window in days; default 7.", "7", "30")}},
 		{Name: "capabilities", Description: "List the broker tools available to this coordinator.", Method: http.MethodGet, Path: "/runtime/capabilities",
 			Query: map[string]any{"after": stringSchema("next_cursor from the previous page."), fieldLimit: integerSchema("Rows per page.")}},
 		{Name: "memory", Description: "Read this coordinator's workspace memory. Memory is context, not authorization.", Method: http.MethodGet, Path: "/runtime/memory",
