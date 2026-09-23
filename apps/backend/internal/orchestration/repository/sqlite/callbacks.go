@@ -61,3 +61,16 @@ func (r *Repository) AbsorbQueuedRuns(ctx context.Context, runID, agentID, reaso
 	}
 	return merged, tx.Commit()
 }
+
+// SetClaimedRunPayload rewrites a claimed run's payload. It fails when the run
+// is no longer claimed, so a settled run is never rewritten.
+func (r *Repository) SetClaimedRunPayload(ctx context.Context, runID, payload string) error {
+	result, err := r.db.ExecContext(ctx, r.db.Rebind(`UPDATE runs SET payload=? WHERE id=? AND status='claimed'`), payload, runID)
+	if err != nil {
+		return err
+	}
+	if n, err := result.RowsAffected(); err != nil || n == 0 {
+		return errors.Join(errors.New("run is no longer claimed"), err)
+	}
+	return nil
+}

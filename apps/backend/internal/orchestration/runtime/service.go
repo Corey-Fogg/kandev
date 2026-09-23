@@ -166,6 +166,9 @@ func (s *Service) launch(ctx context.Context, run *runmodels.Run) error {
 	if payload, err = s.absorbQueuedCallbacks(ctx, run, payload); err != nil {
 		return err
 	}
+	if payload, err = s.stampLaunchIntent(ctx, run, taskID, payload); err != nil {
+		return err
+	}
 	profile, executorID, err := s.executionSelection(ctx, a)
 	if err != nil {
 		return err
