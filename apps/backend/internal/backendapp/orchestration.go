@@ -18,19 +18,14 @@ import (
 
 // orchestrationRunGuard decides whether the shared run processor may execute a
 // persona's run. Registered orchestrators run only while orchestration is
-// enabled. Any other persona keeps upstream behavior, except one that still
-// owns private conversation history, which never becomes an Office target.
+// enabled; any other persona keeps upstream behavior.
 func orchestrationRunGuard(features config.FeaturesConfig, repo *officesqlite.Repository) func(context.Context, string) (bool, error) {
 	return func(ctx context.Context, id string) (bool, error) {
 		role, err := repo.OrchestratorRoleID(ctx, id)
 		if err != nil {
 			return false, err
 		}
-		if role != "" {
-			return features.Orchestration, nil
-		}
-		owner, err := repo.OrchestrationStore().PersonaUserOwner(ctx, id)
-		return owner == "", err
+		return role == "" || features.Orchestration, nil
 	}
 }
 
@@ -38,9 +33,10 @@ func registerOrchestration(p routeParams) {
 	if !p.features.Orchestration || p.services.Orchestration == nil {
 		return
 	}
-	runtimeGroup := p.router.Group("/api/v1/orchestration", runtimeauth.Middleware(p.services.Orchestration.Auth, p.services.Orchestration.Personas))
-	orchestrationruntime.RegisterRoutes(runtimeGroup, &orchestrationruntime.Handler{Service: p.services.Orchestration, Authorize: p.taskSvc.AuthorizeWorkspaceAccess})
 	group := p.router.Group("/api/v1/orchestration", runtimeauth.Middleware(p.services.Orchestration.Auth, p.services.Orchestration.Personas))
+	// Runtime routes register before orchestration.RegisterRoutes adds its
+	// user-only configuration middleware to the shared group.
+	orchestrationruntime.RegisterRoutes(group, &orchestrationruntime.Handler{Service: p.services.Orchestration, Authorize: p.taskSvc.AuthorizeWorkspaceAccess})
 	orchestration.RegisterRoutes(group, &orchestration.Handler{Registry: p.orchestrationRepo, Repo: p.orchestrationRepo, Agents: p.services.Orchestration.Personas, Authorize: p.taskSvc.AuthorizeWorkspaceAccess, RoleWrite: authn.RequireAdmin(), ValidateExecutor: func(ctx context.Context, raw string) error {
 		var preference struct {
 			ID string `json:"executor_profile_id"`
@@ -89,10 +85,6 @@ func orchestrationBrowserRouteAllowed(ctx context.Context, p routeParams, path s
 	case "agents":
 		id = parts[1]
 	case workspaceTasksKey:
-		owner, err := p.officeRepo.OrchestrationStore().ConversationUserOwner(ctx, parts[1])
-		if err != nil || owner != "" {
-			return false, err
-		}
 		fields, err := p.officeRepo.GetTaskExecutionFields(ctx, parts[1])
 		if err != nil {
 			return false, err
@@ -106,9 +98,5 @@ func orchestrationBrowserRouteAllowed(ctx context.Context, p routeParams, path s
 
 func legacyOfficePersona(ctx context.Context, repo *officesqlite.Repository, id string) (bool, error) {
 	role, err := repo.OrchestratorRoleID(ctx, id)
-	if err != nil || role != "" {
-		return false, err
-	}
-	owner, err := repo.OrchestrationStore().PersonaUserOwner(ctx, id)
-	return owner == "", err
+	return role == "", err
 }

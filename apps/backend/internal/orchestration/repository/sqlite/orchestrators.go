@@ -24,10 +24,9 @@ func (r *Repository) Migrate() error {
 		}
 	}
 	for _, migrate := range []func() error{
-		r.migrateAssistantStorage, r.migrateObjectives, r.migrateAttention,
+		r.migrateIntake, r.migrateAssistantStorage, r.migrateObjectives, r.migrateAttention,
 		r.migrateFriction, r.migrateMaintenance, r.migrateWorkspaceGrants,
-		r.ImportLegacyState, r.migrateConversationOwnership,
-		r.migrateMemoryContext, r.migrateRoleConfiguration,
+		r.ImportLegacyState, r.migrateMemoryContext, r.migrateRoleConfiguration,
 	} {
 		if err := migrate(); err != nil {
 			return err

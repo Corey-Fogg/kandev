@@ -14,7 +14,7 @@ import (
 func TestAssistantWorkspaceGrantDefaultsAndCAS(t *testing.T) {
 	for _, engine := range []testconformance.EngineName{testconformance.EngineSQLite, testconformance.EnginePostgres} {
 		t.Run(string(engine), func(t *testing.T) {
-			repo, b := authorityStoreFixture(t, engine, "linked")
+			repo, b, db := bindingStoreFixture(t, engine, "linked")
 			ctx := context.Background()
 			rows, err := repo.WorkspaceGrants(ctx, b.ID, "", 10)
 			require.NoError(t, err)
@@ -46,7 +46,7 @@ func TestAssistantWorkspaceGrantDefaultsAndCAS(t *testing.T) {
 			require.EqualValues(t, 3, grant.Revision)
 			require.Nil(t, grant.RevokedAt)
 			old := *b
-			require.NoError(t, repo.SelectAssistant(ctx, b, b.Version))
+			supersedeBinding(t, db, b)
 			require.ErrorIs(t, repo.SaveWorkspaceGrant(ctx, &old, grant, 3), models.ErrConflict)
 		})
 	}

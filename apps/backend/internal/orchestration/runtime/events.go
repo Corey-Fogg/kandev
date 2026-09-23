@@ -141,9 +141,6 @@ func (s *Service) taskCallback(ctx context.Context, taskID string) error {
 	if conversation.TaskID == taskID {
 		return nil
 	}
-	if owner, err := s.Repo.ConversationUserOwner(ctx, conversation.TaskID); err != nil || owner != "" {
-		return err
-	}
 	payload := map[string]any{"callback": map[string]string{taskIDKey: taskID, "title": clip(task.Title, 300), "state": string(task.State)}}
 	key := fmt.Sprintf("workspace-task-callback:%s:%s:%s:%s", id, taskID, task.State, task.UpdatedAt.UTC().Format("2006-01-02T15:04:05.999999999Z07:00"))
 	return s.QueueTurn(ctx, id, conversation.TaskID, "workspace_task_callback", key, payload)

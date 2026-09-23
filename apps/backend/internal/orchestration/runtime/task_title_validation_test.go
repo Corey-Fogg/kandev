@@ -11,7 +11,7 @@ func TestCreateTaskRejectsLongTitleWithoutUnknownOutcome(t *testing.T) {
 	s, db, task := newRuntime(t)
 	manager := &assistantTaskManager{}
 	s.Manager = manager
-	router, token, runID := assistantRuntimeCaller(t, s, task)
+	router, token, runID := workspaceControlCaller(t, s, task)
 	response := runtimeRequest(t, router, "POST", "/api/v1/orchestration/runtime/tasks", token, runID, map[string]any{
 		"title": strings.Repeat("Qualys inspector ", 5), "operation_id": "long-title", "expected_intent_revision": 0,
 	})

@@ -12,7 +12,7 @@ import (
 
 func (r *Repository) AssistantForConversation(ctx context.Context, taskID string) (*models.AssistantBinding, error) {
 	var row models.AssistantBinding
-	err := r.db.GetContext(ctx, &row, r.db.Rebind(`SELECT * FROM orchestration_assistant_bindings WHERE conversation_id=?`), taskID)
+	err := r.db.GetContext(ctx, &row, r.db.Rebind(`SELECT `+bindingColumns+` FROM orchestration_assistant_bindings b WHERE b.conversation_id=?`), taskID)
 	return &row, err
 }
 

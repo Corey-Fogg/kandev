@@ -10,17 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAssistantAuthorityModeCannotBeChangedByRuntime(t *testing.T) {
-	s, _, task := newRuntime(t)
-	router, token, runID := assistantRuntimeCallerMode(t, s, task, "inspect")
-	response := runtimeRequest(t, router, "PUT", "/api/v1/orchestration/assistant", token, runID,
-		map[string]any{"orchestrator_id": "chief", "execution_mode": "execute", "expected_version": 1})
-	require.Equal(t, 403, response.Code)
-	binding, err := s.Repo.AssistantBinding(context.Background(), "owner")
-	require.NoError(t, err)
-	require.Equal(t, "inspect", binding.ExecutionMode)
-}
-
 type testAssistantAuthority struct {
 	revision    string
 	unavailable bool
@@ -38,17 +27,9 @@ func (a *testAssistantAuthority) ResolveAssistantAuthority(context.Context, mode
 	return row, nil
 }
 
-func TestAssistantBindingDefaultsToExecute(t *testing.T) {
-	s, _, task := newRuntime(t)
-	assistantRuntimeCallerMode(t, s, task, "")
-	binding, err := s.Repo.AssistantBinding(context.Background(), "owner")
-	require.NoError(t, err)
-	require.Equal(t, "execute", binding.ExecutionMode)
-}
-
 func TestCoordinatorSessionRequiresBrokerPolicyAndClaimedRun(t *testing.T) {
 	s, db, task := newRuntime(t)
-	_, _, _ = assistantRuntimeCaller(t, s, task)
+	_, _, _ = workspaceControlCaller(t, s, task)
 	ctx := context.Background()
 	session := &taskmodels.TaskSession{ID: "session", TaskID: task}
 	require.ErrorIs(t, s.CheckCoordinatorSession(ctx, task, session), models.ErrConflict, "an unrestricted session cannot join the run")

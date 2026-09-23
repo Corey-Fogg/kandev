@@ -16,7 +16,7 @@ import (
 
 // @covers AC-ORCHESTRATION-ASSISTANT-010.1, AC-ORCHESTRATION-ASSISTANT-010.3
 func TestOrchestratorFeatureGateNativeRunMatrix(t *testing.T) {
-	a, _, repo, taskID := privateConversationFixture(t)
+	a, _, _, _ := coordinatorConversationFixture(t)
 	db := sqlx.NewDb(a.taskRepo.DB(), "sqlite3")
 	office, err := officestore.NewWithDB(db, db, nil)
 	require.NoError(t, err)
@@ -24,18 +24,15 @@ func TestOrchestratorFeatureGateNativeRunMatrix(t *testing.T) {
 		t.Run(fmt.Sprintf("orchestration=%v", orchestration), func(t *testing.T) {
 			var features config.FeaturesConfig
 			require.NoError(t, json.Unmarshal([]byte(fmt.Sprintf(`{"orchestration":%v}`, orchestration)), &features))
-			allowed, err := orchestrationRunGuard(features, office)(context.Background(), "private-chief")
+			allowed, err := orchestrationRunGuard(features, office)(context.Background(), "fixture-chief")
 			require.NoError(t, err)
 			require.Equal(t, orchestration, allowed)
-			owner, err := repo.ConversationUserOwner(context.Background(), taskID)
-			require.NoError(t, err)
-			require.Equal(t, "owner", owner)
 		})
 	}
 }
 
 func TestAssistantFeatureGateNativeConversationDispatch(t *testing.T) {
-	_, tasks, repo, taskID := privateConversationFixture(t)
+	_, tasks, repo, taskID := coordinatorConversationFixture(t)
 	task, err := tasks.GetTask(context.Background(), taskID)
 	require.NoError(t, err)
 	for _, runtime := range []*orchestrationruntime.Service{nil, {Repo: repo}} {

@@ -45,13 +45,10 @@ func (m *workspaceGrantManager) WorkspaceGrantAccess(ctx context.Context, id str
 }
 
 func TestAssistantWorkspaceGrantRechecksAfterNativeAccess(t *testing.T) {
-	s, db, _ := newRuntime(t)
+	s, db, task := newRuntime(t)
 	_, err := db.Exec(`INSERT INTO workspaces(id,name,created_at,updated_at) VALUES('linked','Example linked workspace',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`)
 	require.NoError(t, err)
-	router := assistantRouter(s)
-	require.Equal(t, 200, runtimeRequest(t, router, "PUT", "/api/v1/orchestration/assistant", "", "", map[string]any{"orchestrator_id": "chief"}).Code)
-	b, err := s.Repo.AssistantBinding(context.Background(), "owner")
-	require.NoError(t, err)
+	b := bindTestAssistant(t, s, db, "owner", "chief", task)
 	receiver, err := s.workspaceGrantReceiver(context.Background(), b)
 	require.NoError(t, err)
 	g := &models.WorkspaceGrant{WorkspaceID: "linked", BindingVersion: b.Version, ReceiverProfileID: receiver.ProfileID, ReceiverProfileRevision: receiver.ProfileRevision, AuthorityRevision: receiver.AuthorityRevision, Scope: models.WorkspaceGrantScope{Operations: []string{"observe"}, ContextExports: []string{"task_summary"}}}
@@ -70,14 +67,12 @@ func TestAssistantWorkspaceGrantRechecksAfterNativeAccess(t *testing.T) {
 }
 
 func TestAssistantWorkspaceGrantHumanControl(t *testing.T) {
-	s, db, _ := newRuntime(t)
+	s, db, task := newRuntime(t)
 	s.Manager = &workspaceGrantManager{assistantTaskManager: &assistantTaskManager{}}
 	_, err := db.Exec(`INSERT INTO workspaces(id,name,created_at,updated_at) VALUES('linked','Example linked workspace',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`)
 	require.NoError(t, err)
 	router := assistantRouter(s)
-	require.Equal(t, 200, runtimeRequest(t, router, "PUT", "/api/v1/orchestration/assistant", "", "", map[string]any{"orchestrator_id": "chief"}).Code)
-	b, err := s.Repo.AssistantBinding(context.Background(), "owner")
-	require.NoError(t, err)
+	b := bindTestAssistant(t, s, db, "owner", "chief", task)
 	base := "/api/v1/orchestration/assistant/workspace-links"
 	response := runtimeRequest(t, router, "GET", "/api/v1/orchestration/assistant/workspace-options", "", "", nil)
 	require.Equal(t, 200, response.Code, response.Body.String())

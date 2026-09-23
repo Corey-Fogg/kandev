@@ -12,7 +12,6 @@ import (
 type InputResolver interface {
 	ReadInput(context.Context, *models.AssistantBinding, models.Attention) (*models.AttentionInput, error)
 	ResolveInput(context.Context, *models.AssistantBinding, models.Attention, models.InputResponse) (any, error)
-	StopSession(context.Context, *models.AssistantBinding, string, string) (string, error)
 }
 type attentionResponseRequest struct {
 	models.OperationRequest

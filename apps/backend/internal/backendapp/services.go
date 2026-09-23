@@ -466,7 +466,6 @@ func wireTaskWorkflowCrossReferences(
 	log *logger.Logger,
 ) {
 	taskSvc.SetSecretStore(userSecretStore)
-	wireAssistantOwnership(taskSvc, repos.Orchestration)
 	if deleter, ok := userSecretStore.(taskservice.WorkspaceSecretDeleter); ok {
 		taskSvc.SetWorkspaceSecretDeleter(deleter)
 	}

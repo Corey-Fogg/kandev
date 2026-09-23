@@ -57,6 +57,18 @@ func (r *Repository) AcceptComment(ctx context.Context, agentID, clientID string
 	return &receipt, true, tx.Commit()
 }
 
+// authorizeIntake admits a message only to a registered coordinator's web
+// conversation.
+func authorizeIntake(ctx context.Context, tx *sqlx.Tx, agentID string, c *models.TaskComment) error {
+	var allowed int
+	err := tx.GetContext(ctx, &allowed, tx.Rebind(`SELECT COUNT(*) FROM orchestration_conversations
+		WHERE task_id=? AND agent_profile_id=? AND platform='web'`), c.TaskID, agentID)
+	if err == nil && allowed != 1 {
+		return models.ErrConflict
+	}
+	return err
+}
+
 func insertIntake(ctx context.Context, tx *sqlx.Tx, receipt *models.Intake, c *models.TaskComment) error {
 	if err := tx.GetContext(ctx, &receipt.Sequence, tx.Rebind(`UPDATE orchestration_conversation_intents SET revision=revision+1 WHERE task_id=? RETURNING revision`), c.TaskID); err != nil {
 		return err

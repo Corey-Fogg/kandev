@@ -8,29 +8,8 @@ import (
 	"time"
 
 	"github.com/kandev/kandev/internal/orchestration/models"
-	taskmodels "github.com/kandev/kandev/internal/task/models"
 	"github.com/stretchr/testify/require"
 )
-
-func TestAssistantBindingRuntimeCannotReadAnotherPrivateConversation(t *testing.T) {
-	s, _, task := newRuntime(t)
-	ctx := context.Background()
-	a, err := s.Personas.GetAgentInstance(ctx, "chief")
-	require.NoError(t, err)
-	a.ID = "foreign-chief"
-	require.NoError(t, s.Personas.CreateAgentInstance(ctx, a))
-	require.NoError(t, s.Repo.RegisterOrchestrator(ctx, a.ID, "ws", "chief-of-staff"))
-	conversation, err := s.Repo.EnsureAgentConversation(ctx, a)
-	require.NoError(t, err)
-	require.NoError(t, s.Repo.SelectAssistant(ctx, &models.AssistantBinding{OwnerUserID: "foreign", OrchestratorID: a.ID, WorkspaceID: "ws", ConversationID: conversation.TaskID}, 0))
-	s.Tasks.(*testTasks).tasks[conversation.TaskID] = &taskmodels.Task{ID: conversation.TaskID, WorkspaceID: "ws"}
-	router, token, runID := assistantRuntimeCaller(t, s, task)
-	path := "/api/v1/orchestration/tasks/" + conversation.TaskID
-	for _, suffix := range []string{"", "/comments"} {
-		require.Equal(t, 404, runtimeRequest(t, router, "GET", path+suffix, token, runID, nil).Code)
-	}
-	require.Equal(t, 404, runtimeRequest(t, router, "POST", path+"/comments", token, runID, map[string]string{"body": "Unauthorized note"}).Code)
-}
 
 func TestAssistantIntakeAtomicRollback(t *testing.T) {
 	s, db, task := newRuntime(t)

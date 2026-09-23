@@ -14,7 +14,6 @@ type AssistantBinding struct {
 	WorkspaceID    string    `json:"home_workspace_id" db:"workspace_id"`
 	ConversationID string    `json:"conversation_id" db:"conversation_id"`
 	Version        int64     `json:"version" db:"version"`
-	ExecutionMode  string    `json:"execution_mode" db:"execution_mode"`
 	CreatedAt      time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
 }
@@ -30,7 +29,6 @@ type AssistantAuthority struct {
 	UnsupportedReason string `json:"unsupported_reason,omitempty"`
 	ProfileID         string `json:"profile_id"`
 	ExecutorID        string `json:"executor_id"`
-	Mode              string `json:"mode"`
 }
 
 type Intake struct {

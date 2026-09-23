@@ -28,13 +28,11 @@ func assistantAttentionFixture(t *testing.T) (*Service, *sqlx.DB, *models.Assist
 	t.Helper()
 	s, db, task := newRuntime(t)
 	ctx := context.Background()
-	require.Equal(t, 200, runtimeRequest(t, assistantRouter(s), "PUT", "/api/v1/orchestration/assistant", "", "", map[string]any{"orchestrator_id": "chief", "execution_mode": "execute"}).Code)
-	b, err := s.Repo.AssistantBinding(ctx, "owner")
-	require.NoError(t, err)
+	b := bindTestAssistant(t, s, db, "owner", "chief", task)
 	require.NoError(t, s.Repo.PutComment(ctx, &models.TaskComment{ID: "source", TaskID: task, AuthorType: "user", AuthorID: "owner", Source: "user", Body: "Review a sample task"}))
 	o := &models.Objective{BindingID: b.ID, WorkspaceID: "ws", SourceCommentID: "source", Title: "Sample task", Mode: "execute", Status: "active", Acceptance: []models.Criterion{{ID: "checked", Description: "Checks pass"}}}
 	require.NoError(t, s.Repo.CreateObjective(ctx, o))
-	_, err = db.Exec(`INSERT INTO tasks(id,workspace_id,title,created_at,updated_at) VALUES('worker','ws','Synthetic worker',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`)
+	_, err := db.Exec(`INSERT INTO tasks(id,workspace_id,title,created_at,updated_at) VALUES('worker','ws','Synthetic worker',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`)
 	require.NoError(t, err)
 	require.NoError(t, s.Repo.LinkObjectiveTask(ctx, models.ObjectiveTask{ObjectiveID: o.ID, TaskID: "worker", Role: "implementation", OperationID: "dispatch"}))
 	f := &attentionFixture{sources: []models.AttentionSource{{SourceID: "question-one", SessionID: "older", Kind: "question", State: "pending", SourceRevision: "native-v1", Summary: "Choose a sample color"}, {SourceID: "permission-two", SessionID: "newer", Kind: "permission", State: "pending", SourceRevision: "native-v1", Summary: "Review a tool permission"}}}

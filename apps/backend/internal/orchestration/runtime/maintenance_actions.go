@@ -85,9 +85,6 @@ func (s *Service) checkMaintenanceIntent(ctx context.Context, b *models.Assistan
 	if err != nil || current.Version != req.ExpectedBindingVersion || current.OwnerUserID != b.OwnerUserID || current.WorkspaceID != b.WorkspaceID {
 		return rejectOperation(409, "assistant_binding_superseded")
 	}
-	if current.ExecutionMode != executionModeExecute {
-		return rejectOperation(403, "maintenance_requires_execute_mode")
-	}
 	intent, err := s.Repo.IntentRevision(ctx, b.ConversationID)
 	if err != nil || req.ExpectedIntentRevision == nil || *req.ExpectedIntentRevision != intent {
 		return rejectOperation(409, "intent_superseded")

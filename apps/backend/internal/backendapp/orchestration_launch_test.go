@@ -14,7 +14,7 @@ import (
 func TestCoordinatorPreparedSessionPersistsBrokerPolicy(t *testing.T) {
 	for _, name := range []string{"bound", "revoked"} {
 		t.Run(name, func(t *testing.T) {
-			a, _, _, conversation := privateConversationFixture(t)
+			a, _, _, conversation := coordinatorConversationFixture(t)
 			ctx := context.Background()
 			require.NoError(t, a.taskRepo.CreateTaskSession(ctx, &taskmodels.TaskSession{
 				ID: "session", TaskID: conversation, State: taskmodels.TaskSessionStateCreated,

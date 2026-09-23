@@ -18,19 +18,6 @@ func (h *Handler) runtimeAssistant(c *gin.Context) (*runtimeauth.AgentClaims, *m
 	return nil, nil, false
 }
 
-func (h *Handler) humanAssistant(c *gin.Context) (*models.AssistantBinding, bool) {
-	identity, ok := assistantHuman(c)
-	if !ok {
-		return nil, false
-	}
-	row, err := h.Service.Repo.AssistantBinding(c.Request.Context(), identity.UserID)
-	if err != nil || !h.assistantWorkspaceAllowed(c, row.WorkspaceID) {
-		c.AbortWithStatus(404)
-		return nil, false
-	}
-	return row, true
-}
-
 func (h *Handler) objectives(c *gin.Context) {
 	var binding *models.AssistantBinding
 	var claims *runtimeauth.AgentClaims

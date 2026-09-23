@@ -21,7 +21,7 @@ func (r *Repository) ContextPacket(ctx context.Context, binding, id string) (str
 // ContextBinding is internal dispatch lookup, not a public unscoped read API.
 func (r *Repository) ContextBinding(ctx context.Context, id string) (*models.AssistantBinding, error) {
 	var b models.AssistantBinding
-	err := r.ro.GetContext(ctx, &b, r.ro.Rebind(`SELECT b.* FROM orchestration_assistant_bindings b
+	err := r.ro.GetContext(ctx, &b, r.ro.Rebind(`SELECT `+bindingColumns+` FROM orchestration_assistant_bindings b
 	JOIN orchestration_context_packets p ON p.binding_id=b.id
 	JOIN workspace_orchestrators o ON o.agent_id=b.orchestrator_id AND o.workspace_id=b.workspace_id
 	WHERE p.id=?`), id)

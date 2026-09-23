@@ -15,20 +15,14 @@ import (
 	"slices"
 )
 
-const inputStopFailed = "failed"
-
 type assistantInputSessions interface {
 	GetTaskSession(context.Context, string) (*taskmodels.TaskSession, error)
-}
-type assistantSessionStopper interface {
-	StopTaskSessionForCoordinator(context.Context, string, string) (bool, error)
 }
 type assistantInputResolver struct {
 	attention      *assistantAttentionReader
 	sessions       assistantInputSessions
 	permissions    permissionResolver
 	clarifications clarificationBundleResolver
-	stopper        assistantSessionStopper
 }
 
 func inputRejected(status int, reason string) error {
@@ -150,26 +144,6 @@ func (a *assistantInputResolver) resolveQuestion(ctx context.Context, b *shared.
 	}
 	return result, nil
 }
-func (a *assistantInputResolver) StopSession(ctx context.Context, b *shared.AssistantBinding, task, session string) (string, error) {
-	if _, err := a.attention.authorizedTask(ctx, b, task); err != nil {
-		return inputStopFailed, err
-	}
-	if a.stopper == nil {
-		return inputStopFailed, fmt.Errorf("native session control unavailable")
-	}
-	if err := shared.CheckWorkspaceEffect(ctx); err != nil {
-		return inputStopFailed, err
-	}
-	changed, err := a.stopper.StopTaskSessionForCoordinator(ctx, task, session)
-	if err != nil {
-		return capabilityUnknown, err
-	}
-	if !changed {
-		return "already_finished", nil
-	}
-	return "stopped", nil
-}
-
 func assistantQuestionActor(ctx context.Context, b *shared.AssistantBinding, input *shared.AttentionInput, response shared.InputResponse) (context.Context, error) {
 	switch response.ActorType {
 	case string(taskmodels.MessageAuthorAgent):

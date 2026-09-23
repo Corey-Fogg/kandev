@@ -17,7 +17,7 @@ type workspacePermissionReader interface {
 
 func (h *Handler) taskPermissions(c *gin.Context) {
 	claims, ok := h.caller(c)
-	if !ok || !h.privateRuntimeAllowed(c, claims, c.Param("id")) {
+	if !ok {
 		return
 	}
 	if _, linked := c.Get(workspaceSelectionKey); linked {
@@ -39,7 +39,7 @@ func (h *Handler) taskPermissions(c *gin.Context) {
 
 func (h *Handler) taskContent(c *gin.Context) {
 	claims, ok := h.caller(c)
-	if !ok || !h.privateRuntimeAllowed(c, claims, c.Param("id")) {
+	if !ok {
 		return
 	}
 	// Linked workspace exports retain their separate grant contract.

@@ -89,10 +89,6 @@ func (h *Handler) deleteRole(c *gin.Context) {
 }
 func (h *Handler) scoped(c *gin.Context) *models.AgentInstance {
 	id := c.Param("id")
-	if err := h.Repo.AuthorizePersona(c.Request.Context(), id); err != nil {
-		c.AbortWithStatus(http.StatusNotFound)
-		return nil
-	}
 	role, err := h.Registry.OrchestratorRoleID(c.Request.Context(), id)
 	if err != nil || role == "" {
 		c.JSON(http.StatusNotFound, gin.H{errorResponseKey: "orchestrator not found"})
@@ -113,9 +109,6 @@ func (h *Handler) list(c *gin.Context) {
 	}
 	rows := []any{}
 	for _, id := range ids {
-		if h.Repo.AuthorizePersona(c.Request.Context(), id) != nil {
-			continue
-		}
 		a, e := h.Agents.GetAgentInstance(c.Request.Context(), id)
 		if e != nil {
 			fail(c, e)

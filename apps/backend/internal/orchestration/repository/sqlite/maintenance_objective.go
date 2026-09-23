@@ -21,7 +21,7 @@ func createMaintenanceObjective(ctx context.Context, tx *sqlx.Tx, b *models.Assi
 		return err
 	}
 	row := models.Objective{ID: objective, BindingID: b.ID, WorkspaceID: b.WorkspaceID, SourceCommentID: comment,
-		Title: "Prepare a scoped local workflow repair", Mode: assistantModeExecute, Status: "active", Revision: 1, AcceptanceRevision: 1, CreatedAt: now, UpdatedAt: now,
+		Title: "Prepare a scoped local workflow repair", Mode: "execute", Status: "active", Revision: 1, AcceptanceRevision: 1, CreatedAt: now, UpdatedAt: now,
 		Acceptance: []models.Criterion{{ID: "files", Description: "Changes remain within the explicit maintenance file scope."}, {ID: "checks", Description: "The approved positive and negative checks pass for the prepared tree."}, {ID: "local-commit", Description: "A local commit and review receipt exist; no changes are published or deployed."}}, Evidence: []models.Evidence{}}
 	if err = tx.GetContext(ctx, &row.IntentRevision, tx.Rebind(`SELECT COALESCE((SELECT revision FROM orchestration_conversation_intents WHERE task_id=?),0)`), b.ConversationID); err != nil {
 		return err

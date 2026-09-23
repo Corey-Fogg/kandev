@@ -8,15 +8,6 @@ import (
 )
 
 func (s *Service) Validate(ctx context.Context, workspace, id string) error {
-	owner, err := s.Repo.PersonaUserOwner(ctx, id)
-	if err != nil {
-		return err
-	}
-	// Core automations currently retain no human-owner grant. Recheck here at
-	// both configuration and delivery; a previously shared target can be claimed.
-	if owner != "" {
-		return fmt.Errorf("private assistant automations require durable owner authorization")
-	}
 	role, err := s.Repo.OrchestratorRoleID(ctx, id)
 	if err != nil || role == "" {
 		return fmt.Errorf("orchestrator is unavailable")

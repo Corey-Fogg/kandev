@@ -2,13 +2,10 @@ package runtime
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/kandev/kandev/internal/orchestration/models"
 )
 
 func (s *Service) withIntentRevision(ctx context.Context, taskID string, payload map[string]any) (map[string]any, error) {
@@ -26,30 +23,6 @@ func (s *Service) withIntentRevision(ctx context.Context, taskID string, payload
 	return copy, nil
 }
 
-func (s *Service) bindingSnapshot(ctx context.Context, taskID string) (string, int64, error) {
-	owner, err := s.Repo.ConversationUserOwner(ctx, taskID)
-	if err != nil {
-		return "", 0, err
-	}
-	if owner != "" && !s.Enabled {
-		return "", 0, ErrOrchestrationDisabled
-	}
-	row, err := s.Repo.AssistantForConversation(ctx, taskID)
-	if errors.Is(err, sql.ErrNoRows) {
-		if owner != "" {
-			return "", 0, models.ErrConflict
-		}
-		return "", 0, nil
-	}
-	if err != nil {
-		return "", 0, err
-	}
-	if row.OwnerUserID != owner {
-		return "", 0, models.ErrConflict
-	}
-	return row.ID, row.Version, nil
-}
-
 func (h *Handler) currentIntent(c *gin.Context, taskID, payload string) bool {
 	var snapshot struct {
 		Revision int64 `json:"intent_revision"`
@@ -65,22 +38,6 @@ func (h *Handler) currentIntent(c *gin.Context, taskID, payload string) bool {
 	}
 	if snapshot.Revision != revision {
 		c.AbortWithStatusJSON(http.StatusConflict, gin.H{errorResponseKey: "intent_superseded", intentRevisionKey: revision})
-		return false
-	}
-	return true
-}
-
-func bindingCheck(c *gin.Context, err error) bool {
-	if errors.Is(err, ErrOrchestrationDisabled) {
-		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{errorResponseKey: err.Error()})
-		return false
-	}
-	if errors.Is(err, models.ErrConflict) {
-		c.AbortWithStatusJSON(http.StatusConflict, gin.H{errorResponseKey: "assistant_binding_superseded"})
-		return false
-	}
-	if err != nil {
-		c.AbortWithStatus(http.StatusServiceUnavailable)
 		return false
 	}
 	return true

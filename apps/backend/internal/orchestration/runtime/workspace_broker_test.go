@@ -13,11 +13,10 @@ func TestCoordinatorCannotTargetLinkedWorkspace(t *testing.T) {
 	s.Manager = &workspaceGrantManager{assistantTaskManager: &assistantTaskManager{}}
 	_, err := db.Exec(`INSERT INTO workspaces(id,name,created_at,updated_at) VALUES('linked','Example linked workspace',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`)
 	require.NoError(t, err)
-	router, token, run := assistantRuntimeCaller(t, s, conversation)
+	b := bindTestAssistant(t, s, db, "owner", "chief", conversation)
+	router, token, run := workspaceControlCaller(t, s, conversation)
 	path := "/api/v1/orchestration/runtime/workspace?workspace_id=linked&workspace_grant_revision=1"
 	require.Equal(t, 403, runtimeRequest(t, router, "GET", path, token, run, nil).Code)
-	b, err := s.Repo.AssistantBinding(context.Background(), "owner")
-	require.NoError(t, err)
 	receiver, err := s.workspaceGrantReceiver(context.Background(), b)
 	require.NoError(t, err)
 	g := &models.WorkspaceGrant{WorkspaceID: "linked", BindingVersion: b.Version, ReceiverProfileID: receiver.ProfileID, ReceiverProfileRevision: receiver.ProfileRevision, AuthorityRevision: receiver.AuthorityRevision, Scope: models.WorkspaceGrantScope{Operations: []string{"observe"}, ContextExports: []string{"directory"}}}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/jmoiron/sqlx"
 	settings "github.com/kandev/kandev/internal/agent/settings/models"
 	settingsstore "github.com/kandev/kandev/internal/agent/settings/store"
 	"github.com/kandev/kandev/internal/common/logger"
@@ -19,17 +20,15 @@ import (
 func TestAssistantAuthorityPersistenceEngines(t *testing.T) {
 	for _, name := range []testconformance.EngineName{testconformance.EngineSQLite, testconformance.EnginePostgres} {
 		t.Run(string(name), func(t *testing.T) {
-			repo, binding := authorityStoreFixture(t, name)
+			repo, binding, db := bindingStoreFixture(t, name)
 			ctx := context.Background()
-			require.Equal(t, "execute", binding.ExecutionMode)
 			request := models.Operation{BindingID: binding.ID, OperationID: "once", ConversationID: binding.ConversationID,
 				RunID: "run", Target: "native-task", RequestHash: "synthetic", BindingVersion: binding.Version}
 			prepared, created, err := repo.BeginOperation(ctx, request)
 			require.NoError(t, err)
 			require.True(t, created)
 			require.Equal(t, "prepared", prepared.State)
-			binding.ExecutionMode = "execute"
-			require.NoError(t, repo.SelectAssistant(ctx, binding, binding.Version))
+			supersedeBinding(t, db, binding)
 			require.ErrorIs(t, repo.DispatchOperation(ctx, prepared), models.ErrConflict)
 			require.NoError(t, repo.RecoverOperations(ctx))
 			unknown, created, err := repo.BeginOperation(ctx, request)
@@ -54,13 +53,19 @@ func TestAssistantAuthorityPersistenceEngines(t *testing.T) {
 			require.NoError(t, repo.Migrate())
 			retained, err := repo.AssistantBinding(ctx, "owner")
 			require.NoError(t, err)
-			require.Equal(t, "execute", retained.ExecutionMode)
 			require.EqualValues(t, 2, retained.Version)
 		})
 	}
 }
 
 func authorityStoreFixture(t *testing.T, name testconformance.EngineName, extraWorkspaces ...string) (*orchstore.Repository, *models.AssistantBinding) {
+	t.Helper()
+	repo, binding, _ := bindingStoreFixture(t, name, extraWorkspaces...)
+	return repo, binding
+}
+
+// bindingStoreFixture stores a binding row for the binding-keyed stores.
+func bindingStoreFixture(t *testing.T, name testconformance.EngineName, extraWorkspaces ...string) (*orchstore.Repository, *models.AssistantBinding, *sqlx.DB) {
 	t.Helper()
 	engine := testconformance.OpenEngine(t, name, "")
 	ctx := context.Background()
@@ -84,7 +89,19 @@ func authorityStoreFixture(t *testing.T, name testconformance.EngineName, extraW
 	require.NoError(t, repo.RegisterOrchestrator(ctx, persona.ID, "workspace", "chief-of-staff"))
 	conversation, err := repo.EnsureAgentConversation(ctx, persona)
 	require.NoError(t, err)
-	binding := &models.AssistantBinding{OwnerUserID: "owner", OrchestratorID: persona.ID, WorkspaceID: "workspace", ConversationID: conversation.TaskID}
-	require.NoError(t, repo.SelectAssistant(ctx, binding, 0))
-	return repo, binding
+	_, err = engine.DB.ExecContext(ctx, engine.DB.Rebind(`INSERT INTO orchestration_assistant_bindings
+		(id,owner_user_id,orchestrator_id,workspace_id,conversation_id,version,created_at,updated_at)
+		VALUES('binding','owner',?,'workspace',?,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`), persona.ID, conversation.TaskID)
+	require.NoError(t, err)
+	binding, err := repo.AssistantBinding(ctx, "owner")
+	require.NoError(t, err)
+	return repo, binding, engine.DB
+}
+
+// supersedeBinding advances the stored binding version, as a reselection did.
+func supersedeBinding(t *testing.T, db *sqlx.DB, b *models.AssistantBinding) {
+	t.Helper()
+	_, err := db.Exec(db.Rebind(`UPDATE orchestration_assistant_bindings SET version=version+1 WHERE id=?`), b.ID)
+	require.NoError(t, err)
+	b.Version++
 }

@@ -13,7 +13,7 @@ import (
 )
 
 func TestE2EResetOrchestrationPreservesOtherWorkspace(t *testing.T) {
-	a, svc, repo, conversation := privateConversationFixture(t)
+	a, svc, repo, conversation := coordinatorConversationFixture(t)
 	ctx := context.Background()
 	database := sqlx.NewDb(a.taskRepo.DB(), "sqlite3")
 	profiles, _, err := settingsstore.Provide(database, database, nil)
@@ -23,12 +23,10 @@ func TestE2EResetOrchestrationPreservesOtherWorkspace(t *testing.T) {
 	require.NoError(t, profiles.CreateAgentProfile(ctx, foreign))
 	require.NoError(t, repo.SaveOrchestratorRole(ctx, &orchmodels.OrchestratorRole{ID: "shared-example-role", Name: "Shared example"}))
 	require.NoError(t, repo.RegisterOrchestrator(ctx, foreign.ID, foreign.WorkspaceID, "shared-example-role"))
-	require.NoError(t, repo.RegisterOrchestrator(ctx, "private-chief", "ws-1", "shared-example-role"))
+	require.NoError(t, repo.RegisterOrchestrator(ctx, "fixture-chief", "ws-1", "shared-example-role"))
 	other, err := repo.EnsureAgentConversation(ctx, foreign)
 	require.NoError(t, err)
-	foreignBinding := &orchmodels.AssistantBinding{OwnerUserID: "other-owner", OrchestratorID: foreign.ID, WorkspaceID: foreign.WorkspaceID, ConversationID: other.TaskID}
-	require.NoError(t, repo.SelectAssistant(ctx, foreignBinding, 0))
-	for _, id := range []string{"private-chief", foreign.ID} {
+	for _, id := range []string{"fixture-chief", foreign.ID} {
 		require.NoError(t, repo.UpsertAgentMemory(ctx, &orchmodels.AgentMemory{ID: id + "-memory", AgentProfileID: id, Layer: "user", Key: "example", Content: "Use short headings."}))
 	}
 	require.NoError(t, deleteTaskForE2EReset(ctx, svc, conversation))
@@ -38,14 +36,12 @@ func TestE2EResetOrchestrationPreservesOtherWorkspace(t *testing.T) {
 		assertWorkspaceRows(t, database, table, foreign.WorkspaceID, 1)
 	}
 	var count int
-	require.NoError(t, database.Get(&count, `SELECT count(*) FROM orchestration_memory WHERE agent_profile_id='private-chief'`))
+	require.NoError(t, database.Get(&count, `SELECT count(*) FROM orchestration_memory WHERE agent_profile_id='fixture-chief'`))
 	require.Zero(t, count)
-	require.NoError(t, database.Get(&count, `SELECT count(*) FROM agent_profiles WHERE id='private-chief'`))
+	require.NoError(t, database.Get(&count, `SELECT count(*) FROM agent_profiles WHERE id='fixture-chief'`))
 	require.Zero(t, count)
 	require.NoError(t, database.Get(&count, `SELECT count(*) FROM orchestration_memory WHERE agent_profile_id=?`, foreign.ID))
 	require.Equal(t, 1, count)
-	_, err = repo.AssistantBinding(ctx, foreignBinding.OwnerUserID)
-	require.NoError(t, err)
 	_, err = repo.GetOrchestratorRole(ctx, "shared-example-role")
 	require.NoError(t, err, "a role used by a different fixture workspace must remain")
 	require.NoError(t, deleteTaskForE2EReset(ctx, svc, other.TaskID))
@@ -57,7 +53,7 @@ func TestE2EResetOrchestrationPreservesOtherWorkspace(t *testing.T) {
 }
 
 func TestE2EResetRoutingPreservesExecutionAndCoordinatorProfiles(t *testing.T) {
-	a, _, _, _ := privateConversationFixture(t)
+	a, _, _, _ := coordinatorConversationFixture(t)
 	ctx := context.Background()
 	database := sqlx.NewDb(a.taskRepo.DB(), "sqlite3")
 	profiles, _, err := settingsstore.Provide(database, database, nil)
@@ -69,10 +65,10 @@ func TestE2EResetRoutingPreservesExecutionAndCoordinatorProfiles(t *testing.T) {
 	} {
 		require.NoError(t, profiles.CreateAgentProfile(ctx, p))
 	}
-	_, err = database.Exec(`UPDATE agent_profiles SET settings=? WHERE id='private-chief'`, original)
+	_, err = database.Exec(`UPDATE agent_profiles SET settings=? WHERE id='fixture-chief'`, original)
 	require.NoError(t, err)
 	require.NoError(t, resetOfficeRoutingForE2E(ctx, database, "ws-1"))
-	for _, id := range []string{"private-chief", "worker-profile"} {
+	for _, id := range []string{"fixture-chief", "worker-profile"} {
 		p, getErr := profiles.GetAgentProfile(ctx, id)
 		require.NoError(t, getErr)
 		require.Equal(t, original, p.Settings)

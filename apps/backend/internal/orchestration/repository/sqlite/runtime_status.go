@@ -2,6 +2,8 @@ package sqlite
 
 import "context"
 
+const runtimeIdle = "idle"
+
 // SetRuntimeWorking updates only execution state, preserving concurrent profile edits and pauses.
 func (r *Repository) SetRuntimeWorking(ctx context.Context, id string, working bool) error {
 	from, to := "working", runtimeIdle

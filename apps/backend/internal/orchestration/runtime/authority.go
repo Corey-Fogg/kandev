@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/kandev/kandev/internal/auth/authn"
 	mcpprofile "github.com/kandev/kandev/internal/mcp/profile"
 	"github.com/kandev/kandev/internal/orchestration/models"
 	taskmodels "github.com/kandev/kandev/internal/task/models"
@@ -72,50 +71,4 @@ func (s *Service) CheckCoordinatorSession(ctx context.Context, taskID string, se
 		return models.ErrConflict
 	}
 	return nil
-}
-
-type AssistantAuthorityReader interface {
-	ResolveAssistantAuthority(context.Context, models.AssistantBinding, string, string) (models.AssistantAuthority, error)
-}
-
-func (s *Service) assistantAuthority(ctx context.Context, taskID string) (*models.AssistantAuthority, error) {
-	binding, err := s.Repo.AssistantForConversation(ctx, taskID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	if !s.Enabled {
-		return nil, ErrOrchestrationDisabled
-	}
-	persona, err := s.Personas.GetAgentInstance(ctx, binding.OrchestratorID)
-	if err != nil {
-		return nil, err
-	}
-	if paused(persona) {
-		return nil, ErrOrchestratorPaused
-	}
-	profile, executor, err := s.executionSelection(ctx, persona)
-	if err != nil {
-		return nil, err
-	}
-	if s.Authority == nil {
-		return nil, errors.New("assistant_authority_unavailable")
-	}
-	ctx = authn.WithIdentity(ctx, authn.Identity{UserID: binding.OwnerUserID, Role: authn.RoleMember})
-	row, err := s.Authority.ResolveAssistantAuthority(ctx, *binding, profile, executor)
-	if err != nil {
-		return nil, err
-	}
-	row.ProfileID, row.ExecutorID, row.Mode = profile, executor, binding.ExecutionMode
-	row.BindingID, row.BindingVersion = binding.ID, binding.Version
-	row.IntentRevision, err = s.Repo.IntentRevision(ctx, taskID)
-	if err != nil {
-		return nil, err
-	}
-	if err = s.validateWorkspaceHistory(ctx, binding, row, false); err != nil {
-		return nil, err
-	}
-	return &row, nil
 }

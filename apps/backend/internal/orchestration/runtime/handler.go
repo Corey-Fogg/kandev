@@ -44,9 +44,6 @@ type Handler struct {
 }
 
 func RegisterRoutes(g *gin.RouterGroup, h *Handler) {
-	g.GET("/assistant", h.assistant)
-	g.PUT("/assistant", h.selectAssistant)
-	g.POST("/assistant/control", h.assistantControl)
 	g.GET("/assistant/objectives", h.objectives)
 	h.registerMaintenanceRoutes(g)
 	h.registerWorkspaceGrantRoutes(g)
@@ -146,16 +143,6 @@ func (h *Handler) scopedConversation(c *gin.Context) (string, string, bool) {
 	} else if h.Authorize != nil {
 		if err := h.Authorize(c.Request.Context(), ws); err != nil {
 			c.AbortWithStatus(404)
-			return "", "", false
-		}
-	}
-	if _, runtime := c.Get("agent_claims"); !runtime && !h.privateConversationAllowed(c, id) {
-		c.AbortWithStatus(404)
-		return "", "", false
-	}
-	if c.Request.Method != "GET" {
-		_, _, err := h.Service.bindingSnapshot(c.Request.Context(), id)
-		if !bindingCheck(c, err) {
 			return "", "", false
 		}
 	}
@@ -271,7 +258,7 @@ func (h *Handler) catalog(c *gin.Context) {
 }
 func (h *Handler) details(c *gin.Context) {
 	claims, ok := h.caller(c)
-	if !ok || !h.privateRuntimeAllowed(c, claims, c.Param("id")) {
+	if !ok {
 		return
 	}
 	if _, linked := c.Get(workspaceSelectionKey); linked {
@@ -325,7 +312,7 @@ func (h *Handler) createTask(c *gin.Context) {
 		return
 	}
 	if req.ExecutionMode != "" && req.ExecutionMode != executionModeExecute && req.ExecutionMode != executionModeDesign {
-		c.AbortWithStatusJSON(422, gin.H{errorResponseKey: "answer and inspect stay in the assistant conversation"})
+		c.AbortWithStatusJSON(422, gin.H{errorResponseKey: "execution_mode must be design or execute"})
 		return
 	}
 	h.performOperation(c, claims, req.OperationRequest, req, http.StatusCreated, func() (any, error) {
@@ -350,7 +337,7 @@ func (h *Handler) createTask(c *gin.Context) {
 }
 func (h *Handler) manageTask(c *gin.Context) {
 	claims, ok := h.caller(c)
-	if !ok || !h.privateRuntimeAllowed(c, claims, c.Param("id")) {
+	if !ok {
 		return
 	}
 	var req models.WorkspaceTaskCommand
@@ -391,7 +378,7 @@ func (h *Handler) manageTask(c *gin.Context) {
 }
 func (h *Handler) updateTask(c *gin.Context) {
 	claims, ok := h.caller(c)
-	if !ok || !h.privateRuntimeAllowed(c, claims, c.Param("id")) {
+	if !ok {
 		return
 	}
 	var req struct {
@@ -428,9 +415,6 @@ func (h *Handler) runtimeComment(c *gin.Context) {
 	if req.TaskID == "" {
 		req.TaskID = claims.TaskID
 	}
-	if !h.privateRuntimeAllowed(c, claims, req.TaskID) {
-		return
-	}
 	task, err := h.Service.Tasks.GetTask(c.Request.Context(), req.TaskID)
 	if err != nil || task.WorkspaceID != claims.WorkspaceID {
 		c.AbortWithStatus(403)
@@ -457,7 +441,7 @@ func (h *Handler) canReadTask(c *gin.Context) bool {
 }
 func (h *Handler) authorizeRuntimeTask(c *gin.Context) bool {
 	claims, ok := h.caller(c)
-	if !ok || !h.privateRuntimeAllowed(c, claims, c.Param("id")) {
+	if !ok {
 		return false
 	}
 	task, err := h.Service.Tasks.GetTask(c.Request.Context(), c.Param("id"))

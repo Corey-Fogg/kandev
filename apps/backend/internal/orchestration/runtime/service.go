@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/kandev/kandev/internal/agent/runtimeauth"
-	"github.com/kandev/kandev/internal/auth/authn"
 	"github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/orchestration/personas"
 	store "github.com/kandev/kandev/internal/orchestration/repository/sqlite"
@@ -74,11 +73,6 @@ func (s *Service) QueueTurn(ctx context.Context, id, taskID, reason, key string,
 	if err := s.CheckConversationExecution(ctx, taskID); err != nil {
 		return err
 	}
-	if _, human := authn.IdentityFromContext(ctx); human {
-		if err := s.Repo.AuthorizePersona(ctx, id); err != nil {
-			return err
-		}
-	}
 	a, err := s.Personas.GetAgentInstance(ctx, id)
 	if err != nil {
 		return err
@@ -95,9 +89,6 @@ func (s *Service) QueueTurn(ctx context.Context, id, taskID, reason, key string,
 	}
 	payload, err = s.withIntentRevision(ctx, taskID, payload)
 	if err != nil {
-		return err
-	}
-	if err := s.privateTurnSource(ctx, taskID, payload); err != nil {
 		return err
 	}
 	s.mu.Lock()

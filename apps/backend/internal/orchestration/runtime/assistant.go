@@ -1,12 +1,9 @@
 package runtime
 
 import (
-	"errors"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/kandev/kandev/internal/agent/runtimeauth"
 	"github.com/kandev/kandev/internal/auth/authn"
 	"github.com/kandev/kandev/internal/orchestration/models"
 )
@@ -24,86 +21,21 @@ func assistantHuman(c *gin.Context) (authn.Identity, bool) {
 	return identity, true
 }
 
-func (h *Handler) privateConversationAllowed(c *gin.Context, taskID string) bool {
-	owner, err := h.Service.Repo.ConversationUserOwner(c.Request.Context(), taskID)
-	if err != nil {
-		return false
-	}
-	if owner == "" {
-		return true
-	}
-	identity, ok := authn.FromGin(c)
-	return ok && identity.UserID == owner
-}
-
-func (h *Handler) privateRuntimeAllowed(c *gin.Context, claims *runtimeauth.AgentClaims, taskID string) bool {
-	owner, err := h.Service.Repo.ConversationUserOwner(c.Request.Context(), taskID)
-	if err != nil || (owner != "" && claims.TaskID != taskID) {
-		c.AbortWithStatus(http.StatusNotFound)
-		return false
-	}
-	return true
-}
-
-func (h *Handler) assistant(c *gin.Context) {
-	identity, ok := assistantHuman(c)
-	if !ok {
-		return
-	}
-	row, err := h.Service.Repo.AssistantBinding(c.Request.Context(), identity.UserID)
-	if err != nil || !h.assistantWorkspaceAllowed(c, row.WorkspaceID) {
-		c.AbortWithStatus(http.StatusNotFound)
-		return
-	}
-	h.assistantSnapshot(c, row)
-}
-
 func (h *Handler) assistantWorkspaceAllowed(c *gin.Context, workspaceID string) bool {
 	return h.Authorize == nil || h.Authorize(c.Request.Context(), workspaceID) == nil
 }
 
-func (h *Handler) selectAssistant(c *gin.Context) {
+// humanAssistant resolves the caller's binding for the binding-keyed human
+// surfaces. Coordinator conversations never consult it.
+func (h *Handler) humanAssistant(c *gin.Context) (*models.AssistantBinding, bool) {
 	identity, ok := assistantHuman(c)
 	if !ok {
-		return
+		return nil, false
 	}
-	var req struct {
-		OrchestratorID string `json:"orchestrator_id"`
-		Expected       int64  `json:"expected_version"`
-		ExecutionMode  string `json:"execution_mode"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil || req.OrchestratorID == "" || req.Expected < 0 {
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-	ctx := c.Request.Context()
-	persona, err := h.Service.Personas.GetAgentInstance(ctx, req.OrchestratorID)
-	if err != nil || !h.assistantWorkspaceAllowed(c, persona.WorkspaceID) {
+	row, err := h.Service.Repo.AssistantBinding(c.Request.Context(), identity.UserID)
+	if err != nil || !h.assistantWorkspaceAllowed(c, row.WorkspaceID) {
 		c.AbortWithStatus(http.StatusNotFound)
-		return
+		return nil, false
 	}
-	role, err := h.Service.Repo.OrchestratorRoleID(ctx, persona.ID)
-	if err != nil || role == "" {
-		c.AbortWithStatus(http.StatusNotFound)
-		return
-	}
-	conversation, err := h.Service.Repo.EnsureAgentConversation(ctx, persona)
-	if err != nil {
-		fail(c, err)
-		return
-	}
-	row := &models.AssistantBinding{OwnerUserID: identity.UserID, OrchestratorID: persona.ID,
-		WorkspaceID: persona.WorkspaceID, ConversationID: conversation.TaskID, ExecutionMode: req.ExecutionMode}
-	if err := h.Service.Repo.SelectAssistant(ctx, row, req.Expected); err != nil {
-		if errors.Is(err, models.ErrConflict) {
-			c.JSON(http.StatusConflict, gin.H{errorResponseKey: "assistant_binding_conflict"})
-			return
-		}
-		fail(c, err)
-		return
-	}
-	if h.Service.AttentionUpdated != nil {
-		h.Service.AttentionUpdated(ctx, row.ID, time.Now().UTC())
-	}
-	h.assistantSnapshot(c, row)
+	return row, true
 }

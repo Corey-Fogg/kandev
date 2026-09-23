@@ -12,6 +12,7 @@ import (
 	"github.com/kandev/kandev/internal/agent/runtimeauth"
 	"github.com/kandev/kandev/internal/auth/authn"
 	"github.com/kandev/kandev/internal/orchestration/models"
+	taskmodels "github.com/kandev/kandev/internal/task/models"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,17 +30,6 @@ func assistantRouter(s *Service, users ...string) *gin.Engine {
 	})
 	RegisterRoutes(router.Group("/api/v1/orchestration"), &Handler{Service: s})
 	return router
-}
-
-func TestAssistantBindingPrivateConversationRejectsOtherUsers(t *testing.T) {
-	s, _, task := newRuntime(t)
-	owner, foreign := assistantRouter(s), assistantRouter(s, "other-user")
-	path := "/api/v1/orchestration/assistant"
-	require.Equal(t, 200, runtimeRequest(t, owner, "PUT", path, "", "", map[string]any{"orchestrator_id": "chief"}).Code)
-	require.Equal(t, 404, runtimeRequest(t, foreign, "GET", path, "", "", nil).Code)
-	comments := "/api/v1/orchestration/tasks/" + task + "/comments"
-	require.Equal(t, 404, runtimeRequest(t, foreign, "GET", comments, "", "", nil).Code)
-	require.Equal(t, 404, runtimeRequest(t, foreign, "POST", comments, "", "", map[string]string{"body": "Inject instructions"}).Code)
 }
 
 func TestAssistantIntakeRepairsAcceptedMessageAtRestart(t *testing.T) {
@@ -157,24 +147,29 @@ func TestAssistantIntentExactSourceSurvivesNewerComments(t *testing.T) {
 	require.Contains(t, prompt, original.Body)
 }
 
-func TestAssistantBindingSelectsExistingConversation(t *testing.T) {
-	s, _, task := newRuntime(t)
-	router := assistantRouter(s)
-	path := "/api/v1/orchestration/assistant"
-	result := runtimeRequest(t, router, http.MethodPut, path, "", "", map[string]any{
-		"orchestrator_id": "chief", "expected_version": 0,
-	})
-	require.Equal(t, 200, result.Code, result.Body.String())
-	var binding map[string]any
-	require.NoError(t, json.Unmarshal(result.Body.Bytes(), &binding))
-	require.Equal(t, task, binding["conversation_id"])
-	require.Equal(t, "owner", binding["owner_user_id"])
-	require.EqualValues(t, 1, binding["version"])
-	read := runtimeRequest(t, router, http.MethodGet, path, "", "", nil)
-	require.Equal(t, 200, read.Code)
-	require.JSONEq(t, result.Body.String(), read.Body.String())
-	stale := runtimeRequest(t, router, http.MethodPut, path, "", "", map[string]any{
-		"orchestrator_id": "chief", "expected_version": 0,
-	})
-	require.Equal(t, 409, stale.Code)
+// A conversation retained from a private binding stays a workspace
+// coordinator conversation: its stored owner and binding are never consulted.
+func TestRetainedOwnerAndBindingDoNotRestrictConversation(t *testing.T) {
+	s, db, task := newRuntime(t)
+	_, err := db.Exec(`ALTER TABLE orchestration_conversations ADD COLUMN owner_user_id TEXT NOT NULL DEFAULT ''`)
+	require.NoError(t, err)
+	_, err = db.Exec(`UPDATE orchestration_conversations SET owner_user_id='owner' WHERE task_id=?`, task)
+	require.NoError(t, err)
+	bindTestAssistant(t, s, db, "owner", "chief", task)
+	s.Tasks.(*testTasks).tasks[task] = &taskmodels.Task{ID: task, WorkspaceID: "ws"}
+	member := assistantRouter(s, "member")
+	path := "/api/v1/orchestration/tasks/" + task
+	require.Equal(t, 200, runtimeRequest(t, member, "GET", path, "", "", nil).Code)
+	response := runtimeRequest(t, member, "POST", path+"/comments", "", "", map[string]string{"body": "Summarize the sample tasks", "client_message_id": "member"})
+	require.Equal(t, 201, response.Code, response.Body.String())
+	listed := runtimeRequest(t, member, "GET", path+"/comments", "", "", nil)
+	require.Equal(t, 200, listed.Code)
+	require.Contains(t, listed.Body.String(), "Summarize the sample tasks")
+	require.NoError(t, s.Validate(context.Background(), "ws", "chief"), "automations may target the conversation")
+	run, err := s.Runs.ClaimNextEligibleRun(context.Background())
+	require.NoError(t, err)
+	s.Start = func(ctx context.Context, l Launch) error { return l.OnSessionPrepared(ctx, "session") }
+	handled, err := s.Process(context.Background(), run)
+	require.True(t, handled)
+	require.NoError(t, err)
 }

@@ -10,10 +10,6 @@ import (
 // The user supplies a complete new configuration, just as for a new orchestrator.
 func (h *Handler) importAgent(c *gin.Context) {
 	ctx := c.Request.Context()
-	if err := h.Repo.AuthorizePersona(ctx, c.Param("id")); err != nil {
-		c.AbortWithStatus(http.StatusNotFound)
-		return
-	}
 	a, err := h.Agents.GetAgentInstance(ctx, c.Param("id"))
 	if err != nil || a.WorkspaceID != c.Param("wsId") || a.Role != models.AgentRoleAssistant {
 		c.JSON(http.StatusNotFound, gin.H{errorResponseKey: "workspace assistant not found"})

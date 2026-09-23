@@ -10,8 +10,8 @@ import (
 )
 
 func TestAssistantMemoryOwnerConfirmationAndForget(t *testing.T) {
-	s, _, task := newRuntime(t)
-	_, _, _ = assistantRuntimeCaller(t, s, task)
+	s, db, task := newRuntime(t)
+	bindTestAssistant(t, s, db, "owner", "chief", task)
 	router := assistantRouter(s)
 	path := "/api/v1/orchestration/assistant/memory/preference"
 	request := map[string]any{"key": "concise", "content": "Use short updates", "scope": "workspace", "source_comment_id": "source", "expected_revision": 0, "confirmed": true}

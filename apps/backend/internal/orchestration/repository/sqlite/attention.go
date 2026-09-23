@@ -23,7 +23,7 @@ func (r *Repository) AttentionTargets(ctx context.Context, taskID, after string,
 }
 func (r *Repository) AssistantBindingByID(ctx context.Context, id string) (*models.AssistantBinding, error) {
 	var b models.AssistantBinding
-	err := r.ro.GetContext(ctx, &b, r.ro.Rebind(`SELECT * FROM orchestration_assistant_bindings WHERE id=?`), id)
+	err := r.ro.GetContext(ctx, &b, r.ro.Rebind(`SELECT `+bindingColumns+` FROM orchestration_assistant_bindings b WHERE b.id=?`), id)
 	return &b, err
 }
 func (r *Repository) AttentionPage(ctx context.Context, binding, after string, limit int) ([]models.Attention, error) {

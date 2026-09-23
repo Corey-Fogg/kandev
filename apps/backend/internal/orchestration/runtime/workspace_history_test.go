@@ -12,10 +12,8 @@ func TestAssistantWorkspaceHistoryReconfirmation(t *testing.T) {
 	s.Manager = &workspaceGrantManager{assistantTaskManager: &assistantTaskManager{}}
 	_, err := db.Exec(`INSERT INTO workspaces(id,name,created_at,updated_at) VALUES('linked','Example linked workspace',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`)
 	require.NoError(t, err)
-	_, _, _ = assistantRuntimeCaller(t, s, conversation)
 	ctx := context.Background()
-	b, err := s.Repo.AssistantBinding(ctx, "owner")
-	require.NoError(t, err)
+	b := bindTestAssistant(t, s, db, "owner", "chief", conversation)
 	r, err := s.workspaceGrantReceiver(ctx, b)
 	require.NoError(t, err)
 	g := &models.WorkspaceGrant{WorkspaceID: "linked", BindingVersion: b.Version, ReceiverProfileID: r.ProfileID, ReceiverProfileRevision: r.ProfileRevision, AuthorityRevision: r.AuthorityRevision, Scope: models.WorkspaceGrantScope{Operations: []string{"observe"}, ContextExports: []string{"task_summary"}}}

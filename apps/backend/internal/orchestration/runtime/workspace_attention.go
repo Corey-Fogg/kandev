@@ -67,14 +67,3 @@ func (s *Service) validateWorkspaceWake(ctx context.Context, b *models.Assistant
 	_, err := s.currentWorkspaceGrant(ctx, b, row.WorkspaceID, ref.WorkspaceGrantRevision, workspaceObserve, workspaceTaskSummaryExport)
 	return err
 }
-
-func (s *Service) managedStopWorkspace(ctx context.Context, b *models.AssistantBinding, task string) (*models.AssistantBinding, context.Context, error) {
-	scoped, g, err := s.attentionWorkspace(ctx, b, task)
-	if err != nil || g == nil {
-		return scoped, ctx, err
-	}
-	if _, err = s.currentWorkspaceGrant(ctx, b, g.WorkspaceID, g.Revision, workspaceCoordinate, ""); err != nil {
-		return nil, ctx, err
-	}
-	return scoped, s.workspaceEffectContext(ctx, b, g, workspaceCoordinate, ""), nil
-}

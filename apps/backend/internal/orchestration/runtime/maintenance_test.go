@@ -94,11 +94,9 @@ func (f *maintenanceFixtureManager) CreateWorkspaceTask(ctx context.Context, spe
 
 func maintenanceFixture(t *testing.T) (*Service, *models.AssistantBinding, models.ImprovementCandidate, *maintenanceFixtureSandbox, *maintenanceFixtureManager) {
 	t.Helper()
-	s, db, _ := newRuntime(t)
-	require.Equal(t, 200, runtimeRequest(t, assistantRouter(s), "PUT", "/api/v1/orchestration/assistant", "", "", map[string]any{"orchestrator_id": "chief", "execution_mode": "execute"}).Code)
+	s, db, task := newRuntime(t)
 	ctx := context.Background()
-	b, err := s.Repo.AssistantBinding(ctx, "owner")
-	require.NoError(t, err)
+	b := bindTestAssistant(t, s, db, "owner", "chief", task)
 	revision, err := s.contextProfileRevision(ctx, "ws", "personal")
 	require.NoError(t, err)
 	for i := range 3 {

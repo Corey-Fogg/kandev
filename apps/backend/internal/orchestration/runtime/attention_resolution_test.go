@@ -4,20 +4,15 @@ import (
 	"context"
 	"fmt"
 	"github.com/kandev/kandev/internal/orchestration/models"
-	taskmodels "github.com/kandev/kandev/internal/task/models"
 	"github.com/stretchr/testify/require"
-	"net/http/httptest"
 	"testing"
-	"time"
 )
 
 type testAssistantInputs struct {
-	input     models.AttentionInput
-	calls     int
-	stopCalls []string
-	failure   error
-	actor     models.InputResponse
-	onStop    func()
+	input   models.AttentionInput
+	calls   int
+	failure error
+	actor   models.InputResponse
 }
 
 func (f *testAssistantInputs) ReadInput(context.Context, *models.AssistantBinding, models.Attention) (*models.AttentionInput, error) {
@@ -32,13 +27,6 @@ func (f *testAssistantInputs) ResolveInput(_ context.Context, _ *models.Assistan
 	}
 	f.input.State = "resolved"
 	return map[string]string{"status": "resolved"}, nil
-}
-func (f *testAssistantInputs) StopSession(_ context.Context, _ *models.AssistantBinding, task, session string) (string, error) {
-	f.stopCalls = append(f.stopCalls, task+":"+session)
-	if f.onStop != nil {
-		f.onStop()
-	}
-	return "stopped", f.failure
 }
 func assistantInputFixture(t *testing.T) (*Service, *models.AssistantBinding, models.Attention, *testAssistantInputs) {
 	t.Helper()
@@ -108,70 +96,4 @@ func TestAssistantInputRejectsStaleAndWrongSession(t *testing.T) {
 		require.Equal(t, 409, runtimeRequest(t, assistantRouter(s), "POST", path, "", "", body).Code)
 	}
 	require.Zero(t, f.calls)
-}
-
-type assistantControlTasks struct {
-	*testTasks
-	sessions []*taskmodels.TaskSession
-}
-
-func (f *assistantControlTasks) ListTaskSessions(_ context.Context, task string) ([]*taskmodels.TaskSession, error) {
-	if task != "worker" {
-		return nil, nil
-	}
-	return f.sessions, nil
-}
-func TestAssistantInputPauseAndStop(t *testing.T) {
-	s, b, _, inputs := assistantInputFixture(t)
-	ctx := context.Background()
-	router := assistantRouter(s)
-	updated := 0
-	s.AttentionUpdated = func(_ context.Context, id string, _ time.Time) { require.Equal(t, b.ID, id); updated++ }
-	s.Tasks = &assistantControlTasks{testTasks: s.Tasks.(*testTasks), sessions: []*taskmodels.TaskSession{{ID: "first", TaskID: "worker", State: taskmodels.TaskSessionStateRunning}, {ID: "second", TaskID: "worker", State: taskmodels.TaskSessionStateWaitingForInput}, {ID: "finished", TaskID: "worker", State: taskmodels.TaskSessionStateCompleted}, {ID: "foreign", TaskID: "unmanaged", State: taskmodels.TaskSessionStateRunning}}}
-	control := func(action, op string) *httptest.ResponseRecorder {
-		return runtimeRequest(t, router, "POST", "/api/v1/orchestration/assistant/control", "", "", map[string]any{"action": action, "operation_id": op, "expected_binding_version": b.Version, "expected_intent_revision": 0})
-	}
-	paused := control("pause", "pause")
-	require.Equal(t, 200, paused.Code, paused.Body.String())
-	require.Empty(t, inputs.stopCalls)
-	require.Error(t, s.QueueTurn(ctx, b.OrchestratorID, b.ConversationID, "test", "paused", nil))
-	require.Equal(t, 400, runtimeRequest(t, router, "POST", "/api/v1/orchestration/tasks/"+b.ConversationID+"/comments", "", "", map[string]string{"body": "A synthetic request while paused"}).Code)
-	resumed := control("resume", "resume")
-	require.Equal(t, 200, resumed.Code, resumed.Body.String())
-	stopped := control("stop_managed_work", "stop")
-	require.Equal(t, 200, stopped.Code, stopped.Body.String())
-	require.ElementsMatch(t, []string{"worker:first", "worker:second"}, inputs.stopCalls)
-	require.Contains(t, stopped.Body.String(), "already_finished")
-	require.NotContains(t, stopped.Body.String(), "unmanaged")
-	replay := control("stop_managed_work", "stop")
-	require.Equal(t, 200, replay.Code, replay.Body.String())
-	require.Len(t, inputs.stopCalls, 2)
-	revision, err := s.Repo.IntentRevision(ctx, b.ConversationID)
-	require.NoError(t, err)
-	require.EqualValues(t, 1, revision)
-	require.Equal(t, 3, updated)
-}
-func TestAssistantInputStopReportsUnknown(t *testing.T) {
-	s, b, _, inputs := assistantInputFixture(t)
-	inputs.failure = context.DeadlineExceeded
-	s.Tasks = &assistantControlTasks{testTasks: s.Tasks.(*testTasks), sessions: []*taskmodels.TaskSession{{ID: "worker-session", TaskID: "worker", State: taskmodels.TaskSessionStateRunning}}}
-	response := runtimeRequest(t, assistantRouter(s), "POST", "/api/v1/orchestration/assistant/control", "", "", map[string]any{"action": "stop_managed_work", "operation_id": "stop", "expected_binding_version": b.Version, "expected_intent_revision": 0})
-	require.Equal(t, 200, response.Code, response.Body.String())
-	require.Contains(t, response.Body.String(), `"status":"unknown"`)
-	require.Contains(t, response.Body.String(), `"partial":true`)
-}
-
-func TestAssistantInputStopRechecksBindingPerSession(t *testing.T) {
-	s, b, _, inputs := assistantInputFixture(t)
-	s.Tasks = &assistantControlTasks{testTasks: s.Tasks.(*testTasks), sessions: []*taskmodels.TaskSession{{ID: "first", TaskID: "worker", State: taskmodels.TaskSessionStateRunning}, {ID: "second", TaskID: "worker", State: taskmodels.TaskSessionStateRunning}}}
-	inputs.onStop = func() {
-		fresh := *b
-		fresh.ExecutionMode = "execute"
-		require.NoError(t, s.Repo.SelectAssistant(context.Background(), &fresh, b.Version))
-	}
-	response := runtimeRequest(t, assistantRouter(s), "POST", "/api/v1/orchestration/assistant/control", "", "", map[string]any{"action": "stop_managed_work", "operation_id": "stop-revoked", "expected_binding_version": b.Version, "expected_intent_revision": 0})
-	require.Equal(t, 200, response.Code, response.Body.String())
-	require.Equal(t, []string{"worker:first"}, inputs.stopCalls)
-	require.Contains(t, response.Body.String(), `"partial":true`)
-	require.Contains(t, response.Body.String(), `"status":"failed"`)
 }
