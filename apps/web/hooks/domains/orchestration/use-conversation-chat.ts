@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useAppStore, useAppStoreApi } from "@/components/state-provider";
+import { useOfficeRefetch } from "@/hooks/use-office-refetch";
 import {
   getConversation,
   getConversationCommentPage,
@@ -73,7 +74,8 @@ function useConversationMetadata(taskId: string) {
 /**
  * Reads one orchestration conversation: a paged comment window, the task and
  * its sessions. Polling runs only while `visible` and the document is shown,
- * fastest while a user message awaits its reply.
+ * fastest while a user message awaits its reply; a comment-created event
+ * refreshes at once.
  */
 export function useConversationChat(taskId: string, visible = true) {
   const connection = useAppStore((s) => s.connection.status);
@@ -114,6 +116,11 @@ export function useConversationChat(taskId: string, visible = true) {
       document.removeEventListener("visibilitychange", poll);
     };
   }, [visible, interval, refresh]);
+  // A comment written outside this chat (an agent reply, an API client)
+  // arrives as a live event, so it shows without waiting for the idle poll.
+  useOfficeRefetch(`comments:${taskId}`, () => {
+    if (visible && !document.hidden) void refresh();
+  });
   const sessionIds = useMemo(() => sessions?.map((session) => session.id) ?? [], [sessions]);
   useSessionLiveSyncSubscriptions({ connectionStatus: connection, taskId, sessionIds });
   const comments = useMemo(

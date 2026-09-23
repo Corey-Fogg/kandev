@@ -1,7 +1,7 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
-import { StateProvider } from "@/components/state-provider";
+import { StateProvider, useAppStoreApi } from "@/components/state-provider";
 import type { TaskComment } from "@/app/office/tasks/[id]/types";
 import type { TaskSession } from "@/lib/types/http";
 import {
@@ -86,6 +86,20 @@ describe("useConversationChat", () => {
     });
     expect(api.page).not.toHaveBeenCalled();
     expect(api.conversation).not.toHaveBeenCalled();
+  });
+
+  it("refreshes at once when a comment is created on the conversation", async () => {
+    serve();
+    const { result } = renderHook(
+      () => ({ chat: useConversationChat("t"), store: useAppStoreApi() }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.chat.loaded).toBe(true));
+    const calls = api.page.mock.calls.length;
+    act(() => {
+      result.current.store.getState().setOfficeRefetchTrigger("comments:t");
+    });
+    await waitFor(() => expect(api.page.mock.calls.length).toBeGreaterThan(calls));
   });
 
   it("loads once shown and stops polling when hidden again", async () => {
