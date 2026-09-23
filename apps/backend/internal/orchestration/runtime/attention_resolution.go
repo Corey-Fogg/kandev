@@ -146,58 +146,8 @@ func (h *Handler) validateInputResponse(c *gin.Context, claims *runtimeauth.Agen
 		return rejectOperation(409, "native_input_expired_or_superseded")
 	}
 	req.ActorType, req.ActorID = authorTypeUser, b.OwnerUserID
-	if claims.Capabilities == assistantBrokerAudience {
-		if err := h.authorizeTaskEffect(c, claims, executionModeDesign); err != nil {
-			return err
-		}
-		if err := h.Service.knownAnswerContext(ctx, b, *row, input, req); err != nil {
-			return rejectOperation(403, "known_answer_scope_required")
-		}
-		req.ActorType, req.ActorID, req.SourceMemoryIDs = authorTypeAgent, b.OrchestratorID, req.MemoryIDs
-	}
 	return nil
 }
-func (s *Service) knownAnswerContext(ctx context.Context, b *models.AssistantBinding, row models.Attention, input *models.AttentionInput, req *attentionResponseRequest) error {
-	if input.Kind != attentionKindQuestion || len(input.Questions) == 0 || len(req.MemoryIDs) == 0 || len(req.MemoryIDs) > 20 || req.Rejected {
-		return errors.New("only delegable questions with confirmed sources")
-	}
-	if !allQuestionsDelegable(input.Questions) {
-		return errors.New("question requires human input")
-	}
-	task, err := s.Tasks.GetTask(ctx, row.TaskID)
-	if err != nil {
-		return err
-	}
-	if err = s.ValidateDispatchContext(ctx, req.ContextRef, task, input.ProfileID); err != nil {
-		return err
-	}
-	packet, err := s.currentPacket(ctx, b, req.ContextRef)
-	if err != nil {
-		return err
-	}
-	available := map[string]bool{}
-	for _, memory := range packet.Memory {
-		if memory.Confirmed && !memory.Truncated {
-			available[memory.ID] = true
-		}
-	}
-	for _, id := range req.MemoryIDs {
-		if !available[id] {
-			return errors.New("source unavailable in worker context")
-		}
-	}
-	return nil
-}
-
 func currentInputMatches(input *models.AttentionInput, row *models.Attention, req *attentionResponseRequest) bool {
 	return input != nil && input.Kind == row.Kind && input.State == models.AttentionPending && input.SourceRevision == req.SourceRevision && input.SessionID == req.SessionID && input.TaskID == row.TaskID && input.SourceID == row.SourceID
-}
-
-func allQuestionsDelegable(questions []models.InputQuestion) bool {
-	for _, q := range questions {
-		if !q.AssistantDelegable {
-			return false
-		}
-	}
-	return len(questions) > 0
 }

@@ -3,7 +3,6 @@ package runtime
 import (
 	"context"
 	"crypto/sha256"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,8 +18,7 @@ const operationIDKey = "operation_id"
 
 func (h *Handler) performOperation(c *gin.Context, claims *runtimeauth.AgentClaims, req models.OperationRequest, input any, status int, execute func() (any, error)) {
 	ctx := c.Request.Context()
-	binding, err := h.Service.Repo.AssistantForConversation(ctx, claims.TaskID)
-	if errors.Is(err, sql.ErrNoRows) && req.OperationID == "" {
+	if req.OperationID == "" {
 		result, err := execute()
 		if err != nil {
 			fail(c, err)
@@ -29,6 +27,7 @@ func (h *Handler) performOperation(c *gin.Context, claims *runtimeauth.AgentClai
 		c.JSON(status, result)
 		return
 	}
+	binding, err := h.Service.Repo.AssistantForConversation(ctx, claims.TaskID)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{errorResponseKey: "assistant_binding_required"})
 		return

@@ -96,7 +96,7 @@ func nativeWorkspaceRuntime(t *testing.T, a *taskCreatorAdapter) (*gin.Engine, s
 	require.NoError(t, err)
 	runs := runstore.NewWithDB(db, db)
 	require.NoError(t, runs.Migrate())
-	s := &orchestrationruntime.Service{AssistantEnabled: true, Repo: repo, Personas: &personas.Service{Profiles: profiles, Repo: repo}, Runs: runs, Queue: runservice.New(runs, nil, log, nil), Auth: runtimeauth.NewAgentAuth(""), Tasks: a.taskSvc, Manager: a}
+	s := &orchestrationruntime.Service{Enabled: true, Repo: repo, Personas: &personas.Service{Profiles: profiles, Repo: repo}, Runs: runs, Queue: runservice.New(runs, nil, log, nil), Auth: runtimeauth.NewAgentAuth(""), Tasks: a.taskSvc, Manager: a}
 	s.UpdateStatus = func(ctx context.Context, ws, id, status string) error {
 		return updateOrchestratedStatus(ctx, a.taskSvc, &Repositories{Workflow: a.workflow}, ws, id, status)
 	}

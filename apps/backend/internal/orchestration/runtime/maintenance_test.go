@@ -208,33 +208,10 @@ func maintenanceRuntimeCaller(t *testing.T, s *Service, b *models.AssistantBindi
 	require.NoError(t, s.QueueTurn(ctx, b.OrchestratorID, b.ConversationID, "task_comment", "maintenance-example-run", nil))
 	run, err := s.Runs.ClaimNextEligibleRun(ctx)
 	require.NoError(t, err)
-	require.NoError(t, s.Runs.UpdateRunRuntimeSnapshot(ctx, run.ID, assistantBrokerAudience, run.Payload, "session"))
-	token, err := s.Auth.MintRuntimeJWT(b.OrchestratorID, b.ConversationID, b.WorkspaceID, run.ID, "session", assistantBrokerAudience)
+	require.NoError(t, s.Runs.UpdateRunRuntimeSnapshot(ctx, run.ID, workspaceCoordinatorAudience, run.Payload, "session"))
+	token, err := s.Auth.MintRuntimeJWT(b.OrchestratorID, b.ConversationID, b.WorkspaceID, run.ID, "session", workspaceCoordinatorAudience)
 	require.NoError(t, err)
 	router := gin.New()
 	RegisterRoutes(router.Group("/api/v1/orchestration", runtimeauth.Middleware(s.Auth, s.Personas)), &Handler{Service: s})
 	return router, token, run.ID
-}
-
-func TestAssistantMaintenanceBoundaryCannotUseGeneralDelegation(t *testing.T) {
-	s, b, candidate, _, manager := maintenanceFixture(t)
-	prepareMaintenanceFixture(t, s, b, candidate)
-	current, err := s.Repo.ImprovementCandidate(context.Background(), b.ID, candidate.ID)
-	require.NoError(t, err)
-	links, err := s.Repo.ObjectiveTasks(context.Background(), current.ObjectiveID)
-	require.NoError(t, err)
-	require.Len(t, links, 1)
-	router, token, run := maintenanceRuntimeCaller(t, s, b)
-	body := map[string]any{"operation_id": "escape-closed-repair", "expected_intent_revision": 0, "objective_id": current.ObjectiveID, "execution_mode": "execute", "workflow_id": "workflow", "workflow_step_id": "review", "repository_id": "repo", "assignee": "personal", "title": "Unrestricted repair", "description": "Prepare a sample change", "context_ref": links[0].ContextRef}
-	response := runtimeRequest(t, router, "POST", "/api/v1/orchestration/runtime/tasks", token, run, body)
-	require.Equal(t, 422, response.Code, response.Body.String())
-	require.EqualValues(t, 1, manager.creates.Load(), "the granted task is the only task created")
-	objective, err := s.Repo.Objective(context.Background(), b.ID, current.ObjectiveID)
-	require.NoError(t, err)
-	response = runtimeRequest(t, router, "POST", "/api/v1/orchestration/runtime/objectives", token, run, map[string]any{"operation_id": "launder-grant", "expected_intent_revision": 0, "source_comment_id": objective.SourceCommentID, "mode": "execute", "title": "Different task", "acceptance": []models.Criterion{{ID: "new", Description: "Different effects"}}})
-	require.Equal(t, 422, response.Code, response.Body.String())
-	response = runtimeRequest(t, router, "PATCH", "/api/v1/orchestration/runtime/objectives/"+objective.ID, token, run, map[string]any{"operation_id": "change-grant-goal", "expected_intent_revision": 0, "expected_revision": objective.Revision, "mode": "design"})
-	require.Equal(t, 403, response.Code, response.Body.String())
-	response = runtimeRequest(t, router, "PUT", "/api/v1/orchestration/assistant/improvements/"+candidate.ID+"/grant", token, run, maintenanceGrantBody(b, candidate))
-	require.Equal(t, 403, response.Code, "the runtime cannot grant itself maintenance authority")
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/kandev/kandev/internal/common/config"
 	officestore "github.com/kandev/kandev/internal/office/repository/sqlite"
 	orchestrationruntime "github.com/kandev/kandev/internal/orchestration/runtime"
+	taskmodels "github.com/kandev/kandev/internal/task/models"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,6 +40,9 @@ func TestAssistantFeatureGateNativeConversationDispatch(t *testing.T) {
 	require.NoError(t, err)
 	for _, runtime := range []*orchestrationruntime.Service{nil, {Repo: repo}} {
 		guard := assistantDispatchGuard(runtime, repo)
-		require.ErrorIs(t, guard(context.Background(), task, nil, "profile"), orchestrationruntime.ErrAssistantDisabled)
+		require.ErrorIs(t, guard(context.Background(), task, nil, "profile"), orchestrationruntime.ErrOrchestrationDisabled)
 	}
+	ordinary := &taskmodels.Task{ID: "ordinary-task", WorkspaceID: task.WorkspaceID}
+	require.NoError(t, assistantDispatchGuard(nil, repo)(context.Background(), ordinary, nil, "profile"),
+		"tasks that are not coordinator conversations keep native dispatch")
 }

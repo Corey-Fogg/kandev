@@ -51,7 +51,7 @@ var retiredRuntimeFlagIdentities = []runtimeFlagIdentity{
 }
 
 var registrations = []runtimeFlagRegistration{
-	{definition: RuntimeFlagDefinition{Key: "features.orchestration", EnvVar: "KANDEV_FEATURES_ORCHESTRATION", Kind: KindFeature, Label: "Orchestrator", Description: "Enables workspace coordination and the central assistant capabilities.", Stability: StabilityExperimental, RiskLevel: RiskHigh, RiskDescription: "The Orchestrator can inspect context and create or manage tasks through explicitly selected accounts and permissions.", RestartRequired: true, Mutable: true}, read: func(cfg *config.Config) bool { return cfg.Features.Orchestration }, apply: func(cfg *config.Config, v bool) { cfg.Features.Orchestration = v }},
+	{definition: RuntimeFlagDefinition{Key: "features.orchestration", EnvVar: "KANDEV_FEATURES_ORCHESTRATION", Kind: KindFeature, Label: "Orchestrator", Description: "Enables workspace coordinators and the work they manage.", Stability: StabilityExperimental, RiskLevel: RiskHigh, RiskDescription: "The Orchestrator can inspect context and create or manage tasks through explicitly selected accounts and permissions.", RestartRequired: true, Mutable: true}, read: func(cfg *config.Config) bool { return cfg.Features.Orchestration }, apply: func(cfg *config.Config, v bool) { cfg.Features.Orchestration = v }},
 	{
 		definition: RuntimeFlagDefinition{
 			Key:         "features.office",

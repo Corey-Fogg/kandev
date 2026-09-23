@@ -57,9 +57,6 @@ func (h *Handler) maintenanceAction(c *gin.Context) {
 			return nil, err
 		}
 		guard := maintenance.Guard(func(ctx context.Context) error {
-			if err := h.authorizeTaskEffect(c, claims, executionModeExecute); err != nil {
-				return err
-			}
 			_, _, err := h.Service.currentMaintenance(ctx, b, c.Param("id"), req)
 			return err
 		})

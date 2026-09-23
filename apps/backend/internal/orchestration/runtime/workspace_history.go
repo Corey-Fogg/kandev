@@ -83,25 +83,3 @@ func (s *Service) workspaceHistory(ctx context.Context, b *models.AssistantBindi
 	}
 	return nil, fmt.Errorf("workspace history exceeds the validation budget")
 }
-
-func (s *Service) recordWorkspaceHistory(ctx context.Context, taskID string, authority *models.AssistantAuthority) error {
-	if authority == nil {
-		return nil
-	}
-	b, err := s.Repo.AssistantForConversation(ctx, taskID)
-	if err != nil {
-		return err
-	}
-	return s.validateWorkspaceHistory(ctx, b, *authority, true)
-}
-
-func (s *Service) authorizeHistoryLaunch(ctx context.Context, taskID, payload string) (*models.AssistantAuthority, error) {
-	authority, err := s.validateAssistantAuthority(ctx, taskID, payload)
-	if err != nil {
-		return nil, err
-	}
-	if err = s.recordWorkspaceHistory(ctx, taskID, authority); err != nil {
-		return nil, err
-	}
-	return authority, nil
-}

@@ -54,15 +54,6 @@ func TestAssistantImprovementHumanReview(t *testing.T) {
 	require.Equal(t, 404, runtimeRequest(t, assistantRouter(s, "foreign"), "POST", base+"/review", "", "", review).Code)
 	runtimeRouter, token, run := maintenanceRuntimeCaller(t, s, b)
 	require.Equal(t, 403, runtimeRequest(t, runtimeRouter, "POST", base+"/review", token, run, review).Code)
-	comments, err := s.Repo.ListComments(context.Background(), b.ConversationID, 100)
-	require.NoError(t, err)
-	for _, comment := range comments {
-		if comment.Source != "maintenance_review" {
-			continue
-		}
-		response = runtimeRequest(t, runtimeRouter, "POST", "/api/v1/orchestration/runtime/objectives", token, run, map[string]any{"operation_id": "reuse-review", "expected_intent_revision": 0, "source_comment_id": comment.ID, "mode": "execute", "title": "Another example task", "acceptance": []models.Criterion{{ID: "result", Description: "Example output"}}})
-		require.Equal(t, 422, response.Code, "a scoped review does not authorize a general objective: "+response.Body.String())
-	}
 }
 
 func TestAssistantImprovementReadArtifacts(t *testing.T) {

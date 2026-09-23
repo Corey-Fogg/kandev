@@ -3,7 +3,6 @@ package runtime
 import (
 	"context"
 	"encoding/json"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -20,8 +19,8 @@ type workspaceSelection struct {
 	Export    string
 }
 
-// The signed credential remains bound to the home conversation. Only this
-// request-local copy carries an explicitly authorized linked target.
+// resolveWorkspaceTarget keeps every coordinator call inside the signed
+// credential's home workspace.
 func (h *Handler) resolveWorkspaceTarget(c *gin.Context, claims *runtimeauth.AgentClaims) (*runtimeauth.AgentClaims, bool) {
 	workspace := c.Query(workspaceIDKey)
 	if workspace == "" || workspace == claims.WorkspaceID {
@@ -31,27 +30,9 @@ func (h *Handler) resolveWorkspaceTarget(c *gin.Context, claims *runtimeauth.Age
 		}
 		return claims, true
 	}
-	operation, export := workspaceRouteScope(c)
-	revision, err := strconv.ParseInt(c.Query("workspace_grant_revision"), 10, 64)
-	if claims.Capabilities != assistantBrokerAudience || operation == "" || err != nil || revision < 1 {
-		c.AbortWithStatus(403)
-		return nil, false
-	}
-	b, err := h.Service.Repo.AssistantForConversation(c.Request.Context(), claims.TaskID)
-	if err != nil || b.WorkspaceID != claims.WorkspaceID || b.OrchestratorID != claims.AgentProfileID {
-		c.AbortWithStatus(403)
-		return nil, false
-	}
-	g, err := h.Service.currentWorkspaceGrant(c.Request.Context(), b, workspace, revision, operation, export)
-	if err != nil {
-		c.AbortWithStatusJSON(403, gin.H{errorResponseKey: "workspace_grant_unavailable_or_superseded"})
-		return nil, false
-	}
-	c.Set(workspaceSelectionKey, workspaceSelection{Binding: b, Grant: g, Operation: operation, Export: export})
-	c.Request = c.Request.WithContext(h.Service.workspaceEffectContext(c.Request.Context(), b, g, operation, export))
-	selected := *claims
-	selected.WorkspaceID = workspace
-	return &selected, true
+	// Linked workspaces are never reachable from a coordinator credential.
+	c.AbortWithStatus(403)
+	return nil, false
 }
 
 func workspaceRouteScope(c *gin.Context) (string, string) {

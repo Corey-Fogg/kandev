@@ -78,28 +78,3 @@ func (s *Service) managedStopWorkspace(ctx context.Context, b *models.AssistantB
 	}
 	return scoped, s.workspaceEffectContext(ctx, b, g, workspaceCoordinate, ""), nil
 }
-
-func (s *Service) validateWorkspaceWakeAuthority(ctx context.Context, binding string, refs []attentionWakeRef) error {
-	if len(refs) == 0 {
-		return nil
-	}
-	if len(refs) > attentionBatch {
-		return models.ErrConflict
-	}
-	b, err := s.Repo.AssistantBindingByID(ctx, binding)
-	if err != nil {
-		return err
-	}
-	// Wake freshness is checked before launch. An active session can acknowledge
-	// resolved requests, but every further call still needs the original grant.
-	for _, ref := range refs {
-		row, err := s.Repo.AttentionByID(ctx, binding, ref.ID)
-		if err != nil {
-			return err
-		}
-		if err = s.validateWorkspaceWake(ctx, b, row, ref); err != nil {
-			return err
-		}
-	}
-	return nil
-}

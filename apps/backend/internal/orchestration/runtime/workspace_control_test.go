@@ -90,16 +90,3 @@ func TestWorkspaceControlUsesSignedScope(t *testing.T) {
 	require.Equal(t, 403, response.Code)
 	require.Len(t, manager.commands, 11)
 }
-
-func TestPrivateTaskDeletionDoesNotCreateObjectiveLink(t *testing.T) {
-	s, db, task := newRuntime(t)
-	s.Manager = &assistantTaskManager{}
-	router, token, run := assistantRuntimeCaller(t, s, task)
-	body := assistantDeliveryRequest(t, s, db, task, router, token, run, "delete-example")
-	body["action"] = "delete"
-	response := runtimeRequest(t, router, "POST", "/api/v1/orchestration/runtime/tasks/created-task/manage", token, run, body)
-	require.Equal(t, 200, response.Code, response.Body.String())
-	var count int
-	require.NoError(t, db.Get(&count, "SELECT count(*) FROM orchestration_objective_tasks WHERE task_id='created-task'"))
-	require.Zero(t, count, "deleting a task must not add a delivery link")
-}

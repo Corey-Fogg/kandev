@@ -1,8 +1,6 @@
 package runtime
 
 import (
-	"context"
-	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -32,46 +30,4 @@ func TestAssistantContextScopesBudgetAndMandatoryOverflow(t *testing.T) {
 	require.ErrorContains(t, fillContextMemory(&models.ContextPacket{}, b, []*models.AgentMemory{required}), "required memory")
 	p = &models.ContextPacket{UserInstruction: strings.Repeat("x", models.ContextBudgetBytes)}
 	require.ErrorContains(t, fillContextMemory(p, b, nil), "indispensable")
-}
-
-func TestAssistantMemoryRedactsKnownTokensAndProtectsConfirmation(t *testing.T) {
-	s, _, _, _ := assistantContextFixture(t)
-	canary := "ghp_" + strings.Repeat("A", 36)
-	put := runtimeRequest(t, assistantRouter(s), "PUT", "/api/v1/orchestration/assistant/memory/redacted", "", "", map[string]any{
-		"key": "token", "content": "Do not store " + canary, "scope": "workspace", "source_comment_id": "source", "confirmed": true,
-	})
-	require.Equal(t, 200, put.Code, put.Body.String())
-	require.NotContains(t, put.Body.String(), canary)
-	err := s.Repo.UpsertAgentMemory(context.Background(), &models.AgentMemory{
-		AgentProfileID: "chief", Layer: "user", Key: "token", Content: "runtime overwrite", Metadata: "{}",
-	})
-	require.ErrorIs(t, err, models.ErrConflict)
-}
-
-func TestAssistantContextForgetAndExpiryChangeDigest(t *testing.T) {
-	s, token, run, goal := assistantContextFixture(t)
-	human, agent := assistantRouter(s), assistantRuntimeRouter(s)
-	memoryPath := "/api/v1/orchestration/assistant/memory/preference"
-	req := map[string]any{"key": "keep", "content": "SCOPED_PREFERENCE", "scope": "workspace", "source_comment_id": "source", "confirmed": true}
-	require.Equal(t, 200, runtimeRequest(t, human, "PUT", memoryPath, "", "", req).Code)
-	packetPath := "/api/v1/orchestration/runtime/context/" + goal + "?profile_id=personal"
-	fetch := func() models.ContextPacket {
-		r := runtimeRequest(t, agent, "GET", packetPath, token, run, nil)
-		require.Equal(t, 200, r.Code, r.Body.String())
-		var p models.ContextPacket
-		require.NoError(t, json.Unmarshal(r.Body.Bytes(), &p))
-		return p
-	}
-	first := fetch()
-	require.Len(t, first.Memory, 1)
-	req["expected_revision"], req["expires_at"] = 1, time.Now().Add(-time.Hour)
-	require.Equal(t, 200, runtimeRequest(t, human, "PUT", memoryPath, "", "", req).Code)
-	expired := fetch()
-	require.Empty(t, expired.Memory)
-	require.NotEqual(t, first.ID, expired.ID)
-	req["expected_revision"], req["expires_at"] = 2, nil
-	require.Equal(t, 200, runtimeRequest(t, human, "PUT", memoryPath, "", "", req).Code)
-	require.Len(t, fetch().Memory, 1)
-	require.Equal(t, 200, runtimeRequest(t, human, "DELETE", memoryPath, "", "", map[string]int{"expected_revision": 3}).Code)
-	require.Empty(t, fetch().Memory)
 }

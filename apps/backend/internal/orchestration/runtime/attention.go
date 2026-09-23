@@ -127,7 +127,7 @@ func (s *Service) reconcileAttentionTarget(ctx context.Context, target models.At
 	return s.dispatchUnpausedAttentionWakes(ctx, b, target.TaskID, frictionErr)
 }
 func (s *Service) dispatchUnpausedAttentionWakes(ctx context.Context, b *models.AssistantBinding, task string, frictionErr error) error {
-	if !s.AssistantEnabled {
+	if !s.Enabled {
 		return nil
 	}
 	a, err := s.Personas.GetAgentInstance(ctx, b.OrchestratorID)
@@ -215,7 +215,7 @@ func (s *Service) dispatchAttentionWakes(ctx context.Context, b *models.Assistan
 		if refs[0].WorkspaceID != "" {
 			callback[workspaceIDKey], callback["workspace_grant_revision"] = refs[0].WorkspaceID, refs[0].WorkspaceGrantRevision
 		}
-		payload := map[string]any{"attention_refs": refs, "callback": callback}
+		payload := map[string]any{"attention_refs": refs, "binding_id": b.ID, "callback": callback}
 		if err = s.QueueTurn(ctx, b.OrchestratorID, b.ConversationID, "assistant_attention", "assistant-attention:"+wake.ID, payload); err != nil {
 			return err
 		}

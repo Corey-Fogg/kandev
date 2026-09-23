@@ -23,22 +23,6 @@ func (s *Service) withIntentRevision(ctx context.Context, taskID string, payload
 		}
 		copy[intentRevisionKey] = revision
 	}
-	if _, present := copy["binding_version"]; !present {
-		id, version, err := s.bindingSnapshot(ctx, taskID)
-		if err != nil {
-			return nil, err
-		}
-		copy["binding_id"], copy["binding_version"] = id, version
-	}
-	if _, present := copy["assistant_authority"]; !present {
-		authority, err := s.assistantAuthority(ctx, taskID)
-		if err != nil {
-			return nil, err
-		}
-		if authority != nil {
-			copy["assistant_authority"] = authority
-		}
-	}
 	return copy, nil
 }
 
@@ -47,8 +31,8 @@ func (s *Service) bindingSnapshot(ctx context.Context, taskID string) (string, i
 	if err != nil {
 		return "", 0, err
 	}
-	if owner != "" && !s.AssistantEnabled {
-		return "", 0, ErrAssistantDisabled
+	if owner != "" && !s.Enabled {
+		return "", 0, ErrOrchestrationDisabled
 	}
 	row, err := s.Repo.AssistantForConversation(ctx, taskID)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -83,34 +67,11 @@ func (h *Handler) currentIntent(c *gin.Context, taskID, payload string) bool {
 		c.AbortWithStatusJSON(http.StatusConflict, gin.H{errorResponseKey: "intent_superseded", intentRevisionKey: revision})
 		return false
 	}
-	return h.currentBinding(c, taskID, payload)
-}
-
-func (s *Service) validateBindingSnapshot(ctx context.Context, taskID, payload string) error {
-	var snapshot struct {
-		ID      string `json:"binding_id"`
-		Version int64  `json:"binding_version"`
-	}
-	if err := json.Unmarshal([]byte(payload), &snapshot); err != nil {
-		return err
-	}
-	id, version, err := s.bindingSnapshot(ctx, taskID)
-	if err != nil {
-		return err
-	}
-	if snapshot.ID != id || snapshot.Version != version {
-		return models.ErrConflict
-	}
-	return nil
-}
-
-func (h *Handler) currentBinding(c *gin.Context, taskID, payload string) bool {
-	err := h.Service.validateBindingSnapshot(c.Request.Context(), taskID, payload)
-	return bindingCheck(c, err)
+	return true
 }
 
 func bindingCheck(c *gin.Context, err error) bool {
-	if errors.Is(err, ErrAssistantDisabled) {
+	if errors.Is(err, ErrOrchestrationDisabled) {
 		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{errorResponseKey: err.Error()})
 		return false
 	}

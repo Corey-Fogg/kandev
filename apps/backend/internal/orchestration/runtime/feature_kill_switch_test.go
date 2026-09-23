@@ -16,13 +16,13 @@ func TestProcessSettlesRegisteredRunWithoutLaunchWhenOrchestrationDisabled(t *te
 	require.NoError(t, err)
 	require.NotNil(t, run)
 
-	svc.AssistantEnabled = false
+	svc.Enabled = false
 	svc.Start = func(context.Context, Launch) error {
 		t.Fatal("a disabled orchestration runtime must not launch")
 		return nil
 	}
 	handled, err := svc.Process(ctx, run)
-	require.ErrorIs(t, err, errOrchestrationDisabled)
+	require.ErrorIs(t, err, ErrOrchestrationDisabled)
 	require.True(t, handled, "the run is settled here, not handed to another runtime")
 	settled, err := svc.Runs.GetRunByID(ctx, run.ID)
 	require.NoError(t, err)

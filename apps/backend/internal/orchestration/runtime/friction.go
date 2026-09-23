@@ -14,7 +14,7 @@ import (
 // Only canonical typed events become observations. Free-form error messages and
 // question bodies are deliberately absent from this projection.
 func (s *Service) observeFriction(ctx context.Context, b *models.AssistantBinding, task string, sources []models.AttentionSource) error {
-	if !s.AssistantEnabled {
+	if !s.Enabled {
 		return nil
 	}
 	sessions, err := s.Tasks.ListTaskSessions(ctx, task)

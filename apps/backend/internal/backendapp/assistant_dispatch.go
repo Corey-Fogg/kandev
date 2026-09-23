@@ -2,6 +2,8 @@ package backendapp
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 
 	orchstore "github.com/kandev/kandev/internal/orchestration/repository/sqlite"
@@ -18,17 +20,8 @@ func assistantDispatchGuard(s *orchestrationruntime.Service, owners *orchstore.R
 		if err := checkMaintenanceDispatch(ctx, owners, task); err != nil {
 			return err
 		}
-		if err := checkAssistantConversationDispatch(ctx, s, owners, task.ID); err != nil {
+		if coordinator, err := checkCoordinatorDispatch(ctx, s, owners, task.ID, session); coordinator || err != nil {
 			return err
-		}
-		if owners != nil {
-			owner, err := owners.ConversationUserOwner(ctx, task.ID)
-			if err != nil {
-				return err
-			}
-			if owner != "" {
-				return s.CheckAssistantSession(ctx, task.ID, session, profile)
-			}
 		}
 		baseline, _ := task.Metadata[dispatchcontext.MetadataKey].(string)
 		ref, explicit := dispatchcontext.Reference(ctx)
@@ -72,18 +65,23 @@ func checkMaintenanceDispatch(ctx context.Context, owners *orchstore.Repository,
 	return nil
 }
 
-func checkAssistantConversationDispatch(ctx context.Context, s *orchestrationruntime.Service, owners *orchstore.Repository, taskID string) error {
+// checkCoordinatorDispatch reports whether taskID is a coordinator
+// conversation and, if so, admits only its broker-pinned session.
+func checkCoordinatorDispatch(ctx context.Context, s *orchestrationruntime.Service, owners *orchstore.Repository, taskID string, session *models.TaskSession) (bool, error) {
 	if owners == nil {
-		return nil
+		return false, nil
 	}
-	owner, err := owners.ConversationUserOwner(ctx, taskID)
-	if err != nil || owner == "" {
-		return err
+	_, _, err := owners.ConversationOwner(ctx, taskID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return true, err
 	}
 	if s == nil {
-		return orchestrationruntime.ErrAssistantDisabled
+		return true, orchestrationruntime.ErrOrchestrationDisabled
 	}
-	return s.CheckConversationExecution(ctx, taskID)
+	return true, s.CheckCoordinatorSession(ctx, taskID, session)
 }
 
 // Wire even with orchestration disabled: disabling a feature is not permission

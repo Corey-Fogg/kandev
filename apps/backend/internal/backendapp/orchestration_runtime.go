@@ -22,7 +22,7 @@ import (
 	"strings"
 )
 
-func newOrchestrationRuntime(cfg *config.Config, repos *Repositories, services *Services, orch *orchestrator.Service, cli string, eventBus bus.EventBus, log *logger.Logger) *orchestrationruntime.Service {
+func newOrchestrationRuntime(cfg *config.Config, repos *Repositories, services *Services, orch *orchestrator.Service, eventBus bus.EventBus, log *logger.Logger) *orchestrationruntime.Service {
 	apiPort := cfg.Server.Port
 	if apiPort == 0 {
 		apiPort = ports.Backend
@@ -34,10 +34,8 @@ func newOrchestrationRuntime(cfg *config.Config, repos *Repositories, services *
 		FailureHandlerInstalled: true,
 		RecoveryStarting:        orch.ResolveManagedRecovery,
 		Maintenance:             maintenance.New(filepath.Join(cfg.ResolvedDataDir(), "orchestration-maintenance")),
-		// The Orchestrator is the single product boundary. Its assistant
-		// capabilities are enabled with the same flag as workspace coordination.
-		AssistantEnabled: cfg.Features.Orchestration,
-		Repo:             repos.Orchestration, Personas: personasSvc, Runs: repos.Runs,
+		Enabled:                 cfg.Features.Orchestration,
+		Repo:                    repos.Orchestration, Personas: personasSvc, Runs: repos.Runs,
 		Auth: runtimeauth.NewAgentAuth(""), Tasks: services.Task,
 		Credentials:  assistantCredentialReader{store: repos.Secrets},
 		Capabilities: newAssistantCapabilityReader(repos, services),
@@ -46,7 +44,7 @@ func newOrchestrationRuntime(cfg *config.Config, repos *Repositories, services *
 			taskCreatorAdapter: &taskCreatorAdapter{taskSvc: services.Task, profiles: repos.AgentSettings, orch: orch, taskRepo: repos.Task, workflow: repos.Workflow},
 			workflows:          services.Workflow, stepEvents: stepevents.NewPublisher(eventBus, "orchestration", log),
 		},
-		APIURL: fmt.Sprintf("http://localhost:%d", apiPort), CLI: cli,
+		APIURL: fmt.Sprintf("http://localhost:%d", apiPort),
 		Start: func(ctx context.Context, launch orchestrationruntime.Launch) error {
 			_, err := orch.StartTaskWithRoute(ctx, launch.TaskID, launch.PersonaID, orchestrationLaunchContext(repos, launch), orchexecutor.RouteOverride{ExecutionProfileID: launch.ProfileID})
 			return err

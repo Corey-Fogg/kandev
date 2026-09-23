@@ -16,10 +16,6 @@ func (h *Handler) memory(c *gin.Context) {
 		c.AbortWithStatus(403)
 		return
 	}
-	if claims.Capabilities == assistantBrokerAudience {
-		h.runtimeMemory(c)
-		return
-	}
 	h.workspaceMemory(c, claims)
 }
 

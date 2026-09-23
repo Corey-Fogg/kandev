@@ -728,7 +728,7 @@ func startAgentInfrastructure(
 	// The HTTP orchestration handlers depend on the runtime facade. Construct
 	// it immediately after the core orchestrator so route registration sees a
 	// non-nil service when the Orchestration feature is enabled.
-	services.Orchestration = newOrchestrationRuntime(cfg, repos, services, orchestratorSvc, agentctlBinaryPath, eventBus, log)
+	services.Orchestration = newOrchestrationRuntime(cfg, repos, services, orchestratorSvc, eventBus, log)
 	services.Task.SetWorkflowMovePreflight(orchestratorSvc)
 	orchestratorSvc.SetAgentctlBinaryPath(agentctlBinaryPath)
 	// The checker is populated by lifecycleMgr.Start below before the

@@ -7,68 +7,20 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kandev/kandev/internal/auth/authn"
 	orchestrationapi "github.com/kandev/kandev/internal/orchestration"
-	"github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/stretchr/testify/require"
 )
 
-func TestAssistantPrivacyRevokesRuntimeReadsAfterSwitch(t *testing.T) {
-	s, _, task := newRuntime(t)
-	router, token, runID := assistantRuntimeCaller(t, s, task)
-	require.NoError(t, s.Repo.UpsertAgentMemory(context.Background(), &models.AgentMemory{
-		AgentProfileID: "chief", Layer: "user", Key: "private", Content: "PRIVATE_MEMORY_CANARY",
-	}))
-	path := "/api/v1/orchestration/agents/chief/memory"
-	require.Equal(t, 200, runtimeRequest(t, router, "GET", path, token, runID, nil).Code)
-	switchPrivateAssistant(t, s, assistantRouter(s), 1)
-	for _, path := range []string{path, "/api/v1/orchestration/tasks/" + task + "/comments", "/api/v1/orchestration/runtime/workspace"} {
-		response := runtimeRequest(t, router, "GET", path, token, runID, nil)
-		require.Equal(t, 409, response.Code, response.Body.String())
-		require.NotContains(t, response.Body.String(), "PRIVATE_MEMORY_CANARY")
-	}
-}
-
 func TestAssistantPrivacyRefusesInactiveTurns(t *testing.T) {
-	s, db, task := newRuntime(t)
+	s, _, task := newRuntime(t)
 	human := assistantRouter(s)
 	require.Equal(t, 200, runtimeRequest(t, human, "PUT", "/api/v1/orchestration/assistant", "", "", map[string]any{"orchestrator_id": "chief"}).Code)
 	switchPrivateAssistant(t, s, human, 1)
 	path := "/api/v1/orchestration/tasks/" + task + "/comments"
 	response := runtimeRequest(t, human, "POST", path, "", "", map[string]string{"body": "Old conversation"})
 	require.Equal(t, 409, response.Code, response.Body.String())
-	require.Error(t, s.QueueTurn(context.Background(), "chief", task, "task_comment", "inactive", nil))
-	var count int
-	require.NoError(t, db.Get(&count, "SELECT count(*) FROM runs"))
-	require.Zero(t, count)
 	comments, err := s.Repo.ListComments(context.Background(), task, 10)
 	require.NoError(t, err)
 	require.Empty(t, comments)
-}
-
-func TestAssistantPrivacyRechecksBindingBeforeLaunch(t *testing.T) {
-	for _, change := range []string{"switch", "claim-shared"} {
-		t.Run(change, func(t *testing.T) {
-			s, _, task := newRuntime(t)
-			ctx := context.Background()
-			human := assistantRouter(s)
-			if change == "switch" {
-				require.Equal(t, 200, runtimeRequest(t, human, "PUT", "/api/v1/orchestration/assistant", "", "", map[string]any{"orchestrator_id": "chief"}).Code)
-			}
-			require.NoError(t, s.QueueTurn(ctx, "chief", task, "task_comment", "queued", nil))
-			run, err := s.Runs.ClaimNextEligibleRun(ctx)
-			require.NoError(t, err)
-			if change == "switch" {
-				switchPrivateAssistant(t, s, human, 1)
-			} else {
-				require.Equal(t, 200, runtimeRequest(t, human, "PUT", "/api/v1/orchestration/assistant", "", "", map[string]any{"orchestrator_id": "chief"}).Code)
-			}
-			started := false
-			s.Start = func(context.Context, Launch) error { started = true; return nil }
-			handled, err := s.Process(ctx, run)
-			require.True(t, handled)
-			require.Error(t, err)
-			require.False(t, started, "stale authority must be rejected before supplying history to a provider")
-		})
-	}
 }
 
 func TestAssistantPrivacyAutomationRequiresDurableOwnerAuthority(t *testing.T) {

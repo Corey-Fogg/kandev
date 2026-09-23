@@ -133,7 +133,7 @@ func TestAssistantAttentionPausedAndExpired(t *testing.T) {
 	for _, row := range rows {
 		require.NotEqual(t, "pending", row.State)
 	}
-	s.AssistantEnabled = false
+	s.Enabled = false
 	f.sources[0].State = "pending"
 	require.NoError(t, s.ReconcileAttentionTask(ctx, "worker"))
 	require.NoError(t, db.Get(&count, `SELECT count(*) FROM runs`))

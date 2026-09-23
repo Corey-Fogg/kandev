@@ -3,7 +3,6 @@ package runtime
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/kandev/kandev/internal/orchestration/models"
@@ -30,33 +29,4 @@ func TestAssistantMemoryOwnerConfirmationAndForget(t *testing.T) {
 	list := runtimeRequest(t, router, "GET", "/api/v1/orchestration/assistant/memory", "", "", nil)
 	require.Equal(t, 200, list.Code, list.Body.String())
 	require.NotContains(t, list.Body.String(), "Use short updates")
-}
-
-func TestAssistantContextConfirmedPreferenceSurvivesActivity(t *testing.T) {
-	s, _, task := newRuntime(t)
-	router, token, run := assistantRuntimeCaller(t, s, task)
-	ctx := context.Background()
-	require.NoError(t, s.Repo.PutComment(ctx, &models.TaskComment{ID: "source", TaskID: task, AuthorType: "user", AuthorID: "owner", Body: "Inspect only; concise updates", Source: "user"}))
-	request := map[string]any{"title": "Inspect", "mode": "inspect", "source_comment_id": "source", "acceptance": []map[string]string{{"id": "summary", "description": "Summarize"}}, "operation_id": "context-goal", "expected_intent_revision": 0}
-	created := runtimeRequest(t, router, "POST", "/api/v1/orchestration/runtime/objectives", token, run, request)
-	require.Equal(t, 201, created.Code, created.Body.String())
-	var goal models.Objective
-	require.NoError(t, json.Unmarshal(created.Body.Bytes(), &goal))
-	put := runtimeRequest(t, assistantRouter(s), "PUT", "/api/v1/orchestration/assistant/memory/concise", "", "", map[string]any{"key": "concise", "content": "IMPORTANT_CONFIRMED_PREFERENCE", "scope": "workspace", "source_comment_id": "source", "expected_revision": 0, "confirmed": true})
-	require.Equal(t, 200, put.Code, put.Body.String())
-	for i := 0; i < 30; i++ {
-		require.NoError(t, s.Repo.UpsertAgentMemory(ctx, &models.AgentMemory{AgentProfileID: "chief", Layer: "activity", Key: fmt.Sprint(i), Content: "Newer activity", Metadata: "{}"}))
-	}
-	path := "/api/v1/orchestration/runtime/context/" + goal.ID + "?profile_id=personal"
-	first := runtimeRequest(t, router, "GET", path, token, run, nil)
-	require.Equal(t, 200, first.Code, first.Body.String())
-	require.Contains(t, first.Body.String(), "IMPORTANT_CONFIRMED_PREFERENCE")
-	require.LessOrEqual(t, first.Body.Len(), 12*1024)
-	second := runtimeRequest(t, router, "GET", path, token, run, nil)
-	require.Equal(t, first.Body.String(), second.Body.String())
-	persona, err := s.Personas.GetAgentInstance(ctx, "chief")
-	require.NoError(t, err)
-	prompt, err := s.prompt(ctx, persona, task, nil)
-	require.NoError(t, err)
-	require.Contains(t, prompt, "IMPORTANT_CONFIRMED_PREFERENCE")
 }

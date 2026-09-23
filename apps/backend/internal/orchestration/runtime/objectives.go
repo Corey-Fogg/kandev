@@ -11,19 +11,11 @@ import (
 	"github.com/kandev/kandev/internal/orchestration/models"
 )
 
+// runtimeAssistant admits no agent caller. Binding-scoped routes serve only
+// the human owner; coordinators use the workspace broker routes.
 func (h *Handler) runtimeAssistant(c *gin.Context) (*runtimeauth.AgentClaims, *models.AssistantBinding, bool) {
-	claims, ok := h.caller(c)
-	if !ok {
-		return nil, nil, false
-	}
-	row, err := h.Service.Repo.AssistantForConversation(c.Request.Context(), claims.TaskID)
-	raw, _ := c.Get("agent_claims")
-	signed, _ := raw.(*runtimeauth.AgentClaims)
-	if err != nil || signed == nil || row.OrchestratorID != claims.AgentProfileID || row.WorkspaceID != signed.WorkspaceID {
-		c.AbortWithStatus(404)
-		return nil, nil, false
-	}
-	return claims, row, true
+	c.AbortWithStatus(http.StatusNotFound)
+	return nil, nil, false
 }
 
 func (h *Handler) humanAssistant(c *gin.Context) (*models.AssistantBinding, bool) {

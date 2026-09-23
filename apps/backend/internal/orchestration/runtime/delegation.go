@@ -10,9 +10,6 @@ import (
 
 func (h *Handler) delegationObjective(c *gin.Context, claims *runtimeauth.AgentClaims, id, mode string) (*models.Objective, error) {
 	if id == "" {
-		if claims.Capabilities == assistantBrokerAudience {
-			return nil, fmt.Errorf("explicit delivery requires an objective")
-		}
 		return nil, nil // Workspace conversations delegate directly through native tasks.
 	}
 	b, err := h.Service.Repo.AssistantForConversation(c.Request.Context(), claims.TaskID)

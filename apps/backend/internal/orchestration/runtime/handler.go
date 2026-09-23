@@ -44,43 +44,42 @@ type Handler struct {
 }
 
 func RegisterRoutes(g *gin.RouterGroup, h *Handler) {
-	assistant := g.Group("", h.requireAssistant)
-	assistant.GET("/assistant", h.assistant)
-	assistant.PUT("/assistant", h.selectAssistant)
-	assistant.POST("/assistant/control", h.assistantControl)
-	assistant.GET("/assistant/objectives", h.objectives)
-	h.registerMaintenanceRoutes(assistant)
-	h.registerWorkspaceGrantRoutes(assistant)
-	assistant.GET("/assistant/attention", h.attention)
-	assistant.GET("/assistant/attention/:id/input", h.attentionInput)
-	assistant.GET("/runtime/attention/:id/input", h.attentionInput)
-	assistant.POST("/assistant/attention/:id/resolve", h.resolveAttention)
-	assistant.POST("/runtime/attention/:id/answer", h.resolveAttention)
-	assistant.GET("/runtime/attention", h.attention)
-	assistant.GET("/assistant/capabilities", h.capabilities)
-	assistant.GET("/runtime/capabilities", h.capabilities)
-	assistant.GET("/runtime/memory", h.runtimeMemory)
-	assistant.GET("/assistant/memory", h.assistantMemory)
-	assistant.GET("/assistant/memory/:id", h.assistantMemory)
-	assistant.GET("/assistant/memory/:id/source", h.assistantMemorySource)
-	assistant.PUT("/assistant/memory/:id", h.editAssistantMemory)
-	assistant.DELETE("/assistant/memory/:id", h.forgetAssistantMemory)
-	assistant.GET("/assistant/credentials", h.credential)
-	assistant.GET("/assistant/credentials/:id", h.credential)
-	assistant.PUT("/assistant/credentials/:id", h.editCredential)
-	assistant.DELETE("/assistant/credentials/:id", h.forgetCredential)
-	assistant.GET("/runtime/objectives", h.objectives)
-	assistant.POST("/runtime/objectives", h.createObjective)
-	assistant.PATCH("/runtime/objectives/:id", h.updateObjective)
-	assistant.GET("/runtime/context/:id", h.contextPacket)
-	assistant.GET("/runtime/context/:id/memory", h.contextMemory)
+	g.GET("/assistant", h.assistant)
+	g.PUT("/assistant", h.selectAssistant)
+	g.POST("/assistant/control", h.assistantControl)
+	g.GET("/assistant/objectives", h.objectives)
+	h.registerMaintenanceRoutes(g)
+	h.registerWorkspaceGrantRoutes(g)
+	g.GET("/assistant/attention", h.attention)
+	g.GET("/assistant/attention/:id/input", h.attentionInput)
+	g.GET("/runtime/attention/:id/input", h.attentionInput)
+	g.POST("/assistant/attention/:id/resolve", h.resolveAttention)
+	g.POST("/runtime/attention/:id/answer", h.resolveAttention)
+	g.GET("/runtime/attention", h.attention)
+	g.GET("/assistant/capabilities", h.capabilities)
+	g.GET("/runtime/capabilities", h.capabilities)
+	g.GET("/runtime/memory", h.runtimeMemory)
+	g.GET("/assistant/memory", h.assistantMemory)
+	g.GET("/assistant/memory/:id", h.assistantMemory)
+	g.GET("/assistant/memory/:id/source", h.assistantMemorySource)
+	g.PUT("/assistant/memory/:id", h.editAssistantMemory)
+	g.DELETE("/assistant/memory/:id", h.forgetAssistantMemory)
+	g.GET("/assistant/credentials", h.credential)
+	g.GET("/assistant/credentials/:id", h.credential)
+	g.PUT("/assistant/credentials/:id", h.editCredential)
+	g.DELETE("/assistant/credentials/:id", h.forgetCredential)
+	g.GET("/runtime/objectives", h.objectives)
+	g.POST("/runtime/objectives", h.createObjective)
+	g.PATCH("/runtime/objectives/:id", h.updateObjective)
+	g.GET("/runtime/context/:id", h.contextPacket)
+	g.GET("/runtime/context/:id/memory", h.contextMemory)
 	g.GET("/tasks/:id", h.conversation)
 	g.GET("/tasks/:id/comments", h.comments)
 	g.POST("/tasks/:id/comments", h.comment)
 	g.POST("/tasks/:id/retry", h.retry)
 	g.GET("/runtime/workspace", h.catalog)
 	g.POST("/runtime/workspace/manage", h.manageWorkspace)
-	assistant.GET("/runtime/tasks", h.workspaceTasks)
+	g.GET("/runtime/tasks", h.workspaceTasks)
 	g.GET("/runtime/tasks/:id/details", h.details)
 	g.GET("/runtime/tasks/:id/content", h.taskContent)
 	g.GET("/runtime/tasks/:id/permissions", h.taskPermissions)
@@ -98,7 +97,7 @@ func fail(c *gin.Context, err error) {
 func (h *Handler) caller(c *gin.Context) (*runtimeauth.AgentClaims, bool) {
 	raw, ok := c.Get("agent_claims")
 	claims, valid := raw.(*runtimeauth.AgentClaims)
-	if !ok || !valid || (claims.Capabilities != workspaceCoordinatorAudience && claims.Capabilities != assistantBrokerAudience) {
+	if !ok || !valid || claims.Capabilities != workspaceCoordinatorAudience {
 		c.AbortWithStatusJSON(403, gin.H{errorResponseKey: "coordinator token required"})
 		return nil, false
 	}
@@ -115,18 +114,12 @@ func (h *Handler) caller(c *gin.Context) (*runtimeauth.AgentClaims, bool) {
 	if !h.currentRunAuthority(c, claims, run.Payload) {
 		return nil, false
 	}
-	if !h.assistantInvocation(c, claims, run.Payload) {
-		return nil, false
-	}
 	return h.resolveWorkspaceTarget(c, claims)
 }
 
 func (h *Handler) currentRunAuthority(c *gin.Context, claims *runtimeauth.AgentClaims, payload string) bool {
 	if c.Request.Method == http.MethodGet {
-		if claims.Capabilities == assistantBrokerAudience {
-			return h.currentIntent(c, claims.TaskID, payload)
-		}
-		return h.currentBinding(c, claims.TaskID, payload)
+		return true
 	}
 	if c.GetHeader("X-Kandev-Run-Id") != claims.RunID {
 		c.AbortWithStatus(http.StatusForbidden)
@@ -348,9 +341,6 @@ func (h *Handler) createTask(c *gin.Context) {
 		if err != nil {
 			return nil, err
 		}
-		if err := h.authorizeTaskEffect(c, claims, req.ExecutionMode); err != nil {
-			return nil, err
-		}
 		id, err := h.Service.Manager.CreateWorkspaceTask(c.Request.Context(), models.WorkspaceTaskSpec{DelegationReference: ref, DirectProfile: true, WorkspaceID: claims.WorkspaceID, ChiefID: claims.AgentProfileID, WorkflowID: req.WorkflowID, WorkflowStepID: req.WorkflowStepID, ExecutionMode: req.ExecutionMode, RepositoryID: req.RepositoryID, AssigneeID: req.AssigneeID, Title: req.Title, Description: req.Description, ExternalID: req.ExternalID, ParentID: req.ParentID})
 		if err == nil && objective != nil {
 			err = h.Service.Repo.LinkObjectiveTask(c.Request.Context(), models.ObjectiveTask{ObjectiveID: objective.ID, TaskID: id, Role: "implementation", ContextRef: req.ContextRef, OperationID: req.OperationID})
@@ -392,13 +382,6 @@ func (h *Handler) manageTask(c *gin.Context) {
 				return nil, rejectOperation(422, err.Error())
 			}
 		}
-		mode := ""
-		if objective != nil {
-			mode = objective.Mode
-		}
-		if err := h.authorizeTaskEffect(c, claims, mode); err != nil {
-			return nil, err
-		}
 		err = h.Service.Manager.ManageWorkspaceTask(c.Request.Context(), req)
 		if err == nil && objective != nil && req.Action != "delete" {
 			err = h.Service.Repo.LinkObjectiveTask(c.Request.Context(), models.ObjectiveTask{ObjectiveID: objective.ID, TaskID: req.TaskID, SessionID: req.SessionID, Role: "implementation", ContextRef: req.ContextRef, OperationID: req.OperationID})
@@ -423,9 +406,6 @@ func (h *Handler) updateTask(c *gin.Context) {
 		if err := h.rejectMaintenanceTaskControl(c, c.Param("id")); err != nil {
 			return nil, err
 		}
-		if err := h.authorizeTaskEffect(c, claims, ""); err != nil {
-			return nil, err
-		}
 		return gin.H{"ok": true}, h.Service.UpdateStatus(c.Request.Context(), claims.WorkspaceID, c.Param("id"), req.Status)
 	})
 }
@@ -447,10 +427,6 @@ func (h *Handler) runtimeComment(c *gin.Context) {
 	}
 	if req.TaskID == "" {
 		req.TaskID = claims.TaskID
-	}
-	if claims.Capabilities == assistantBrokerAudience && req.TaskID != claims.TaskID {
-		c.AbortWithStatus(http.StatusForbidden)
-		return
 	}
 	if !h.privateRuntimeAllowed(c, claims, req.TaskID) {
 		return

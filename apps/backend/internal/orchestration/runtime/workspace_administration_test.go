@@ -36,23 +36,3 @@ func TestWorkspaceAdministrationRequiresCurrentSignedScope(t *testing.T) {
 	require.Equal(t, 403, runtimeRequest(t, router, "POST", path, token, run, body).Code)
 	require.Equal(t, 1, m.calls)
 }
-
-func TestPrivateWorkspaceAdministrationRequiresExecuteMode(t *testing.T) {
-	for _, mode := range []string{"answer", "inspect", "design", "execute"} {
-		t.Run(mode, func(t *testing.T) {
-			s, _, task := newRuntime(t)
-			m := &workspaceAdministratorFake{assistantTaskManager: &assistantTaskManager{}}
-			s.Manager = m
-			router, token, run := assistantRuntimeCallerMode(t, s, task, mode)
-			response := runtimeRequest(t, router, "POST", "/api/v1/orchestration/runtime/workspace/manage", token, run,
-				map[string]any{"resource": "workspace", "action": "update", "configuration": map[string]string{"name": "Synthetic workspace"}})
-			if mode == "execute" {
-				require.Equal(t, 200, response.Code, response.Body.String())
-				require.Equal(t, 1, m.calls)
-			} else {
-				require.Equal(t, 403, response.Code, response.Body.String())
-				require.Zero(t, m.calls)
-			}
-		})
-	}
-}

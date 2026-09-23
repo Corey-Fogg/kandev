@@ -4,7 +4,6 @@ package runtime
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/kandev/kandev/internal/agent/runtimeauth"
 	"github.com/kandev/kandev/internal/auth/authn"
@@ -21,8 +20,6 @@ import (
 	"unicode/utf8"
 )
 
-var errOrchestrationDisabled = errors.New("orchestration feature disabled")
-
 type Tasks interface {
 	GetTask(context.Context, string) (*taskmodels.Task, error)
 	ListTaskSessions(context.Context, string) ([]*taskmodels.TaskSession, error)
@@ -36,7 +33,6 @@ type Manager interface {
 	WorkspaceCatalog(context.Context, string) (any, error)
 }
 type Launch struct {
-	Authority                                        *models.AssistantAuthority
 	OnSessionPrepared                                func(context.Context, string) error
 	TaskID, PersonaID, ProfileID, ExecutorID, Prompt string
 	Env                                              map[string]string
@@ -48,7 +44,7 @@ type Service struct {
 	Maintenance             MaintenanceSandbox
 	maintenanceMu           sync.Mutex
 	Inputs                  InputResolver
-	AssistantEnabled        bool
+	Enabled                 bool
 	Attention               AttentionReader
 	AttentionUpdated        func(context.Context, string, time.Time)
 	// OperationUnknown reports the cause of an operation whose outcome became
@@ -70,7 +66,7 @@ type Service struct {
 	Authority        AssistantAuthorityReader
 	Start            func(context.Context, Launch) error
 	UpdateStatus     func(context.Context, string, string, string) error
-	APIURL, CLI      string
+	APIURL           string
 	mu               sync.Mutex
 }
 
@@ -119,14 +115,14 @@ func (s *Service) Process(ctx context.Context, run *runmodels.Run) (bool, error)
 	if err != nil || role == "" {
 		return false, err
 	}
-	if !s.AssistantEnabled {
+	if !s.Enabled {
 		// The feature flag is the kill-switch: a registered orchestrator's run
 		// is settled here rather than launched or handed to another runtime.
-		_ = s.Runs.RecordFailure(ctx, run.ID, errOrchestrationDisabled.Error())
+		_ = s.Runs.RecordFailure(ctx, run.ID, ErrOrchestrationDisabled.Error())
 		if _, err := s.Runs.FinishRun(ctx, run.ID, statusFailed, nil); err != nil {
 			return true, err
 		}
-		return true, errOrchestrationDisabled
+		return true, ErrOrchestrationDisabled
 	}
 	if run.RetryCount > 0 && s.RecoveryStarting != nil {
 		s.RecoveryStarting(ctx, run.SessionID)
@@ -163,23 +159,11 @@ func (s *Service) launch(ctx context.Context, run *runmodels.Run) error {
 	if err := s.validateAttentionWake(ctx, payload); err != nil {
 		return err
 	}
-	if err := s.validateBindingSnapshot(ctx, taskID, run.Payload); err != nil {
-		return fmt.Errorf("conversation binding is no longer current: %w", err)
-	}
 	profile, executorID, err := s.executionSelection(ctx, a)
 	if err != nil {
 		return err
 	}
-	authority, err := s.authorizeHistoryLaunch(ctx, taskID, run.Payload)
-	if err != nil {
-		return err
-	}
-	audience := workspaceCoordinatorAudience
-	if authority != nil {
-		audience = assistantBrokerAudience
-	}
-
-	token, err := s.Auth.MintRuntimeJWT(a.ID, taskID, ws, run.ID, "", audience)
+	token, err := s.Auth.MintRuntimeJWT(a.ID, taskID, ws, run.ID, "", workspaceCoordinatorAudience)
 	if err != nil {
 		return err
 	}
@@ -187,28 +171,23 @@ func (s *Service) launch(ctx context.Context, run *runmodels.Run) error {
 	if err != nil {
 		return err
 	}
-	env := map[string]string{"KANDEV_API_URL": s.APIURL, "KANDEV_API_KEY": token, "KANDEV_RUN_TOKEN": token, "KANDEV_AGENT_ID": a.ID, "KANDEV_AGENT_NAME": a.Name, "KANDEV_WORKSPACE_ID": ws, "KANDEV_RUN_ID": run.ID, "KANDEV_TASK_ID": taskID, "KANDEV_WAKE_REASON": run.Reason, "KANDEV_CLI": s.CLI, "KANDEV_RUNTIME_API_PREFIX": "/api/v1/orchestration"}
-	env["KANDEV_INTENT_REVISION"] = fmt.Sprint(payload[intentRevisionKey])
-	env["KANDEV_PERSONAL_ASSISTANT_ENABLED"] = fmt.Sprint(s.AssistantEnabled)
+	env := map[string]string{"KANDEV_API_URL": s.APIURL, "KANDEV_API_KEY": token, "KANDEV_RUN_TOKEN": token, "KANDEV_AGENT_ID": a.ID, "KANDEV_WORKSPACE_ID": ws, "KANDEV_RUN_ID": run.ID, "KANDEV_TASK_ID": taskID, "KANDEV_RUNTIME_API_PREFIX": "/api/v1/orchestration"}
 	_ = s.Runs.UpdateRunPromptArtifacts(ctx, run.ID, prompt, "")
 	if err := s.Repo.SetRuntimeWorking(ctx, a.ID, true); err != nil {
 		return err
 	}
-	return s.Start(ctx, Launch{Authority: authority, TaskID: taskID, PersonaID: a.ID, ProfileID: profile, ExecutorID: executorID, Prompt: prompt, Env: env,
-		OnSessionPrepared: s.bindRuntimeSession(run, a.ID, taskID, ws, audience, env)})
+	return s.Start(ctx, Launch{TaskID: taskID, PersonaID: a.ID, ProfileID: profile, ExecutorID: executorID, Prompt: prompt, Env: env,
+		OnSessionPrepared: s.bindRuntimeSession(run, a.ID, taskID, ws, env)})
 }
 
-func (s *Service) bindRuntimeSession(run *runmodels.Run, persona, taskID, workspace, audience string, env map[string]string) func(context.Context, string) error {
+func (s *Service) bindRuntimeSession(run *runmodels.Run, persona, taskID, workspace string, env map[string]string) func(context.Context, string) error {
 	return func(ctx context.Context, sessionID string) error {
-		if _, err := s.validateAssistantAuthority(ctx, taskID, run.Payload); err != nil {
-			return err
-		}
-		token, err := s.Auth.MintRuntimeJWT(persona, taskID, workspace, run.ID, sessionID, audience)
+		token, err := s.Auth.MintRuntimeJWT(persona, taskID, workspace, run.ID, sessionID, workspaceCoordinatorAudience)
 		if err != nil {
 			return err
 		}
 		env["KANDEV_API_KEY"], env["KANDEV_RUN_TOKEN"] = token, token
-		return s.Runs.UpdateRunRuntimeSnapshot(ctx, run.ID, audience, run.Payload, sessionID)
+		return s.Runs.UpdateRunRuntimeSnapshot(ctx, run.ID, workspaceCoordinatorAudience, run.Payload, sessionID)
 	}
 }
 
@@ -270,17 +249,12 @@ func (s *Service) prompt(ctx context.Context, a *models.AgentInstance, taskID st
 		data, _ := json.Marshal(callback)
 		fmt.Fprintf(&text, "\nTask update: %s\nInspect this task's current state/result and post only new information in this chat. Review is not completion; do not repeat an answered question or restart work. If the task's session stopped on a provider login or OAuth refresh error, call manage_task with action repair_session once, then report the outcome.\n", data)
 	}
-	appendRuntimeToolGuidance(&text, payload)
+	appendRuntimeToolGuidance(&text)
 	return text.String(), nil
 }
 
-func appendRuntimeToolGuidance(text *strings.Builder, payload map[string]any) {
-	if authority, ok := payload["assistant_authority"]; ok {
-		data, _ := json.Marshal(authority)
-		fmt.Fprintf(text, "\nUse the supplied kandev_assistant MCP tools. Shell, built-in provider tools, plugins and other MCP servers are unavailable. Current server authority: %s. Every call rechecks live authority. An unknown operation outcome requires inspection of native evidence, never a fresh retry ID.\n", data)
-	} else {
-		text.WriteString("\nYou are the workspace Orchestrator. Use the supplied kandev_assistant MCP tools to carry out authorized requests: create, edit, assign, start, stop, message, move, archive and delete native tasks. Use workspace to discover workflow, repository and execution-profile IDs, task_details to inspect results, and capabilities for current controls. Workspace tasks do not require objectives or private-assistant setup; omit operation_id and expected_intent_revision. Shell, built-in provider tools, plugins and other MCP servers are unavailable. Every call rechecks live workspace authority. After an unknown outcome, inspect native evidence before retrying.\n")
-	}
+func appendRuntimeToolGuidance(text *strings.Builder) {
+	text.WriteString("\nYou are the workspace Orchestrator. Use the supplied kandev_assistant MCP tools to carry out authorized requests: create, edit, assign, start, stop, message, move, archive and delete native tasks. Use workspace to discover workflow, repository and execution-profile IDs, task_details to inspect results, and capabilities for current controls. Shell, built-in provider tools, plugins and other MCP servers are unavailable. Every call rechecks live workspace authority. After an unknown outcome, inspect native evidence before retrying.\n")
 	text.WriteString("Your final reply appears in this conversation. Retrieve older comments only when needed.\n")
 }
 
