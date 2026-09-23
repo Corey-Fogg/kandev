@@ -304,5 +304,6 @@
   "orchestratorTargetHint": "Each run is sent to this orchestrator's conversation. The orchestrator uses its own execution profile.",
   "manageOrchestrators": "Manage orchestrators",
   "orchestratorDeliveryHint": "This run was delivered to an orchestrator conversation.",
+  "runDispatched": "Delivered to orchestrator",
   "openOrchestratorChat": "Open orchestrator chat"
 }

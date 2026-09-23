@@ -304,5 +304,6 @@
   "orchestratorTargetHint": "每次執行都會傳送到此編排器的對話。編排器使用自己的執行設定。",
   "manageOrchestrators": "管理編排器",
   "orchestratorDeliveryHint": "此次執行已傳送到編排器對話。",
+  "runDispatched": "已傳送至編排器",
   "openOrchestratorChat": "開啟編排器對話"
 }

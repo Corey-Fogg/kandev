@@ -11,6 +11,7 @@ import {
   statusLabelKey,
 } from "./run-status";
 import { ANY_AUTOMATION, isDefaultFilters } from "./run-filters";
+import automationsEn from "@/src/locales/en/automations.json";
 
 const EVERY_STATUS: RunStatus[] = [
   "triggered",
@@ -29,6 +30,15 @@ describe("run status presentation", () => {
     for (const status of EVERY_STATUS) {
       expect(statusLabelKey(status), status).toBeTruthy();
       expect(statusDotClass(status), status).toBeTruthy();
+    }
+  });
+
+  it("labels every status with a key the English catalog defines", () => {
+    // A missing key renders the raw key name (for example "runDispatched")
+    // on the run row instead of a label.
+    const catalog = automationsEn as Record<string, string>;
+    for (const key of Object.values(RUN_STATUS_LABEL_KEY)) {
+      expect(catalog[key.replace(/^automations:/, "")], key).toBeTruthy();
     }
   });
 

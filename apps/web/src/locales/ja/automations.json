@@ -304,5 +304,6 @@
   "orchestratorTargetHint": "各実行はこのオーケストレーターの会話に送信されます。オーケストレーターは独自の実行プロファイルを使用します。",
   "manageOrchestrators": "オーケストレーターを管理",
   "orchestratorDeliveryHint": "この実行はオーケストレーターの会話に配信されました。",
+  "runDispatched": "オーケストレーターに送信済み",
   "openOrchestratorChat": "オーケストレーターのチャットを開く"
 }
