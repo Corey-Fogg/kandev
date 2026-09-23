@@ -1,6 +1,7 @@
 import { fetchJson } from "../client";
 import { generateUUID } from "@/lib/utils";
 import type { CommentTransport } from "@/components/task/simple/comment-transport";
+import type { RecoveryOutcome, RecoveryTarget } from "@/components/task/simple/recovery-transport";
 import type { TaskComment } from "@/app/office/tasks/[id]/types";
 export type ConversationTask = {
   id: string;
@@ -85,11 +86,20 @@ export const postConversationComment = (
   body: { body: string; client_message_id?: string },
 ) => fetchJson(`${path(id)}/comments`, { init: { method: "POST", body: JSON.stringify(body) } });
 
-export const retryConversation = (
+/**
+ * Retries a failed conversation turn, named by its session or, for a turn
+ * that never bound a session, by its run id.
+ */
+export async function retryConversation(
   id: string,
-  sessionId: string,
+  target: RecoveryTarget,
   action: "resume" | "fresh_start",
-) =>
-  fetchJson(`${path(id)}/retry`, {
-    init: { method: "POST", body: JSON.stringify({ session_id: sessionId, action }) },
+): Promise<RecoveryOutcome> {
+  const result = await fetchJson<{ status?: string }>(`${path(id)}/retry`, {
+    init: {
+      method: "POST",
+      body: JSON.stringify({ session_id: target.sessionId, run_id: target.runId, action }),
+    },
   });
+  return result?.status === "already_queued" ? "already_queued" : "queued";
+}

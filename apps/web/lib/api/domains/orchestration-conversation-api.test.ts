@@ -38,7 +38,7 @@ it("uses independent endpoints and preserves comment run state", async () => {
   expect(fetcher.mock.calls[0][0]).toContain("/api/v1/orchestration/tasks/t/comments");
   fetcher.mockImplementation(async () => new Response("{}", { status: 200 }));
   await postConversationComment("t", { body: "Hello" });
-  await retryConversation("t", "session", "resume");
+  await retryConversation("t", { sessionId: "session" }, "resume");
   expect(fetcher.mock.calls.map((call) => call[0])).toEqual(
     expect.arrayContaining([expect.stringContaining("/api/v1/orchestration/tasks/t/retry")]),
   );
@@ -107,4 +107,17 @@ describe("conversation sender", () => {
     await Promise.all([first, duplicate]);
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
+});
+
+it("retries an unbound turn by run id and reports an already queued retry", async () => {
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, status: "queued" })))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, status: "already_queued" })));
+  vi.stubGlobal("fetch", fetcher);
+  await expect(retryConversation("t", { runId: "run-1" }, "resume")).resolves.toBe("queued");
+  expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({ run_id: "run-1", action: "resume" });
+  await expect(retryConversation("t", { runId: "run-1" }, "resume")).resolves.toBe(
+    "already_queued",
+  );
 });

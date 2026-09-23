@@ -84,5 +84,8 @@
   "tasksTab": "Tasks",
   "workflowFilter": "Workflow",
   "workspaceBoard": "Workspace board",
-  "workspaceUnavailable": "This workspace could not be loaded. Check your access and try again."
+  "workspaceUnavailable": "This workspace could not be loaded. Check your access and try again.",
+  "retryMessage": "Retry",
+  "retryQueued": "Retry queued",
+  "retryAlreadyQueued": "A retry is already queued"
 }

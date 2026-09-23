@@ -2,12 +2,15 @@ package runtime
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/gin-gonic/gin"
 
 	runmodels "github.com/kandev/kandev/internal/runs/models"
+	runservice "github.com/kandev/kandev/internal/runs/service"
 )
 
 func (h *Handler) retry(c *gin.Context) {
@@ -33,8 +36,20 @@ func (h *Handler) retry(c *gin.Context) {
 		return
 	}
 	run, err := h.retryTarget(c.Request.Context(), req.RunID, req.SessionID)
+	if err == nil {
+		run, err = h.latestRetry(c.Request.Context(), run)
+	}
 	if err != nil || run.AgentProfileID != owner {
 		c.AbortWithStatus(404)
+		return
+	}
+	h.requeue(c, owner, run)
+}
+
+// requeue queues a retry of run, or reports that one is already queued.
+func (h *Handler) requeue(c *gin.Context, owner string, run *runmodels.Run) {
+	if run.Status == runQueued || run.Status == statusClaimed {
+		c.JSON(200, gin.H{"ok": true, retryStatusKey: retryAlreadyQueued})
 		return
 	}
 	if run.Status != statusFailed && run.Status != "cancelled" {
@@ -42,7 +57,7 @@ func (h *Handler) retry(c *gin.Context) {
 		return
 	}
 	var payload map[string]any
-	if err = json.Unmarshal([]byte(run.Payload), &payload); err != nil {
+	if err := json.Unmarshal([]byte(run.Payload), &payload); err != nil {
 		fail(c, err)
 		return
 	}
@@ -50,11 +65,43 @@ func (h *Handler) retry(c *gin.Context) {
 		c.AbortWithStatus(404)
 		return
 	}
-	if err = h.Service.QueueTurn(c.Request.Context(), owner, c.Param("id"), run.Reason, "retry:"+run.ID, payload); err != nil {
+	outcome, err := h.Service.queueTurn(c.Request.Context(), owner, c.Param("id"), run.Reason, retryKeyPrefix+run.ID, payload)
+	if err != nil {
 		fail(c, err)
 		return
 	}
-	c.JSON(202, gin.H{"ok": true})
+	if outcome == runservice.QueueOutcomeDeduped {
+		c.JSON(200, gin.H{"ok": true, retryStatusKey: retryAlreadyQueued})
+		return
+	}
+	c.JSON(202, gin.H{"ok": true, retryStatusKey: retryQueued})
+}
+
+const (
+	retryKeyPrefix     = "retry:"
+	retryStatusKey     = "status"
+	retryQueued        = "queued"
+	retryAlreadyQueued = "already_queued"
+	runQueued          = "queued"
+	// maxRetryChain bounds how many earlier retries are followed.
+	maxRetryChain = 50
+)
+
+// latestRetry follows a run's retries to the newest one, so retrying a turn
+// whose earlier retry failed retries that retry instead of deduplicating
+// against it.
+func (h *Handler) latestRetry(ctx context.Context, run *runmodels.Run) (*runmodels.Run, error) {
+	for i := 0; i < maxRetryChain; i++ {
+		next, err := h.Service.Repo.RunByIdempotencyKey(ctx, retryKeyPrefix+run.ID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return run, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		run = next
+	}
+	return run, nil
 }
 
 // retryTarget selects the run to retry: the named run, or the latest run of

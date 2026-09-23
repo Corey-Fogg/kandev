@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+
+	runmodels "github.com/kandev/kandev/internal/runs/models"
 )
 
 // AbsorbQueuedRuns folds the payloads of an agent's other queued, unscheduled
@@ -73,4 +75,14 @@ func (r *Repository) SetClaimedRunPayload(ctx context.Context, runID, payload st
 		return errors.Join(errors.New("run is no longer claimed"), err)
 	}
 	return nil
+}
+
+// RunByIdempotencyKey returns the run queued under key.
+func (r *Repository) RunByIdempotencyKey(ctx context.Context, key string) (*runmodels.Run, error) {
+	var run runmodels.Run
+	err := r.ro.GetContext(ctx, &run, r.ro.Rebind(`SELECT * FROM runs WHERE idempotency_key=?`), key)
+	if err != nil {
+		return nil, err
+	}
+	return &run, nil
 }

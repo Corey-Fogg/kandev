@@ -21,6 +21,7 @@ import { MarkdownComment } from "./markdown-comment";
 import { AgentTurnPanel } from "./components/agent-turn-panel";
 import { RunErrorEntry } from "./components/run-error-entry";
 import { UserCommentRunBadge } from "./components/user-comment-run-badge";
+import { CommentRetryButton } from "./components/comment-retry-button";
 import { buildCommentTurnContext, type CommentTurnContext } from "./turn-context";
 import { groupSessionsForTimeline, groupSortKey, type SessionGroup } from "./session-groups";
 import { synchronizeInputValue } from "./synchronize-input-value";
@@ -92,6 +93,19 @@ function formatDuration(ms: number): string {
   return `${minutes}m ${remaining}s`;
 }
 
+/** The run badge of a user message, with a retry for a failed turn. */
+function UserCommentRunState({ comment, taskId }: { comment: TaskComment; taskId: string }) {
+  if (!comment.runStatus || comment.runStatus === "finished") return null;
+  return (
+    <div className="mt-1.5 flex items-center gap-2">
+      <UserCommentRunBadge status={comment.runStatus} errorMessage={comment.runError} />
+      {comment.runStatus === "failed" && comment.runId && (
+        <CommentRetryButton taskId={taskId} runId={comment.runId} />
+      )}
+    </div>
+  );
+}
+
 function CommentEntry({
   comment,
   taskId,
@@ -142,14 +156,9 @@ function CommentEntry({
         <div className="mt-1">
           <MarkdownComment content={comment.content} />
         </div>
-        {!isAgent &&
-          comment.runStatus &&
-          comment.runStatus !== "finished" &&
-          !hasLaterAgentReply && (
-            <div className="mt-1.5">
-              <UserCommentRunBadge status={comment.runStatus} errorMessage={comment.runError} />
-            </div>
-          )}
+        {!isAgent && !hasLaterAgentReply && (
+          <UserCommentRunState comment={comment} taskId={taskId} />
+        )}
         {comment.toolCalls && comment.toolCalls.length > 0 && (
           <Collapsible>
             <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground mt-1 cursor-pointer hover:text-foreground transition-colors">

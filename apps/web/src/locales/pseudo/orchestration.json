@@ -84,5 +84,8 @@
   "tasksTab": "Ţàśķś",
   "workflowFilter": "Ŵōŕķƒĺōŵ",
   "workspaceBoard": "Ŵōŕķśƥàćē ƀōàŕď",
-  "workspaceUnavailable": "Ţĥĩś ŵōŕķśƥàćē ćōũĺď ńōţ ƀē ĺōàďēď. Ćĥēćķ ŷōũŕ àććēśś àńď ţŕŷ àĝàĩń."
+  "workspaceUnavailable": "Ţĥĩś ŵōŕķśƥàćē ćōũĺď ńōţ ƀē ĺōàďēď. Ćĥēćķ ŷōũŕ àććēśś àńď ţŕŷ àĝàĩń.",
+  "retryMessage": "Ŕēţŕŷ",
+  "retryQueued": "Ŕēţŕŷ qũēũēď",
+  "retryAlreadyQueued": "À ŕēţŕŷ ĩś àĺŕēàďŷ qũēũēď"
 }

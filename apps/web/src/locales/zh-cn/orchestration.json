@@ -84,5 +84,8 @@
   "tasksTab": "任务",
   "workflowFilter": "工作流",
   "workspaceBoard": "工作区看板",
-  "workspaceUnavailable": "无法加载此工作区。请检查访问权限后重试。"
+  "workspaceUnavailable": "无法加载此工作区。请检查访问权限后重试。",
+  "retryMessage": "重试",
+  "retryQueued": "已加入重试队列",
+  "retryAlreadyQueued": "重试已在队列中"
 }

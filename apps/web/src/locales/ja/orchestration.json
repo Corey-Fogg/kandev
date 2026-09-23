@@ -84,5 +84,8 @@
   "tasksTab": "タスク",
   "workflowFilter": "ワークフロー",
   "workspaceBoard": "ワークスペースボード",
-  "workspaceUnavailable": "このワークスペースを読み込めませんでした。アクセス権を確認して再試行してください。"
+  "workspaceUnavailable": "このワークスペースを読み込めませんでした。アクセス権を確認して再試行してください。",
+  "retryMessage": "再試行",
+  "retryQueued": "再試行をキューに追加しました",
+  "retryAlreadyQueued": "再試行はすでにキューに入っています"
 }

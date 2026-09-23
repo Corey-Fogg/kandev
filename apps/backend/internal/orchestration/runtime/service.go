@@ -70,34 +70,40 @@ type SourceIssueWriter interface {
 }
 
 func (s *Service) QueueTurn(ctx context.Context, id, taskID, reason, key string, payload map[string]any) error {
+	_, err := s.queueTurn(ctx, id, taskID, reason, key, payload)
+	return err
+}
+
+// queueTurn queues a coordinator turn and reports what the queue did with
+// it, so a caller can tell a deduplicated request from a queued one.
+func (s *Service) queueTurn(ctx context.Context, id, taskID, reason, key string, payload map[string]any) (runservice.QueueOutcome, error) {
 	if err := s.CheckConversationExecution(ctx, taskID); err != nil {
-		return err
+		return runservice.QueueOutcomeNone, err
 	}
 	a, err := s.Personas.GetAgentInstance(ctx, id)
 	if err != nil {
-		return err
+		return runservice.QueueOutcomeNone, err
 	}
 	if paused(a) {
-		return fmt.Errorf("coordinator is paused")
+		return runservice.QueueOutcomeNone, fmt.Errorf("coordinator is paused")
 	}
 	role, err := s.Repo.OrchestratorRoleID(ctx, id)
 	if err != nil {
-		return err
+		return runservice.QueueOutcomeNone, err
 	}
 	if role == "" {
-		return fmt.Errorf("coordinator not registered")
+		return runservice.QueueOutcomeNone, fmt.Errorf("coordinator not registered")
 	}
 	payload, err = s.withIntentRevision(ctx, taskID, payload)
 	if err != nil {
-		return err
+		return runservice.QueueOutcomeNone, err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.Queue == nil {
-		return fmt.Errorf("orchestration queue is not ready")
+		return runservice.QueueOutcomeNone, fmt.Errorf("orchestration queue is not ready")
 	}
-	_, err = s.Queue.QueueRun(ctx, runservice.QueueRunRequest{AgentProfileID: id, TaskID: taskID, Reason: reason, IdempotencyKey: key, Payload: payload, DisableCoalescing: true})
-	return err
+	return s.Queue.QueueRun(ctx, runservice.QueueRunRequest{AgentProfileID: id, TaskID: taskID, Reason: reason, IdempotencyKey: key, Payload: payload, DisableCoalescing: true})
 }
 
 // Process claims no rows itself: the core queue dispatcher owns the single claim loop.

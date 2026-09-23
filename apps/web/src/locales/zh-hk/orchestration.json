@@ -84,5 +84,8 @@
   "tasksTab": "任務",
   "workflowFilter": "工作流程",
   "workspaceBoard": "工作區看板",
-  "workspaceUnavailable": "無法載入此工作區。請檢查存取權限後重試。"
+  "workspaceUnavailable": "無法載入此工作區。請檢查存取權限後重試。",
+  "retryMessage": "重試",
+  "retryQueued": "已加入重試佇列",
+  "retryAlreadyQueued": "重試已在佇列中"
 }

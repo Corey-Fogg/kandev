@@ -272,12 +272,14 @@ function ConversationRunErrorEntry({
   error: RunError;
   recover: NonNullable<React.ContextType<typeof RecoveryTransportContext>>;
 }) {
+  const { t } = useTranslation();
   const [busyAction, setBusyAction] = useState<SessionRecoveryAction | null>(null);
   const recoverConversation = async (action: SessionRecoveryAction): Promise<boolean> => {
     if (action !== "resume" && action !== "fresh_start") return false;
     setBusyAction(action);
     try {
-      await recover(taskId, error.sessionId, action);
+      const outcome = await recover(taskId, { sessionId: error.sessionId }, action);
+      if (outcome === "already_queued") toast.info(t("orchestration:retryAlreadyQueued"));
       return true;
     } catch (cause) {
       toast.error(String(cause));

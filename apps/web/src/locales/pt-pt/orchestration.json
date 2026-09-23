@@ -84,5 +84,8 @@
   "tasksTab": "Tarefas",
   "workflowFilter": "Fluxo de trabalho",
   "workspaceBoard": "Quadro do espaço de trabalho",
-  "workspaceUnavailable": "Não foi possível carregar este espaço de trabalho. Verifique o acesso e tente novamente."
+  "workspaceUnavailable": "Não foi possível carregar este espaço de trabalho. Verifique o acesso e tente novamente.",
+  "retryMessage": "Tentar novamente",
+  "retryQueued": "Nova tentativa em fila",
+  "retryAlreadyQueued": "Já existe uma nova tentativa em fila"
 }
