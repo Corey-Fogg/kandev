@@ -41,10 +41,12 @@ func testHandler(t *testing.T) (*gin.Engine, *sqlite.Repository) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	if err = profiles.CreateAgent(ctx, &settingsmodels.Agent{ID: "claude", Name: "claude-acp"}); err != nil {
-		t.Fatal(err)
+	for _, agent := range []*settingsmodels.Agent{{ID: "claude", Name: "claude-acp"}, {ID: "codex", Name: "codex-acp"}} {
+		if err = profiles.CreateAgent(ctx, agent); err != nil {
+			t.Fatal(err)
+		}
 	}
-	for _, p := range []*settingsmodels.AgentProfile{{ID: "personal", AgentID: "claude", Name: "Personal", Enabled: true, Model: "default"}, {ID: "work", AgentID: "claude", Name: "Work", Enabled: true, Model: "default"}, {ID: "disabled", AgentID: "claude", Name: "Disabled", Enabled: false, Model: "default"}, {ID: "foreign", AgentID: "claude", Name: "Foreign", Enabled: true, Model: "default", WorkspaceID: "other"}} {
+	for _, p := range []*settingsmodels.AgentProfile{{ID: "personal", AgentID: "claude", Name: "Personal", Enabled: true, Model: "default"}, {ID: "work", AgentID: "claude", Name: "Work", Enabled: true, Model: "default"}, {ID: "disabled", AgentID: "claude", Name: "Disabled", Enabled: false, Model: "default"}, {ID: "foreign", AgentID: "claude", Name: "Foreign", Enabled: true, Model: "default", WorkspaceID: "other"}, {ID: "codex-profile", AgentID: "codex", Name: "Codex", Enabled: true, Model: "default"}} {
 		if err = profiles.CreateAgentProfile(ctx, p); err != nil {
 			t.Fatal(err)
 		}
@@ -178,3 +180,12 @@ func TestCoordinatorChangesRequireWorkspaceManageAccess(t *testing.T) {
 }
 
 var errForbiddenForTest = errors.New("forbidden")
+
+func TestCoordinatorRequiresABrokerCapableProvider(t *testing.T) {
+	r, _ := testHandler(t)
+	cfg := configuration{RoleID: "chief-of-staff", ProfileID: "codex-profile"}
+	w := request(t, r, http.MethodPost, "/api/v1/orchestration/workspaces/ws/orchestrators", cfg)
+	if w.Code != http.StatusBadRequest || !bytes.Contains(w.Body.Bytes(), []byte("claude-acp")) {
+		t.Fatalf("codex coordinator = %d %s", w.Code, w.Body.String())
+	}
+}

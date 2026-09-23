@@ -9,16 +9,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Every provider that can run a coordinator gets the same broker restriction;
-// only Claude also receives the provider session policy.
-func TestBrokerCoordinatorExposesOnlyTheBrokerOnEveryProvider(t *testing.T) {
-	for _, agentType := range []string{"claude-acp", "codex-acp", "gemini", "copilot-acp", "opencode-acp", "auggie", "cursor-acp"} {
+func brokerCoordinatorManager(t *testing.T, agentType string) *Manager {
+	profile := mcpprofile.New(mcpprofile.SurfaceOrchestratorBroker, nil, nil)
+	return &Manager{cfg: &config.InstanceConfig{AgentArgs: []string{"cat"}, AgentType: agentType, WorkDir: t.TempDir(),
+		Protocol: agent.ProtocolACP, McpProfile: &profile, ShellEnabled: true, AutoApprovePermissions: true,
+		McpServers: []config.McpServerConfig{{Name: "ambient", Command: "tool"}},
+		AgentEnv:   []string{"CLAUDE_CONFIG_DIR=/synthetic/account"}}, logger: newTestLogger(t)}
+}
+
+// A provider that can run a coordinator gets the broker restriction; only
+// Claude also receives the provider session policy.
+func TestBrokerCoordinatorExposesOnlyTheBroker(t *testing.T) {
+	for _, agentType := range []string{"claude-acp", "mock-agent"} {
 		t.Run(agentType, func(t *testing.T) {
-			profile := mcpprofile.New(mcpprofile.SurfaceOrchestratorBroker, nil, nil)
-			m := &Manager{cfg: &config.InstanceConfig{AgentArgs: []string{"cat"}, AgentType: agentType, WorkDir: t.TempDir(),
-				Protocol: agent.ProtocolACP, McpProfile: &profile, ShellEnabled: true, AutoApprovePermissions: true,
-				McpServers: []config.McpServerConfig{{Name: "ambient", Command: "tool"}},
-				AgentEnv:   []string{"CLAUDE_CONFIG_DIR=/synthetic/account"}}, logger: newTestLogger(t)}
+			m := brokerCoordinatorManager(t, agentType)
 			require.NoError(t, m.buildAdapterConfig())
 			t.Cleanup(func() { _ = m.adapter.Close() })
 			require.True(t, m.adapterCfg.BrokerRestricted)
@@ -33,6 +37,18 @@ func TestBrokerCoordinatorExposesOnlyTheBrokerOnEveryProvider(t *testing.T) {
 			} else {
 				require.Empty(t, m.adapterCfg.ToolPolicy)
 			}
+		})
+	}
+}
+
+// A provider whose built-in shell and file tools cannot be switched off never
+// starts a broker-only coordinator.
+func TestBrokerCoordinatorRefusesProvidersWithBuiltInTools(t *testing.T) {
+	for _, agentType := range []string{"codex-acp", "gemini", "copilot-acp", "opencode-acp", "auggie", "cursor-acp"} {
+		t.Run(agentType, func(t *testing.T) {
+			m := brokerCoordinatorManager(t, agentType)
+			require.ErrorContains(t, m.buildAdapterConfig(), "cannot run a broker-only coordinator")
+			require.Nil(t, m.adapter)
 		})
 	}
 }

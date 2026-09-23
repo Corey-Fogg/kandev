@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	mcpprofile "github.com/kandev/kandev/internal/mcp/profile"
 	"github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/orchestration/personas"
 )
@@ -71,6 +72,15 @@ func (h *Handler) prepare(c *gin.Context, a *models.AgentInstance) (*configurati
 	}
 	if !valid {
 		return nil, fmt.Errorf("select an enabled execution profile in this workspace")
+	}
+	// The broker has no shell. Only a provider whose built-in tools can be
+	// switched off may run a coordinator; agentctl enforces the same rule.
+	agentType, err := h.Registry.ProfileAgentType(c.Request.Context(), req.ProfileID)
+	if err != nil {
+		return nil, err
+	}
+	if !mcpprofile.BrokerCapableAgent(agentType) {
+		return nil, fmt.Errorf("coordinators run on Claude (claude-acp) execution profiles only; other providers keep built-in shell tools")
 	}
 	if h.ValidateExecutor != nil {
 		if err := h.ValidateExecutor(c.Request.Context(), req.ExecutorPreference); err != nil {

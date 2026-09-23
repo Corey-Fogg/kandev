@@ -174,7 +174,7 @@ retrying manually.
 
 ## Profiles and routing
 
-The coordinator's execution profile determines its provider and account. For example, a personal Claude coordinator can direct Jira work to your existing work Claude profile and personal development to a personal Claude or Codex profile. Describe these choices in its routing context, including when to use each profile and where account-specific setup instructions live.
+The coordinator's execution profile determines its provider and account. A coordinator must run on a Claude (claude-acp) profile, because other providers keep built-in shell tools that a coordinator must not have; the workers it delegates to can use any provider. For example, a personal Claude coordinator can direct Jira work to your existing work Claude profile and personal development to a personal Claude or Codex profile. Describe these choices in its routing context, including when to use each profile and where account-specific setup instructions live.
 
 Profiles supply their configured environment. For separate Claude subscriptions, configure the appropriate `CLAUDE_CONFIG_DIR` in each profile and authenticate it on the chosen execution host. A profile name alone does not establish which subscription is authenticated. Keep credentials in the existing secrets/account setup, rather than in role instructions or routing context.
 

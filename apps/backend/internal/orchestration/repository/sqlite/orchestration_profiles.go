@@ -10,6 +10,14 @@ import (
 	"github.com/kandev/kandev/internal/orchestration/models"
 )
 
+// ProfileAgentType returns the agent type (the agent's registry name, such as
+// claude-acp) an execution profile runs on.
+func (r *Repository) ProfileAgentType(ctx context.Context, profileID string) (string, error) {
+	var agentType string
+	err := r.ro.GetContext(ctx, &agentType, r.ro.Rebind(`SELECT COALESCE(a.name,'') FROM agent_profiles p LEFT JOIN agents a ON a.id=p.agent_id WHERE p.id=?`), profileID)
+	return agentType, err
+}
+
 // ExecutionProfileDirectory intentionally omits credentials and environment values.
 func (r *Repository) ExecutionProfileDirectory(ctx context.Context, workspaceID string) ([]map[string]string, error) {
 	rows, err := r.ro.QueryxContext(ctx, r.ro.Rebind(`SELECT id,name,agent_id FROM agent_profiles WHERE COALESCE(role,'')='' AND enabled=? AND deleted_at IS NULL AND (COALESCE(workspace_id,'')='' OR workspace_id=?) ORDER BY name,id`), true, workspaceID)

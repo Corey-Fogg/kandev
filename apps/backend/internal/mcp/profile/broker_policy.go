@@ -25,3 +25,11 @@ func SessionUsesBroker(metadata map[string]any) bool {
 	}
 	return false
 }
+
+// BrokerCapableAgent reports whether an agent type can run as a broker-only
+// coordinator. claude-acp receives a session policy that switches its
+// built-in tools off, and mock-agent has none. Every other provider keeps
+// built-in shell and file tools that the broker restriction cannot remove.
+func BrokerCapableAgent(agentType string) bool {
+	return agentType == "claude-acp" || agentType == "mock-agent"
+}
