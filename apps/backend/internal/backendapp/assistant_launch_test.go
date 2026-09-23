@@ -50,6 +50,7 @@ func TestAssistantPreparedSessionPersistsRestriction(t *testing.T) {
 			case "coordinator":
 				require.Equal(t, mcpprofile.SurfaceOrchestratorBroker, prepared.McpProfile.Surface)
 				require.NotContains(t, session.Metadata, orchestrationruntime.AssistantPolicyMetadata)
+				require.Equal(t, string(mcpprofile.SurfaceOrchestratorBroker), session.Metadata[mcpprofile.BrokerPolicyMetadataKey])
 			case "revoked":
 				require.Equal(t, mcpprofile.SurfaceAssistantBroker, prepared.McpProfile.Surface)
 			}

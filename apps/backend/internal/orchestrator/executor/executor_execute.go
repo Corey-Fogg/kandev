@@ -65,8 +65,8 @@ func (e *Executor) resolveTaskSessionMCPMode(ctx context.Context, taskID string,
 }
 
 func (e *Executor) resolveTaskSessionMCPProfile(ctx context.Context, taskID string, session *models.TaskSession, allowTitleTool bool) (mcpprofile.Context, error) {
-	if session != nil && session.Metadata["assistant_broker_policy"] == string(mcpprofile.SurfaceAssistantBroker) {
-		return mcpprofile.New(mcpprofile.SurfaceAssistantBroker, nil, nil), nil
+	if session != nil && mcpprofile.SessionUsesBroker(session.Metadata) {
+		return mcpprofile.New(mcpprofile.SurfaceOrchestratorBroker, nil, nil), nil
 	}
 	if isConfigModeSession(session) {
 		capabilities := []mcpprofile.Capability{mcpprofile.CapabilityUserQuestion}

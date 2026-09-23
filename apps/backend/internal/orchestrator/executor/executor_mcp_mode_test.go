@@ -86,6 +86,24 @@ func TestResolveTaskSessionMCPProfile_SelectsSurfaceAndQuestionCapability(t *tes
 			wantParentQuestion: false,
 		},
 		{
+			name:        "coordinator conversation session keeps the broker",
+			task:        &models.Task{ID: "task", Origin: "native_conversation"},
+			session:     &models.TaskSession{ID: "session", TaskID: "task", Metadata: map[string]interface{}{mcpprofile.BrokerPolicyMetadataKey: string(mcpprofile.SurfaceOrchestratorBroker)}},
+			wantSurface: mcpprofile.SurfaceOrchestratorBroker,
+		},
+		{
+			name:        "legacy broker session keeps the broker",
+			task:        &models.Task{ID: "task", Origin: "native_conversation"},
+			session:     &models.TaskSession{ID: "session", TaskID: "task", Metadata: map[string]interface{}{"assistant_broker_policy": "assistant-broker-v1"}},
+			wantSurface: mcpprofile.SurfaceOrchestratorBroker,
+		},
+		{
+			name:        "broker session wins over configuration mode",
+			task:        &models.Task{ID: "task", Origin: "native_conversation"},
+			session:     &models.TaskSession{ID: "session", TaskID: "task", Metadata: map[string]interface{}{"config_mode": true, mcpprofile.BrokerPolicyMetadataKey: string(mcpprofile.SurfaceOrchestratorBroker)}},
+			wantSurface: mcpprofile.SurfaceOrchestratorBroker,
+		},
+		{
 			name:               "title owner adds title capability",
 			task:               &models.Task{ID: "task", Metadata: map[string]interface{}{models.MetaKeyAgentTitlePending: true, models.MetaKeyAgentTitleOwnerSessionID: "session"}},
 			session:            &models.TaskSession{ID: "session", TaskID: "task"},

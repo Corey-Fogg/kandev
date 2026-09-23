@@ -19,14 +19,21 @@ func orchestrationLaunchContext(repos *Repositories, launch orchestrationruntime
 	}
 	value := mcpprofile.New(brokerSurface, nil, nil)
 	profile := &value
-	prepared := launch.OnSessionPrepared
-	if launch.Authority != nil {
-		prepared = func(ctx context.Context, sessionID string) error {
+	prepared := func(ctx context.Context, sessionID string) error {
+		// The policy is recorded before runtime credentials are bound, so every
+		// native resume, prompt or steer of this session restores the broker.
+		if err := repos.Task.SetSessionMetadataKey(ctx, sessionID, mcpprofile.BrokerPolicyMetadataKey, string(mcpprofile.SurfaceOrchestratorBroker)); err != nil {
+			return err
+		}
+		if launch.OnSessionPrepared != nil {
 			if err := launch.OnSessionPrepared(ctx, sessionID); err != nil {
 				return err
 			}
+		}
+		if launch.Authority != nil {
 			return repos.Task.SetSessionMetadataKey(ctx, sessionID, orchestrationruntime.AssistantPolicyMetadata, string(mcpprofile.SurfaceAssistantBroker))
 		}
+		return nil
 	}
 	return orchexecutor.LaunchContext{McpProfile: profile, ExecutorProfileID: launch.ExecutorID, Prompt: launch.Prompt, Env: launch.Env, OnSessionPrepared: prepared}
 }
