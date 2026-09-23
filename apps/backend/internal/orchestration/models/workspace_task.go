@@ -17,6 +17,9 @@ type WorkspaceTaskSpec struct {
 	// Source records the tracker issue the task implements; it sets the
 	// issue metadata and ExternalID.
 	Source *SourceIssue
+	// Goal is the task's acceptance criteria, built by the runtime; the
+	// adapter only stores it.
+	Goal *TaskGoal
 }
 
 // WorkspaceTaskCommand manages an existing delivery task under a signed workspace.
@@ -42,6 +45,10 @@ type WorkspaceTaskCommand struct {
 	Answers        []WorkspaceQuestionAnswer `json:"answers,omitempty"`
 	Rejected       bool                      `json:"rejected,omitempty"`
 	RejectReason   string                    `json:"reject_reason,omitempty"`
+	// AcceptanceCriteria replaces the task's criteria (set_criteria).
+	AcceptanceCriteria []string `json:"acceptance_criteria,omitempty"`
+	// Criteria records checked criteria (verify_criteria).
+	Criteria []CriterionVerification `json:"criteria,omitempty"`
 }
 
 // WorkspaceQuestionAnswer answers one question of a delegated task's pending
