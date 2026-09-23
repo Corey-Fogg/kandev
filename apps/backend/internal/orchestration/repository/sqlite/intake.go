@@ -16,7 +16,11 @@ import (
 )
 
 // AcceptComment atomically stores intent and its outbox receipt. The first write
-// serializes SQLite transactions before any read/modify/write sequence.
+// serializes concurrent messages to one conversation before any
+// read/modify/write sequence: SQLite takes its write lock, and the no-op
+// update locks the existing intents row on Postgres, where ON CONFLICT DO
+// NOTHING would take no lock and let a retried client_message_id race its
+// original to a unique-constraint error.
 func (r *Repository) AcceptComment(ctx context.Context, agentID, clientID string, c *models.TaskComment) (*models.Intake, bool, error) {
 	if strings.TrimSpace(c.Body) == "" || len(c.Body) > 32000 || !utf8.ValidString(c.Body) ||
 		c.AuthorID == "" || len(clientID) > 200 || !utf8.ValidString(clientID) {
@@ -30,7 +34,7 @@ func (r *Repository) AcceptComment(ctx context.Context, agentID, clientID string
 		return nil, false, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	_, err = tx.ExecContext(ctx, tx.Rebind(`INSERT INTO orchestration_conversation_intents(task_id,revision) VALUES(?,0) ON CONFLICT(task_id) DO NOTHING`), c.TaskID)
+	_, err = tx.ExecContext(ctx, tx.Rebind(`INSERT INTO orchestration_conversation_intents(task_id,revision) VALUES(?,0) ON CONFLICT(task_id) DO UPDATE SET revision=orchestration_conversation_intents.revision`), c.TaskID)
 	if err != nil {
 		return nil, false, err
 	}
