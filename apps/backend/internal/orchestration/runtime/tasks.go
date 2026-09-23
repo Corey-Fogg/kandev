@@ -182,6 +182,10 @@ func (h *Handler) manageTask(c *gin.Context) {
 	req.ChiefID = claims.AgentProfileID
 	req.TaskID = c.Param("id")
 	if err := h.Service.Manager.ManageWorkspaceTask(c.Request.Context(), req); err != nil {
+		if errors.Is(err, models.ErrCriteriaUnmet) {
+			c.AbortWithStatusJSON(http.StatusConflict, gin.H{errorResponseKey: err.Error()})
+			return
+		}
 		fail(c, err)
 		return
 	}

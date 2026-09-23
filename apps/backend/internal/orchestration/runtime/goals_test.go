@@ -3,7 +3,9 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -141,9 +143,52 @@ func TestCriteriaActionsAreScopedAndGateCompletion(t *testing.T) {
 	code, _ = manage("delegated", map[string]any{"action": "set_criteria", "acceptance_criteria": []string{"Tests pass", "Changelog entry"}})
 	require.Equal(t, 200, code)
 	require.Equal(t, models.CriteriaProgress{Met: 0, Total: 2}, models.TaskGoalFromMetadata(task.Metadata).Progress(), "set_criteria resets every criterion")
+	code, body = manage("delegated", map[string]any{"action": "set_criteria", "acceptance_criteria": []string{}})
+	require.Equal(t, 409, code, "clearing unmet criteria would lift the completion gate")
+	require.Contains(t, body, `"error":"acceptance_criteria_unmet"`)
+	require.NotNil(t, models.TaskGoalFromMetadata(task.Metadata))
+	code, _ = manage("delegated", map[string]any{"action": "verify_criteria", "criteria": []map[string]any{
+		{"id": "c1", "met": true, "evidence": "go test ./... passed"}, {"id": "c2", "met": true, "evidence": "CHANGELOG entry added"}}})
+	require.Equal(t, 200, code)
 	code, _ = manage("delegated", map[string]any{"action": "set_criteria", "acceptance_criteria": []string{}})
 	require.Equal(t, 200, code)
-	require.Nil(t, models.TaskGoalFromMetadata(task.Metadata), "an empty list clears the criteria")
+	require.Nil(t, models.TaskGoalFromMetadata(task.Metadata), "an empty list clears criteria that are all met")
+}
+
+// lockedTaskMetadata is a fakeTaskMetadata safe for concurrent writers.
+type lockedTaskMetadata struct {
+	mu sync.Mutex
+	*fakeTaskMetadata
+}
+
+func (f *lockedTaskMetadata) SetTaskMetadata(ctx context.Context, taskID, key string, value any) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.fakeTaskMetadata.SetTaskMetadata(ctx, taskID, key, value)
+}
+
+func TestParallelVerificationsKeepEveryVerdict(t *testing.T) {
+	s, _, conversation := newRuntime(t)
+	s.Manager = &fakeTaskManager{}
+	s.TaskMetadata = &lockedTaskMetadata{fakeTaskMetadata: &fakeTaskMetadata{tasks: s.Tasks.(*testTasks)}}
+	task := delegate(s, "delegated", v1.TaskStateReview)
+	goal, err := models.NewTaskGoal([]string{"One", "Two", "Three", "Four"}, s.now())
+	require.NoError(t, err)
+	task.Metadata[models.MetaTaskGoal] = goal
+	router, token, run := workspaceControlCaller(t, s, conversation)
+	var wg sync.WaitGroup
+	codes := make([]int, 4)
+	for i := range codes {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			body := map[string]any{"action": "verify_criteria", "criteria": []map[string]any{{"id": fmt.Sprintf("c%d", i+1), "met": true, "evidence": "Checked"}}}
+			codes[i] = runtimeRequest(t, router, "POST", manageTaskPath("delegated"), token, run, body).Code
+		}(i)
+	}
+	wg.Wait()
+	require.Equal(t, []int{200, 200, 200, 200}, codes)
+	require.Equal(t, models.CriteriaProgress{Met: 4, Total: 4}, models.TaskGoalFromMetadata(task.Metadata).Progress(), "no verdict is lost")
 }
 
 func TestVerifyEvidenceIsRedacted(t *testing.T) {

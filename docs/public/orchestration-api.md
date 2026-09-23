@@ -143,7 +143,7 @@ proposal, and a pending proposal for the same source issue is returned with
 | `session_mode` | `session_id`, `mode`: `default`, `acceptEdits` or `auto` |
 | `resolve_permission` | `session_id`, `request_id`, `pending_id`, `option_id` from `task_permissions` |
 | `answer_question` | `session_id`, `pending_id`, and `answers` (`question_id` with `selected_options` and/or `custom_text`) or `reject` |
-| `set_criteria` | `acceptance_criteria`; replaces the list and resets every criterion to unverified; an empty list clears it |
+| `set_criteria` | `acceptance_criteria`; replaces the list and resets every criterion to unverified; an empty list clears it only when every current criterion is met (409 `acceptance_criteria_unmet` otherwise) |
 | `verify_criteria` | `criteria`: `id`, `met` and `evidence` (up to 1000 characters) per checked criterion; all or nothing |
 
 Use `move` for board progression; `task_status` changes native status under the
@@ -153,7 +153,8 @@ permission modes are unavailable, and `resolve_permission` accepts only
 `answer_question`, `set_criteria` and `verify_criteria` work only on tasks the
 coordinator created or adopted. `task_status done` on a task with acceptance
 criteria returns 409 `acceptance_criteria_unmet` with the `unmet` list until
-every criterion is recorded as met.
+every criterion is recorded as met; a `move` into a step that completes its task
+is refused with the same 409.
 Answers and permission decisions apply only to the exact live request; a stale
 or replaced request returns 409.
 

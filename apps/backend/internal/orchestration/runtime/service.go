@@ -44,6 +44,7 @@ type Launch struct {
 }
 type Service struct {
 	retiredExecutions       sync.Map
+	goalLocks               [goalLockStripes]sync.Mutex
 	RecoveryStarting        func(context.Context, string)
 	FailureHandlerInstalled bool
 	Enabled                 bool

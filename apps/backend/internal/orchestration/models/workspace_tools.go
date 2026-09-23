@@ -143,7 +143,7 @@ func manageTaskTool() WorkspaceBrokerTool {
 			}),
 			"rejected":      map[string]any{schemaType: "boolean", schemaDescription: "answer_question: decline the questions."},
 			"reject_reason": stringSchema("answer_question: why the questions are declined."),
-			fieldAcceptanceCriteria: arraySchema("set_criteria: replacement list (≤10, each ≤300 characters); resets every criterion to unverified; empty clears.",
+			fieldAcceptanceCriteria: arraySchema("set_criteria: replacement list (≤10, each ≤300 characters); resets every criterion to unverified; empty clears only when every current criterion is met.",
 				map[string]any{schemaType: schemaString, schemaMaxLength: MaxCriterionTextRunes}),
 			"criteria": arraySchema("verify_criteria: one entry per checked criterion.", map[string]any{
 				schemaType: schemaObject,

@@ -191,8 +191,10 @@ in chat when I ask it to, so that nothing starts without my approval.
   request with an unknown criterion, a missing verdict or missing evidence
   shall change nothing. Only the task's delegating coordinator can set or
   verify its criteria.
-- **AC-ORCHESTRATION-DELEGATION-008.3:** Setting a task done through the broker
-  shall be refused, listing the unmet criteria, until every criterion is met.
+- **AC-ORCHESTRATION-DELEGATION-008.3:** Setting a task done through the broker,
+  or moving it into a step that completes it, shall be refused, listing the
+  unmet criteria, until every criterion is met. The coordinator shall not clear
+  criteria while any is unmet.
 - **AC-ORCHESTRATION-DELEGATION-008.4:** Task updates, task details and the
   Coordinator view shall show the criteria and their status.
 
@@ -204,4 +206,5 @@ in chat when I ask it to, so that nothing starts without my approval.
 - Tracker write-back and cross-path intake deduplication; see
   [tracker intake](tracker-intake.md).
 - Gating workflow-driven completion on acceptance criteria. Only the
-  coordinator's `task_status done` is gated.
+  coordinator's `task_status done` and its moves into a completing step are
+  gated.

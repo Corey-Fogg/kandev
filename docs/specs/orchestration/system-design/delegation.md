@@ -135,11 +135,17 @@ metadata. `manage_task` handles `set_criteria` and `verify_criteria` before
 the native task action. Both require the task in the token's workspace,
 delegated to the caller (403 otherwise) and not archived; neither is
 batchable. Verification is all or nothing, redacts evidence and records the
-run. The runtime writes metadata only through `TaskMetadataWriter`, which
+run. Criteria actions on one task are serialized through a striped in-process
+lock, so parallel verifications never overwrite each other. `set_criteria`
+with an empty list is refused with 409 `acceptance_criteria_unmet` while any
+current criterion is unmet, since clearing would lift the completion gate. The
+runtime writes metadata only through `TaskMetadataWriter`, which
 accepts only `orchestration_goal` and `orchestration_stall` and publishes
 `task.updated`. `task_status` with `done` or `COMPLETED` answers 409
 `acceptance_criteria_unmet` with the unmet list before calling the native
-update. Digests carry the criteria outside the digest identity, and the prompt
+update, and a `move` into a step with `complete_task_on_enter` is refused the
+same way (the adapter returns `ErrCriteriaUnmet`, answered as 409). Digests
+carry the criteria outside the digest identity, and the prompt
 reminds the coordinator to verify before reporting a task in review or
 completed as done.
 

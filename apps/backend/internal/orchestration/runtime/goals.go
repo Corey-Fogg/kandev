@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"errors"
+	"hash/fnv"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -25,6 +26,11 @@ func (h *Handler) manageCriteria(c *gin.Context, claims *runtimeauth.AgentClaims
 	if req.Action != actionSetCriteria && req.Action != actionVerifyCriteria {
 		return false
 	}
+	// The goal is read, changed and written back whole, so concurrent
+	// criteria actions on one task are serialized: two parallel
+	// verify_criteria calls must not start from the same snapshot.
+	unlock := h.Service.lockTaskGoal(c.Param("id"))
+	defer unlock()
 	task, ok := h.delegatedTask(c, claims, c.Param("id"))
 	if !ok {
 		return true
@@ -60,6 +66,16 @@ func (h *Handler) setCriteria(c *gin.Context, task *taskmodels.Task, texts []str
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{errorResponseKey: err.Error()})
 		return
+	}
+	// Clearing would lift the completion gate, so it is refused while any
+	// current criterion is unmet. A replacement list keeps the gate: every
+	// new criterion starts unverified.
+	if current := models.TaskGoalFromMetadata(task.Metadata); goal == nil && current != nil {
+		if unmet := current.Unmet(); len(unmet) > 0 {
+			c.AbortWithStatusJSON(http.StatusConflict, gin.H{errorResponseKey: models.ErrCriteriaUnmet.Error(),
+				"detail": "acceptance criteria cannot be cleared while any is unmet", "unmet": unmetRows(unmet)})
+			return
+		}
 	}
 	if !h.writeGoal(c, task.ID, goal) {
 		return
@@ -127,12 +143,30 @@ func (h *Handler) completionAllowed(c *gin.Context, claims *runtimeauth.AgentCla
 	if len(unmet) == 0 {
 		return true
 	}
+	c.AbortWithStatusJSON(http.StatusConflict, gin.H{errorResponseKey: models.ErrCriteriaUnmet.Error(), "unmet": unmetRows(unmet)})
+	return false
+}
+
+func unmetRows(unmet []models.AcceptanceCriterion) []gin.H {
 	rows := make([]gin.H, 0, len(unmet))
 	for _, criterion := range unmet {
 		rows = append(rows, gin.H{"id": criterion.ID, "text": criterion.Text, statusKey: criterion.Status})
 	}
-	c.AbortWithStatusJSON(http.StatusConflict, gin.H{errorResponseKey: models.ErrCriteriaUnmet.Error(), "unmet": rows})
-	return false
+	return rows
+}
+
+// goalLockStripes bounds the per-task goal locks.
+const goalLockStripes = 64
+
+// lockTaskGoal serializes read-modify-write of one task's goal and returns
+// the unlock function. Tasks share a fixed set of stripes, so the lock set
+// never grows.
+func (s *Service) lockTaskGoal(taskID string) func() {
+	hash := fnv.New32a()
+	_, _ = hash.Write([]byte(taskID))
+	lock := &s.goalLocks[hash.Sum32()%goalLockStripes]
+	lock.Lock()
+	return lock.Unlock
 }
 
 // criterionDigest is one acceptance criterion as a task update carries it.

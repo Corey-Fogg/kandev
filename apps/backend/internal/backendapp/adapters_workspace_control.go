@@ -60,6 +60,9 @@ func (a *taskCreatorAdapter) moveWorkspaceTask(ctx context.Context, task *models
 		if err := validateOrchestratedCompletion(ctx, &Repositories{Workflow: a.workflow}, task.WorkflowStepID, task.ID); err != nil {
 			return err
 		}
+		if err := requireCriteriaMet(task, step); err != nil {
+			return err
+		}
 	}
 	position := 0
 	if command.Position != nil {
@@ -70,4 +73,26 @@ func (a *taskCreatorAdapter) moveWorkspaceTask(ctx context.Context, task *models
 	}
 	_, err = a.taskSvc.MoveTaskWithOptions(ctx, task.ID, workflowID, step.ID, position, opts)
 	return err
+}
+
+// requireCriteriaMet refuses a coordinator move into a step that completes
+// its task while any acceptance criterion is unmet, the same gate
+// task_status done applies.
+func requireCriteriaMet(task *models.Task, step *wfmodels.WorkflowStep) error {
+	if !step.CompleteTaskOnEnter {
+		return nil
+	}
+	goal := shared.TaskGoalFromMetadata(task.Metadata)
+	if goal == nil {
+		return nil
+	}
+	unmet := goal.Unmet()
+	if len(unmet) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(unmet))
+	for _, criterion := range unmet {
+		ids = append(ids, criterion.ID)
+	}
+	return fmt.Errorf("%w: %s completes the task; unmet criteria %s", shared.ErrCriteriaUnmet, step.Name, strings.Join(ids, ", "))
 }
