@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestOrchestratorFeatureGateIncludesAssistantCapabilities(t *testing.T) {
+func TestOrchestrationFeatureFlagRegistration(t *testing.T) {
 	def, ok := DefinitionByKey("features.orchestration")
 	require.True(t, ok)
 	require.Equal(t, "KANDEV_FEATURES_ORCHESTRATION", def.EnvVar)
