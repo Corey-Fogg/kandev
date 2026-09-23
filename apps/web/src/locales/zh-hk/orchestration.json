@@ -122,5 +122,22 @@
   "pullRequestState_open": "開放",
   "pullRequestState_merged": "已合併",
   "pullRequestState_closed": "已關閉",
-  "pullRequestState_draft": "草稿"
+  "pullRequestState_draft": "草稿",
+  "metricsHeading": "成果",
+  "metricsWindow": "時間範圍",
+  "metricsDays_7": "7 天",
+  "metricsDays_30": "30 天",
+  "metricsDelegated": "已委派",
+  "metricsCompleted": "已完成",
+  "metricsFailed": "失敗",
+  "metricsSuccessRate": "成功率",
+  "metricsMergedPRs": "已合併的 PR",
+  "metricsCycleTime": "週期時間中位數",
+  "metricsCycleTimeValue": "{{hours}} 小時",
+  "metricsCycleTimeP90": "第 90 百分位 {{hours}} 小時",
+  "metricsCost": "成本",
+  "metricsCostLowerBound": "至少 {{amount}}",
+  "metricsNoValue": "無數據",
+  "metricsTruncated": "此時間範圍內的部分較早任務未被統計。",
+  "metricsUnavailable": "成果指標不可用。"
 }

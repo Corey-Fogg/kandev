@@ -122,5 +122,22 @@
   "pullRequestState_open": "オープン",
   "pullRequestState_merged": "マージ済み",
   "pullRequestState_closed": "クローズ",
-  "pullRequestState_draft": "ドラフト"
+  "pullRequestState_draft": "ドラフト",
+  "metricsHeading": "成果",
+  "metricsWindow": "期間",
+  "metricsDays_7": "7 日間",
+  "metricsDays_30": "30 日間",
+  "metricsDelegated": "委任",
+  "metricsCompleted": "完了",
+  "metricsFailed": "失敗",
+  "metricsSuccessRate": "成功率",
+  "metricsMergedPRs": "マージされた PR",
+  "metricsCycleTime": "サイクルタイムの中央値",
+  "metricsCycleTimeValue": "{{hours}} 時間",
+  "metricsCycleTimeP90": "90 パーセンタイル {{hours}} 時間",
+  "metricsCost": "コスト",
+  "metricsCostLowerBound": "{{amount}} 以上",
+  "metricsNoValue": "データなし",
+  "metricsTruncated": "この期間の古いタスクの一部は集計されていません。",
+  "metricsUnavailable": "成果の指標を利用できません。"
 }

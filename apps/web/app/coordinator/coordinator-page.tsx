@@ -15,6 +15,7 @@ import { CoordinatorTaskList } from "./coordinator-task-list";
 import { CoordinatorChat } from "./coordinator-chat";
 import { CoordinatorTabs } from "./coordinator-tabs";
 import { CoordinatorSelect } from "./coordinator-select";
+import { CoordinatorMetricsStrip } from "./coordinator-metrics-strip";
 
 export function CoordinatorPage({ workspaceId }: { workspaceId: string }) {
   const { t } = useTranslation();
@@ -83,6 +84,13 @@ function CoordinatorContent({ catalog }: { catalog: CoordinatorWorkspace }) {
           </Button>
         )}
       </header>
+      {selected && (
+        <CoordinatorMetricsStrip
+          key={selected}
+          workspaceId={catalog.workspace.id}
+          orchestratorId={selected}
+        />
+      )}
       {catalog.assignments.length === 0 && (
         <p className="px-4 py-3 text-sm">{t("orchestration:noOrchestrators")}</p>
       )}

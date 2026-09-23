@@ -122,5 +122,22 @@
   "pullRequestState_open": "Ōƥēń",
   "pullRequestState_merged": "Ḿēŕĝēď",
   "pullRequestState_closed": "Ćĺōśēď",
-  "pullRequestState_draft": "Ďŕàƒţ"
+  "pullRequestState_draft": "Ďŕàƒţ",
+  "metricsHeading": "Ōũţćōḿēś",
+  "metricsWindow": "Ţĩḿē ŵĩńďōŵ",
+  "metricsDays_7": "7 ďàŷś",
+  "metricsDays_30": "30 ďàŷś",
+  "metricsDelegated": "Ďēĺēĝàţēď",
+  "metricsCompleted": "Ćōḿƥĺēţēď",
+  "metricsFailed": "Ƒàĩĺēď",
+  "metricsSuccessRate": "Śũććēśś ŕàţē",
+  "metricsMergedPRs": "Ḿēŕĝēď ƤŔś",
+  "metricsCycleTime": "Ḿēďĩàń ćŷćĺē ţĩḿē",
+  "metricsCycleTimeValue": "{{hours}} ĥ",
+  "metricsCycleTimeP90": "90ţĥ ƥēŕćēńţĩĺē {{hours}} ĥ",
+  "metricsCost": "Ćōśţ",
+  "metricsCostLowerBound": "àţ ĺēàśţ {{amount}}",
+  "metricsNoValue": "Ńō ďàţà",
+  "metricsTruncated": "Śōḿē ōĺďēŕ ţàśķś ĩń ţĥĩś ŵĩńďōŵ ŵēŕē ńōţ ćōũńţēď.",
+  "metricsUnavailable": "Ōũţćōḿē ḿēţŕĩćś àŕē ũńàvàĩĺàƀĺē."
 }

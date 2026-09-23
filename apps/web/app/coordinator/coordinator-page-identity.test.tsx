@@ -19,6 +19,7 @@ vi.mock("@/hooks/domains/orchestration/use-coordinator-workspace", () => ({
 }));
 vi.mock("./coordinator-task-list", () => ({ CoordinatorTaskList: () => null }));
 vi.mock("./coordinator-chat", () => ({ CoordinatorChat: () => null }));
+vi.mock("./coordinator-metrics-strip", () => ({ CoordinatorMetricsStrip: () => null }));
 
 import { CoordinatorPage } from "./coordinator-page";
 

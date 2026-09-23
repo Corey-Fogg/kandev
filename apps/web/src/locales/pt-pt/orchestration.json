@@ -122,5 +122,22 @@
   "pullRequestState_open": "Aberto",
   "pullRequestState_merged": "Integrado",
   "pullRequestState_closed": "Fechado",
-  "pullRequestState_draft": "Rascunho"
+  "pullRequestState_draft": "Rascunho",
+  "metricsHeading": "Resultados",
+  "metricsWindow": "Período",
+  "metricsDays_7": "7 dias",
+  "metricsDays_30": "30 dias",
+  "metricsDelegated": "Delegadas",
+  "metricsCompleted": "Concluídas",
+  "metricsFailed": "Falhadas",
+  "metricsSuccessRate": "Taxa de sucesso",
+  "metricsMergedPRs": "PRs integrados",
+  "metricsCycleTime": "Tempo de ciclo mediano",
+  "metricsCycleTimeValue": "{{hours}} h",
+  "metricsCycleTimeP90": "Percentil 90: {{hours}} h",
+  "metricsCost": "Custo",
+  "metricsCostLowerBound": "pelo menos {{amount}}",
+  "metricsNoValue": "Sem dados",
+  "metricsTruncated": "Algumas tarefas mais antigas deste período não foram contabilizadas.",
+  "metricsUnavailable": "As métricas de resultados não estão disponíveis."
 }

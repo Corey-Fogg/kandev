@@ -122,5 +122,22 @@
   "pullRequestState_open": "Open",
   "pullRequestState_merged": "Merged",
   "pullRequestState_closed": "Closed",
-  "pullRequestState_draft": "Draft"
+  "pullRequestState_draft": "Draft",
+  "metricsHeading": "Outcomes",
+  "metricsWindow": "Time window",
+  "metricsDays_7": "7 days",
+  "metricsDays_30": "30 days",
+  "metricsDelegated": "Delegated",
+  "metricsCompleted": "Completed",
+  "metricsFailed": "Failed",
+  "metricsSuccessRate": "Success rate",
+  "metricsMergedPRs": "Merged PRs",
+  "metricsCycleTime": "Median cycle time",
+  "metricsCycleTimeValue": "{{hours}} h",
+  "metricsCycleTimeP90": "90th percentile {{hours}} h",
+  "metricsCost": "Cost",
+  "metricsCostLowerBound": "at least {{amount}}",
+  "metricsNoValue": "No data",
+  "metricsTruncated": "Some older tasks in this window were not counted.",
+  "metricsUnavailable": "Outcome metrics are unavailable."
 }
