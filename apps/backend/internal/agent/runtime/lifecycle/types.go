@@ -87,6 +87,7 @@ type AgentExecution struct {
 	// terminals and passthrough processes can inherit the same credentials and
 	// PATH as the agent subprocess without persisting secrets in metadata.
 	runtimeEnv       map[string]string
+	runtimeRunID     string
 	runtimeEnvMu     sync.RWMutex
 	promptGeneration uint64
 	// promptCompletionGeneration prevents duplicate terminal events for the
@@ -460,7 +461,30 @@ func (e *AgentExecution) setRuntimeEnvironment(env map[string]string) {
 	}
 	e.runtimeEnvMu.Lock()
 	e.runtimeEnv = cloneStringMap(env)
+	if id := env["KANDEV_RUN_ID"]; id != "" && env["KANDEV_RUNTIME_API_PREFIX"] == orchestrationRuntimeAPIPrefix {
+		e.runtimeRunID = id
+	}
 	e.runtimeEnvMu.Unlock()
+}
+
+// orchestrationRuntimeAPIPrefix marks a launch owned by a workspace
+// orchestration run.
+const orchestrationRuntimeAPIPrefix = "/api/v1/orchestration"
+
+// EventRunID is the durable run that events for this execution report. A
+// run-owned execution carries it directly; an orchestration conversation
+// launch carries it in its launch environment. The value is non-secret and
+// survives credential teardown.
+func (e *AgentExecution) EventRunID() string {
+	if e == nil {
+		return ""
+	}
+	if e.RunID != "" {
+		return e.RunID
+	}
+	e.runtimeEnvMu.RLock()
+	defer e.runtimeEnvMu.RUnlock()
+	return e.runtimeRunID
 }
 
 // RuntimeEnvironment returns a defensive copy of the effective task runtime
