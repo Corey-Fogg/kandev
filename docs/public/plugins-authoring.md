@@ -456,7 +456,7 @@ closing future reads.
 | registerTaskAction              | Child action inside the task menu's native Link section                                                                                                                                                                                                                                                | Active ui.bundle                                                       | Action is revoked on unload; host supplies current task/workspace and desktop/mobile presentation                                                                                                               | registry.registerTaskAction({ id: "link-pr", placement: "link", ... })                                              |
 | registerReviewProvider          | Normalized task reviews, workspace associations, unlink, and shared Review panel                                                                                                                                                                                                                       | ui.bundle and matching `repository_providers[]` id                     | Snapshots/subscriptions are owner-scoped and revoked on unload; host owns status chrome, indicators, unlink UI, and responsive Review placement                                                                 | registry.registerReviewProvider({ id: "acme", ...reviews })                                                         |
 | registerTaskPanel               | { id, title, titleKey?, icon?, Component, mobileEnabled?, visible?(context) }; adds a row to the task workspace's "+" (add panel) menu; Component receives { panelId, taskId, sessionId, sessionKind, presentation, conversation: { openMessage(messageId), history } }; `titleKey` is a plugin translation key with literal `title` fallback | Active ui.bundle | Panel renders behind its own error boundary with reactive localized titles; a throwing `visible` hides the item; handles are generation-bound and independently scoped, inert after unmount, identity change, disable, reload, or uninstall; `host.conversation` outside a panel returns stable empty state; desktop preserves layout identity on navigation and mobile uses the full-height Chat surface | registry.registerTaskPanel({ id: "notes", title: "Notes", titleKey: "panels.notes", Component: NotesPanel }) |
-| registerTaskMenuAction          | { id, label, icon?, group: "edit" \| "primary", visible?(context), run(context) }; "edit" is card-only inside Edit, while "primary" is a flat item on cards and desktop/mobile task-row menus                                                                                                          | Active ui.bundle                                                       | Action is revoked on disable/uninstall; a throwing/rejecting run is caught and logged                                                                                                                           | registry.registerTaskMenuAction({ id: "enhance", label: "Enhance", group: "primary", run: doEnhance })              |
+| registerTaskMenuAction          | { id, label, icon?, group: "edit" \| "primary", visible?(context), items?(context), run(context) }; "edit" is card-only inside Edit, while "primary" is a top-level item on cards and desktop/mobile task-row menus; a synchronous `items(context)` returning TaskMenuSubItemRegistration[] ({ id, label, icon?, disabled?, run(context) }) renders the action as a submenu of those children instead | Active ui.bundle                                                       | Action is revoked on disable/uninstall; a throwing/rejecting run is caught and logged; an items() that throws or yields nothing usable falls back to the flat item, and unusable children are dropped                                                                                                                           | registry.registerTaskMenuAction({ id: "enhance", label: "Enhance", group: "primary", run: doEnhance })              |
 | registerTaskFilter              | { id, label, getOptions(), matches(context, selected) }; adds a client-side, multi-select filter section to the kanban board's display dropdown, alongside Workflow/Repository                                                                                                                         | Active ui.bundle                                                       | Filter is revoked on disable/uninstall; selections are ephemeral (not persisted); matches is only called for a non-empty selection, and a throw is caught, logged, and treated as non-matching                  | registry.registerTaskFilter({ id: "tags", label: "Tags", getOptions: listTagOptions, matches: taskHasSelectedTag }) |
 | registerTaskListFacet           | { id, label, getValues({ taskId, workspaceId }), subscribe? }; adds page-local Sort and Group choices on `/tasks`                                                                                                                                                                                      | Active ui.bundle                                                       | Values apply only to the loaded page, callbacks are isolated, and registrations are revoked on disable/unload                                                                                                   | registry.registerTaskListFacet({ id: "tags", label: "Tag", getValues: taskTags })                                   |
 | host.React / host.jsx           | Shared React instance and React.createElement alias                                                                                                                                                                                                                                                    | Active ui.bundle                                                       | No cleanup; never bundle a second React/Radix runtime                                                                                                                                                           | const h = host.jsx                                                                                                  |
@@ -2523,7 +2523,7 @@ Host reader because event queues are bounded and delivery is best-effort.
 
 `registerTaskMenuAction` adds an item to native task menus. Group `"edit"` is
 card-only and nests inside the kanban card's `Edit` submenu. Group `"primary"`
-renders as a flat top-level item on cards and desktop/mobile task-row menus.
+renders as a top-level item on cards and desktop/mobile task-row menus.
 `task-card-indicators` (see the named slots table) is the matching read-only
 surface, rendered beside the PR status icon on every card. `task-card-tags`
 is a sibling read-only surface with the same `slotProps` shape, mounted in its
@@ -2557,6 +2557,40 @@ logged, not left to crash the card; the menu closes either way. Group
 `"primary"` actions render and behave the same way as their own top-level row,
 including in desktop and phone task-row menus. Do not patch first-party task
 components directly.
+
+An action of either group that declares `items(context)` renders as a submenu
+instead: `label` becomes an unselectable trigger and the returned
+`TaskMenuSubItemRegistration` children are its entries, in order, each called
+with the same `context` as the action. Nesting stops at that one level. A
+`primary` action's children also reach the command palette and the sidebar's
+task commands, one command each; `edit` stays card-only, as it always was. `items()` is synchronous and is called while the host builds that
+card's or row's menu entries on every render, whether or not a menu is open; a
+card's dropdown and context variants are built from one evaluation, so read
+cached state and memoize anything expensive. `run` stays required: it is the
+flat item a host that predates `items` renders, and the fallback whenever
+`items` yields nothing usable (a non-array, an empty list, a promise, or a
+throw, which is caught and logged). A child needs a non-blank, unique `id`, a
+non-blank `label` and a callable `run`, with optional fields of the shapes the
+entry builder understands: a boolean `disabled` (or `null`, meaning enabled) and
+an `icon` that is a curated name, a component, a ready-made element or `null`. A child the host cannot read
+or render is dropped, and one whose `id` repeats is reported and skipped.
+
+```js
+registry.registerTaskMenuAction({
+  id: "add-tag",
+  label: "Add tag...",
+  group: "primary",
+  // Optional. Turns this action into a submenu of these children.
+  items: (context) =>
+    recentTags(context).map((tag) => ({
+      id: tag.id,
+      label: tag.name,
+      run: (ctx) => applyTag(ctx.taskId, tag.id),
+    })),
+  // Flat behavior, and the fallback when `items` has nothing usable.
+  run: (context) => openTagPicker(context.taskId),
+});
+```
 
 `registerTaskFilter` adds a client-side, multi-select filter section to the
 kanban board's display dropdown, next to the built-in Workflow and Repository

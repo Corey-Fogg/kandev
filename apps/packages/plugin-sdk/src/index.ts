@@ -422,12 +422,44 @@ export interface PluginTaskMenuContext {
   presentation: "desktop" | "mobile";
 }
 
+/**
+ * One child of a task menu action that declares `items`. Unlike the parent
+ * action, an item is never registered on its own: it exists only inside its
+ * parent's submenu, so it has no `group`, no `visible`, and its own nesting is
+ * not supported (one level deep).
+ */
+export interface TaskMenuSubItemRegistration {
+  /** Unique within the parent action; contributes to the menu entry's React key. */
+  id: string;
+  label: string;
+  icon?: PluginIcon;
+  disabled?: boolean;
+  run(context: PluginTaskMenuContext): void | Promise<void>;
+}
+
 export interface TaskMenuActionRegistration {
   id: string;
   label: string;
   icon?: PluginIcon;
   group: "edit" | "primary";
   visible?(context: PluginTaskMenuContext): boolean;
+  /**
+   * Declaring this turns the action into a submenu: the host renders `label`
+   * as an unselectable submenu trigger and calls `items(context)` to get its
+   * children, in the returned order. It must be synchronous and cheap: the
+   * host cannot await a menu item, and it builds a card's or row's entries on
+   * every render — a card's dropdown and context variants are built from one
+   * evaluation, whether or not a menu is open — so an implementation that
+   * scans or sorts should memoize on the state it reads.
+   *
+   * `run` then serves as the fallback for a host that predates submenus (it
+   * ignores this field and renders the flat item) and for a build where
+   * `items` yields nothing usable: an empty list, or a throw (caught,
+   * logged, and treated as empty). Either way the action stays reachable
+   * instead of becoming a trigger with no children.
+   */
+  items?(context: PluginTaskMenuContext): readonly TaskMenuSubItemRegistration[];
+  /** A rejection is caught and logged; the menu closes either way. */
   run(context: PluginTaskMenuContext): void | Promise<void>;
 }
 

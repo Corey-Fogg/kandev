@@ -360,8 +360,16 @@ export type PluginTaskMenuContext = PluginSDK.PluginTaskMenuContext;
  * "edit" nests the item inside the card's `Edit` submenu; group "primary"
  * renders it as a flat, top-level menu item after the movement group and
  * before the `Archive`/`Delete` removal group.
+ *
+ * An action that declares `items` becomes a submenu: `label` is its
+ * (unselectable) trigger, the returned children are its entries, and `run`
+ * remains the fallback for a host that predates the field and for a build
+ * whose `items` yields nothing usable.
  */
 export type TaskMenuActionRegistration = PluginSDK.TaskMenuActionRegistration;
+
+/** One child of a `TaskMenuActionRegistration` that declares `items`. */
+export type TaskMenuSubItemRegistration = PluginSDK.TaskMenuSubItemRegistration;
 
 /** Read-only context passed to `TaskFilterRegistration.matches`. */
 export type PluginTaskFilterContext = Parameters<PluginSDK.TaskFilterRegistration["matches"]>[0];
