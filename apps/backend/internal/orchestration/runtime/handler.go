@@ -91,7 +91,23 @@ func RegisterRoutes(g *gin.RouterGroup, h *Handler) {
 func fail(c *gin.Context, err error) {
 	c.JSON(http.StatusBadRequest, gin.H{errorResponseKey: err.Error()})
 }
+
+// callerClaimsKey caches the claims a request already authorized, so nested
+// helpers reuse one run, role, intent and workspace check per request.
+const callerClaimsKey = "orchestration_caller_claims"
+
 func (h *Handler) caller(c *gin.Context) (*runtimeauth.AgentClaims, bool) {
+	if cached, ok := c.Get(callerClaimsKey); ok {
+		return cached.(*runtimeauth.AgentClaims), true
+	}
+	claims, ok := h.authorizeCaller(c)
+	if ok {
+		c.Set(callerClaimsKey, claims)
+	}
+	return claims, ok
+}
+
+func (h *Handler) authorizeCaller(c *gin.Context) (*runtimeauth.AgentClaims, bool) {
 	raw, ok := c.Get("agent_claims")
 	claims, valid := raw.(*runtimeauth.AgentClaims)
 	if !ok || !valid || claims.Capabilities != workspaceCoordinatorAudience {
