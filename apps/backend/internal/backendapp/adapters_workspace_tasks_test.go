@@ -262,3 +262,35 @@ func TestOrchestratorUsesTaskProfilesWithoutProviderPin(t *testing.T) {
 		t.Fatal("foreign profile accepted")
 	}
 }
+
+func TestWorkspaceTaskParentMustBeADeliveryTaskInTheWorkspace(t *testing.T) {
+	adapter, svc := newOfficeTaskAdapterHarness(t)
+	ctx := context.Background()
+	wf, err := svc.CreateWorkflow(ctx, &taskservice.CreateWorkflowRequest{WorkspaceID: "ws-1", Name: "Delivery"})
+	require.NoError(t, err)
+	for _, parent := range []*models.Task{
+		{ID: "foreign-parent", WorkspaceID: "ws-2", Title: "Other workspace"},
+		{ID: "ephemeral-parent", WorkspaceID: "ws-1", Title: "Conversation", IsEphemeral: true},
+	} {
+		require.NoError(t, adapter.taskRepo.CreateTask(ctx, parent))
+		_, err := adapter.CreateWorkspaceTask(ctx, shared.WorkspaceTaskSpec{WorkspaceID: "ws-1", WorkflowID: wf.ID, Title: "Child", ParentID: parent.ID})
+		require.ErrorContains(t, err, "parent must be a delivery task in this workspace", parent.ID)
+	}
+	require.NoError(t, adapter.taskRepo.CreateTask(ctx, &models.Task{ID: "delivery-parent", WorkspaceID: "ws-1", WorkflowID: wf.ID, Title: "Parent"}))
+	id, err := adapter.CreateWorkspaceTask(ctx, shared.WorkspaceTaskSpec{WorkspaceID: "ws-1", WorkflowID: wf.ID, Title: "Child", ParentID: "delivery-parent"})
+	require.NoError(t, err)
+	child, err := svc.GetTask(ctx, id)
+	require.NoError(t, err)
+	require.Equal(t, "delivery-parent", child.ParentID)
+}
+
+func TestOrchestratedStatusRefusesNonDeliveryTasks(t *testing.T) {
+	adapter, svc := newOfficeTaskAdapterHarness(t)
+	ctx := context.Background()
+	require.NoError(t, adapter.taskRepo.CreateTask(ctx, &models.Task{ID: "conversation", WorkspaceID: "ws-1", Title: "Conversation", IsEphemeral: true, State: "IN_PROGRESS"}))
+	err := updateOrchestratedStatus(ctx, svc, &Repositories{Workflow: adapter.workflow}, "ws-1", "conversation", "done")
+	require.ErrorContains(t, err, "task must belong to this workspace")
+	task, err := svc.GetTask(ctx, "conversation")
+	require.NoError(t, err)
+	require.EqualValues(t, "IN_PROGRESS", task.State)
+}

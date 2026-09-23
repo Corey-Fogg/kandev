@@ -19,15 +19,24 @@ func (a *taskCreatorAdapter) editWorkspaceTask(ctx context.Context, task *models
 		return fmt.Errorf("edit requires title, description, priority or parent_id")
 	}
 	if command.ParentID != nil && *command.ParentID != "" {
-		parent, err := a.taskSvc.GetTask(ctx, *command.ParentID)
-		if err != nil || parent.WorkspaceID != task.WorkspaceID || parent.IsEphemeral || parent.IsFromOffice {
-			return fmt.Errorf("parent must be a delivery task in this workspace")
+		if err := a.requireDeliveryParent(ctx, task.WorkspaceID, *command.ParentID); err != nil {
+			return err
 		}
 	}
 	_, err := a.taskSvc.UpdateTask(ctx, task.ID, &taskservice.UpdateTaskRequest{
 		Title: command.Title, Description: command.Description, Priority: command.Priority, ParentID: command.ParentID,
 	})
 	return err
+}
+
+// requireDeliveryParent admits only a delivery task of the same workspace as
+// a coordinator-set parent: never a conversation, Office or ephemeral task.
+func (a *taskCreatorAdapter) requireDeliveryParent(ctx context.Context, workspaceID, parentID string) error {
+	parent, err := a.taskSvc.GetTask(ctx, parentID)
+	if err != nil || parent.WorkspaceID != workspaceID || parent.IsEphemeral || parent.IsFromOffice {
+		return fmt.Errorf("parent must be a delivery task in this workspace")
+	}
+	return nil
 }
 
 func (a *taskCreatorAdapter) moveWorkspaceTask(ctx context.Context, task *models.Task, command shared.WorkspaceTaskCommand) error {

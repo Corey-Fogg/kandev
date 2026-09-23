@@ -21,6 +21,11 @@ func (a *taskCreatorAdapter) CreateWorkspaceTask(ctx context.Context, spec share
 	if err := a.validateWorkspaceEntry(ctx, workflowID, spec); err != nil {
 		return "", err
 	}
+	if spec.ParentID != "" {
+		if err := a.requireDeliveryParent(ctx, spec.WorkspaceID, spec.ParentID); err != nil {
+			return "", err
+		}
+	}
 	metadata := map[string]interface{}{"orchestration_chief_id": spec.ChiefID, "orchestration_managed": true}
 	if spec.Source != nil {
 		maps.Copy(metadata, spec.Source.Metadata())

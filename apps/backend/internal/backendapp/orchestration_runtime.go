@@ -56,7 +56,9 @@ func newOrchestrationRuntime(cfg *config.Config, repos *Repositories, services *
 }
 func updateOrchestratedStatus(ctx context.Context, tasks *taskservice.Service, repos *Repositories, ws, id, status string) error {
 	task, err := tasks.GetTask(ctx, id)
-	if err != nil || task.WorkspaceID != ws {
+	// Conversation, Office and ephemeral tasks keep their own state
+	// management, as they do for every other coordinator task action.
+	if err != nil || task.WorkspaceID != ws || task.IsFromOffice || task.IsEphemeral {
 		return fmt.Errorf("task must belong to this workspace")
 	}
 	states := map[string]v1.TaskState{"done": v1.TaskStateCompleted, "COMPLETED": v1.TaskStateCompleted, "todo": v1.TaskStateTODO, "in_progress": v1.TaskStateInProgress, "in_review": v1.TaskStateReview, "review": v1.TaskStateReview}
