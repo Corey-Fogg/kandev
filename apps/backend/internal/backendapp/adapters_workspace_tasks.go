@@ -31,6 +31,9 @@ func (a *taskCreatorAdapter) CreateWorkspaceTask(ctx context.Context, spec share
 		maps.Copy(metadata, spec.Source.Metadata())
 		spec.ExternalID = spec.Source.ExternalID()
 	}
+	if spec.Goal != nil {
+		metadata[shared.MetaTaskGoal] = spec.Goal
+	}
 	profileID, err := a.directWorkerProfile(ctx, spec, metadata)
 	if err != nil {
 		return "", err

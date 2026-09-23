@@ -3,6 +3,7 @@ package backendapp
 import (
 	"sort"
 
+	shared "github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/task/models"
 )
 
@@ -12,6 +13,7 @@ func workspaceTaskDetailSummary(task *models.Task) map[string]any {
 		workspaceKeyDescription: workspaceExportText(task.Description, 1600), "description_truncated": len(task.Description) > 1600,
 		workspaceResultStateKey: task.State, "workflow_id": task.WorkflowID, "workflow_step_id": task.WorkflowStepID,
 		"parent_id": task.ParentID, "priority": task.Priority,
+		"acceptance_criteria": shared.TaskGoalFromMetadata(task.Metadata), "stall": shared.TaskStallFromMetadata(task.Metadata),
 	}
 }
 

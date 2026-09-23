@@ -31,7 +31,7 @@ func registerOrchestration(p routeParams) {
 		return p.taskSvc.AuthorizeWorkspaceScope(ctx, ws, authz.ScopeWorkspaceManage)
 	}
 	orchestrationruntime.RegisterRoutes(group, &orchestrationruntime.Handler{Service: p.services.Orchestration, Authorize: p.taskSvc.AuthorizeWorkspaceAccess, AuthorizeManage: manage})
-	orchestration.RegisterRoutes(group, &orchestration.Handler{Registry: p.orchestrationRepo, Repo: p.orchestrationRepo, Agents: p.services.Orchestration.Personas, Authorize: p.taskSvc.AuthorizeWorkspaceAccess, AuthorizeManage: manage, RoleWrite: authn.RequireAdmin(), ValidateExecutor: func(ctx context.Context, raw string) error {
+	orchestration.RegisterRoutes(group, &orchestration.Handler{Registry: p.orchestrationRepo, Repo: p.orchestrationRepo, Agents: p.services.Orchestration.Personas, Authorize: p.taskSvc.AuthorizeWorkspaceAccess, AuthorizeManage: manage, RoleWrite: authn.RequireAdmin(), Runtime: p.services.Orchestration, ValidateExecutor: func(ctx context.Context, raw string) error {
 		var preference struct {
 			ID string `json:"executor_profile_id"`
 		}
