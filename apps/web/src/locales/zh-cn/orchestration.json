@@ -133,6 +133,7 @@
   "metricsNoValue": "无数据",
   "metricsTruncated": "此时间范围内的部分较早任务未被统计。",
   "metricsUnavailable": "成果指标不可用。",
+  "metricsSummary": "已完成 {{completed}} 个，失败 {{failed}} 个",
   "proposalTitle": "提议的任务",
   "proposalStatus_pending": "等待你的决定",
   "proposalStatus_approving": "正在创建任务",

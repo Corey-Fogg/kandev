@@ -133,6 +133,7 @@
   "metricsNoValue": "No data",
   "metricsTruncated": "Some older tasks in this window were not counted.",
   "metricsUnavailable": "Outcome metrics are unavailable.",
+  "metricsSummary": "{{completed}} completed, {{failed}} failed",
   "proposalTitle": "Proposed task",
   "proposalStatus_pending": "Awaiting your decision",
   "proposalStatus_approving": "Creating task",

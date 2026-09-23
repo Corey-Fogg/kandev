@@ -133,6 +133,7 @@
   "metricsNoValue": "データなし",
   "metricsTruncated": "この期間の古いタスクの一部は集計されていません。",
   "metricsUnavailable": "成果の指標を利用できません。",
+  "metricsSummary": "完了 {{completed}} 件、失敗 {{failed}} 件",
   "proposalTitle": "提案されたタスク",
   "proposalStatus_pending": "判断待ち",
   "proposalStatus_approving": "タスクを作成中",

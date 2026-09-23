@@ -5,9 +5,6 @@ const hook = vi.hoisted(() => ({ use: vi.fn() }));
 vi.mock("@/hooks/domains/orchestration/use-coordinator-metrics", () => ({
   useCoordinatorMetrics: hook.use,
 }));
-vi.mock("@/hooks/use-responsive-breakpoint", () => ({
-  useResponsiveBreakpoint: () => ({ isMobile: false }),
-}));
 
 import { CoordinatorMetricsStrip } from "./coordinator-metrics-strip";
 
@@ -32,11 +29,32 @@ const tile = (id: string) => screen.getByTestId(`coordinator-metric-${id}`).text
 afterEach(() => {
   cleanup();
   hook.use.mockReset();
+  window.localStorage.clear();
+});
+
+const expand = () => fireEvent.click(screen.getByTestId("coordinator-metrics-toggle"));
+
+it("starts collapsed with a one-line summary and remembers expansion", () => {
+  hook.use.mockReturnValue({ data, loading: false, refresh: vi.fn() });
+  render(<CoordinatorMetricsStrip workspaceId="ws" orchestratorId="jeb" />);
+  const toggle = screen.getByTestId("coordinator-metrics-toggle");
+  expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  expect(toggle.textContent).toContain("8 completed, 1 failed");
+  expect(screen.queryByTestId("coordinator-metric-completed")).toBeNull();
+  expand();
+  expect(toggle.getAttribute("aria-expanded")).toBe("true");
+  expect(screen.getByTestId("coordinator-metric-completed")).toBeTruthy();
+  cleanup();
+  render(<CoordinatorMetricsStrip workspaceId="ws" orchestratorId="jeb" />);
+  expect(screen.getByTestId("coordinator-metrics-toggle").getAttribute("aria-expanded")).toBe(
+    "true",
+  );
 });
 
 it("formats outcome tiles and switches the window", () => {
   hook.use.mockReturnValue({ data, loading: false, refresh: vi.fn() });
   render(<CoordinatorMetricsStrip workspaceId="ws" orchestratorId="jeb" />);
+  expand();
   expect(tile("completed")).toContain("8");
   expect(tile("success")).toContain("89%");
   expect(tile("merged")).toContain("No data");
@@ -54,6 +72,7 @@ it("offers a retry when metrics are unavailable", () => {
   const refresh = vi.fn();
   hook.use.mockReturnValue({ error: new Error("down"), loading: false, refresh });
   render(<CoordinatorMetricsStrip workspaceId="ws" orchestratorId="jeb" />);
+  expand();
   expect(screen.getByRole("alert").textContent).toContain("Outcome metrics are unavailable.");
   fireEvent.click(screen.getByRole("button", { name: "Retry" }));
   expect(refresh).toHaveBeenCalled();

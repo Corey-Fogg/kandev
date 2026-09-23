@@ -133,6 +133,7 @@
   "metricsNoValue": "Sem dados",
   "metricsTruncated": "Algumas tarefas mais antigas deste período não foram contabilizadas.",
   "metricsUnavailable": "As métricas de resultados não estão disponíveis.",
+  "metricsSummary": "{{completed}} concluídas, {{failed}} falhadas",
   "proposalTitle": "Tarefa proposta",
   "proposalStatus_pending": "A aguardar a sua decisão",
   "proposalStatus_approving": "A criar a tarefa",

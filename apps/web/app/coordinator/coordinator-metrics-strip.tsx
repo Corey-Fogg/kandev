@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@kandev/ui/button";
-import { useResponsiveBreakpoint } from "@/hooks/use-responsive-breakpoint";
+import { IconChevronDown, IconChevronRight } from "@tabler/icons-react";
+import { useLocalStorageBoolean } from "@/hooks/use-local-storage-boolean";
 import { useCoordinatorMetrics } from "@/hooks/domains/orchestration/use-coordinator-metrics";
 import type { CoordinatorMetrics } from "@/lib/api/domains/orchestration-api";
 
@@ -113,7 +114,35 @@ function WindowToggle({ days, setDays }: { days: 7 | 30; setDays: (days: 7 | 30)
   );
 }
 
-/** Outcome metrics for the selected orchestrator over the last 7 or 30 days; folded on phones. */
+const EXPANDED_KEY = "kandev.coordinator.metrics.expanded";
+const EXPANDED_EVENT = "kandev:coordinator-metrics-expanded";
+
+function MetricsSummary({ metrics }: { metrics: CoordinatorMetrics }) {
+  const { t, i18n } = useTranslation();
+  const count = new Intl.NumberFormat(i18n.language);
+  return (
+    <span className="truncate text-xs font-normal text-muted-foreground tabular-nums">
+      {t("orchestration:metricsSummary", {
+        completed: count.format(metrics.completed),
+        failed: count.format(metrics.failed),
+      })}
+    </span>
+  );
+}
+
+function useExpanded() {
+  const { value, setValue } = useLocalStorageBoolean(EXPANDED_KEY, EXPANDED_EVENT, false);
+  const toggle = () => {
+    try {
+      setValue(!value);
+    } catch {
+      // Storage unavailable: the strip keeps its current state.
+    }
+  };
+  return { expanded: value, toggle };
+}
+
+/** Outcome metrics for the selected orchestrator over the last 7 or 30 days; collapsed by default. */
 export function CoordinatorMetricsStrip({
   workspaceId,
   orchestratorId,
@@ -122,49 +151,60 @@ export function CoordinatorMetricsStrip({
   orchestratorId: string;
 }) {
   const { t } = useTranslation();
-  const { isMobile } = useResponsiveBreakpoint();
+  const { expanded, toggle } = useExpanded();
   const [days, setDays] = useState<7 | 30>(7);
   const { data, error, loading, refresh } = useCoordinatorMetrics(
     workspaceId,
     orchestratorId,
     days,
   );
+  const Chevron = expanded ? IconChevronDown : IconChevronRight;
   return (
     <section
       aria-labelledby="coordinator-metrics-heading"
-      className="border-b px-4 py-2 md:py-3"
+      className="space-y-2 border-b px-4 py-1.5"
       data-testid="coordinator-metrics"
     >
-      <details open={!isMobile} className="space-y-2">
-        <summary className="md:hidden cursor-pointer min-h-11 flex items-center text-sm">
-          {t("orchestration:metricsHeading")}
-        </summary>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="coordinator-metrics-heading" className="hidden text-sm font-semibold md:block">
-            {t("orchestration:metricsHeading")}
-          </h2>
-          <WindowToggle days={days} setDays={setDays} />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id="coordinator-metrics-heading" className="min-w-0 flex-1 text-sm font-semibold">
+          <button
+            type="button"
+            aria-expanded={expanded}
+            aria-controls="coordinator-metrics-body"
+            className="flex w-full min-w-0 cursor-pointer items-center gap-1.5 text-left max-md:min-h-11"
+            onClick={toggle}
+            data-testid="coordinator-metrics-toggle"
+          >
+            <Chevron className="h-4 w-4 shrink-0" aria-hidden />
+            <span>{t("orchestration:metricsHeading")}</span>
+            {!expanded && data && !error && <MetricsSummary metrics={data} />}
+          </button>
+        </h2>
+        {expanded && <WindowToggle days={days} setDays={setDays} />}
+      </div>
+      {expanded && (
+        <div id="coordinator-metrics-body" className="space-y-2 pb-1.5">
+          {error ? (
+            <div role="alert" className="flex flex-wrap items-center gap-2 text-sm">
+              <span>{t("orchestration:metricsUnavailable")}</span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="cursor-pointer max-md:min-h-11"
+                onClick={refresh}
+              >
+                {t("task:retry")}
+              </Button>
+            </div>
+          ) : null}
+          {loading && (
+            <p role="status" className="text-xs text-muted-foreground">
+              {t("common:loading")}
+            </p>
+          )}
+          {data && !error && <MetricsTiles metrics={data} />}
         </div>
-        {error ? (
-          <div role="alert" className="flex flex-wrap items-center gap-2 text-sm">
-            <span>{t("orchestration:metricsUnavailable")}</span>
-            <Button
-              size="sm"
-              variant="outline"
-              className="cursor-pointer max-md:min-h-11"
-              onClick={refresh}
-            >
-              {t("task:retry")}
-            </Button>
-          </div>
-        ) : null}
-        {loading && (
-          <p role="status" className="text-xs text-muted-foreground">
-            {t("common:loading")}
-          </p>
-        )}
-        {data && !error && <MetricsTiles metrics={data} />}
-      </details>
+      )}
     </section>
   );
 }
