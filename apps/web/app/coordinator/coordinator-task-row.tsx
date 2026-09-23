@@ -9,6 +9,7 @@ import { formatRelativeTime } from "@/lib/utils";
 import type { Task } from "@/lib/types/http";
 import type { CoordinatorWorkspace } from "@/hooks/domains/orchestration/use-coordinator-workspace";
 import type { CoordinatorTaskGroup } from "@/lib/orchestration/coordinator-task-groups";
+import { CoordinatorTaskSignals } from "./coordinator-task-signals";
 
 type CatalogNames = Record<"workflows" | "steps" | "repositories", Map<string, string>>;
 const catalogNames = new WeakMap<CoordinatorWorkspace, CatalogNames>();
@@ -32,28 +33,16 @@ function namesFor(catalog: CoordinatorWorkspace): CatalogNames {
 function TaskEvidence({ task }: { task: Task }) {
   const { t } = useTranslation();
   const summary = task.status_summary;
-  const pr = summary?.pull_request;
-  const href = safeExternalPR(pr?.url);
   return (
     <div className="flex flex-wrap items-center gap-3 px-3 pb-3 text-xs text-muted-foreground">
       <TaskNotices task={task} />
+      <CoordinatorTaskSignals task={task} />
       {!summary && <span>{t("orchestration:statusUnavailable")}</span>}
       {summary?.last_activity_at && (
         <time dateTime={summary.last_activity_at}>
           {t("orchestration:lastActivity", { time: formatRelativeTime(summary.last_activity_at) })}
         </time>
       )}
-      {href && (
-        <a
-          href={href}
-          target="_blank"
-          rel="noreferrer"
-          className="cursor-pointer underline max-md:min-h-11 inline-flex items-center"
-        >
-          {t("orchestration:pullRequest", { number: pr?.number })}
-        </a>
-      )}
-      {pr?.state && <span>{pr.state}</span>}
       {summary?.git?.changed_files !== undefined && !summary.git.comparison_unavailable && (
         <span>{t("orchestration:changedFiles", { count: summary.git.changed_files })}</span>
       )}
@@ -141,8 +130,4 @@ export function CoordinatorTaskRow({
       <TaskEvidence task={task} />
     </article>
   );
-}
-
-function safeExternalPR(value?: string) {
-  return value && /^https?:\/\//i.test(value) ? value : undefined;
 }
