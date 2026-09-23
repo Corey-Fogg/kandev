@@ -21,7 +21,7 @@ func TestAssistantAuthorityPersistenceEngines(t *testing.T) {
 		t.Run(string(name), func(t *testing.T) {
 			repo, binding := authorityStoreFixture(t, name)
 			ctx := context.Background()
-			require.Equal(t, "inspect", binding.ExecutionMode)
+			require.Equal(t, "execute", binding.ExecutionMode)
 			request := models.Operation{BindingID: binding.ID, OperationID: "once", ConversationID: binding.ConversationID,
 				RunID: "run", Target: "native-task", RequestHash: "synthetic", BindingVersion: binding.Version}
 			prepared, created, err := repo.BeginOperation(ctx, request)

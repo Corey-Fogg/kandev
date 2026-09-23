@@ -17,6 +17,7 @@ import (
 	taskservice "github.com/kandev/kandev/internal/task/service"
 	"github.com/kandev/kandev/internal/workflow/stepevents"
 	v1 "github.com/kandev/kandev/pkg/api/v1"
+	"go.uber.org/zap"
 	"path/filepath"
 	"strings"
 )
@@ -104,4 +105,31 @@ func validateOrchestratedCompletion(ctx context.Context, repos *Repositories, st
 		}
 	}
 	return nil
+}
+
+// startOrchestrationRuntime attaches the conversation runtime to the event bus
+// and its dependents before run dispatch starts. Interrupted conversation runs
+// are settled first so a restart never leaves a turn claimed forever.
+func startOrchestrationRuntime(
+	ctx context.Context, cfg *config.Config, services *Services, orch *orchestrator.Service,
+	repos *Repositories, eventBus bus.EventBus, addCleanup func(func() error), log *logger.Logger,
+) bool {
+	if services.Orchestration == nil || !cfg.Features.Orchestration {
+		return true
+	}
+	if services.Automation != nil {
+		services.Automation.Service.SetOrchestratorTarget(services.Orchestration)
+	}
+	if err := services.Orchestration.RecoverInterrupted(ctx); err != nil {
+		log.Error("orchestration recovery failed", zap.Error(err))
+		return false
+	}
+	cleanup, err := services.Orchestration.Subscribe(eventBus)
+	if err != nil {
+		log.Error("orchestration subscriptions failed", zap.Error(err))
+		return false
+	}
+	addCleanup(func() error { cleanup(); return nil })
+	wireAssistantDispatch(orch, services.Orchestration, services.Task, repos.Orchestration)
+	return true
 }

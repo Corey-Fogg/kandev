@@ -19,12 +19,15 @@ func (r *Repository) AssistantBinding(ctx context.Context, owner string) (*model
 	return &row, err
 }
 
+// assistantModeExecute lets the conversation create and manage workspace tasks.
+const assistantModeExecute = "execute"
+
 func (r *Repository) SelectAssistant(ctx context.Context, row *models.AssistantBinding, expected int64) error {
 	if row.ExecutionMode == "" {
-		row.ExecutionMode = "inspect"
+		row.ExecutionMode = assistantModeExecute
 	}
 	switch row.ExecutionMode {
-	case "answer", "inspect", "design", "execute":
+	case "answer", "inspect", "design", assistantModeExecute:
 	default:
 		return models.ErrConflict
 	}

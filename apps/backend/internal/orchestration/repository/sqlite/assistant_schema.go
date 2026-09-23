@@ -35,9 +35,40 @@ func (r *Repository) migrateAssistantStorage() error {
 		}
 	}
 	exists, err := db.ColumnExists(r.db, "orchestration_assistant_bindings", "execution_mode")
-	if err != nil || exists {
+	if err != nil {
 		return err
 	}
-	_, err = r.db.Exec(`ALTER TABLE orchestration_assistant_bindings ADD COLUMN execution_mode TEXT NOT NULL DEFAULT 'inspect'`)
-	return err
+	if !exists {
+		if _, err = r.db.Exec(`ALTER TABLE orchestration_assistant_bindings ADD COLUMN execution_mode TEXT NOT NULL DEFAULT 'execute'`); err != nil {
+			return err
+		}
+	}
+	return r.migrateExecuteDefault()
+}
+
+const executeDefaultMarker = "assistant_bindings.execute_default"
+
+// migrateExecuteDefault moves bindings created under the former read-only
+// default to execute once. The marker row records that the move ran, so a
+// mode chosen afterwards is never overwritten.
+func (r *Repository) migrateExecuteDefault() error {
+	if _, err := r.db.Exec(`CREATE TABLE IF NOT EXISTS orchestration_schema_markers (name TEXT PRIMARY KEY)`); err != nil {
+		return err
+	}
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	inserted, err := tx.Exec(tx.Rebind(`INSERT INTO orchestration_schema_markers (name) VALUES (?) ON CONFLICT (name) DO NOTHING`), executeDefaultMarker)
+	if err != nil {
+		return err
+	}
+	if n, err := inserted.RowsAffected(); err != nil || n == 0 {
+		return err
+	}
+	if _, err = tx.Exec(`UPDATE orchestration_assistant_bindings SET execution_mode='execute' WHERE execution_mode='inspect'`); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

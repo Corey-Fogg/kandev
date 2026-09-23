@@ -24,7 +24,7 @@ func TestAssistantReadOnlyDefaultsAndMutationCounters(t *testing.T) {
 	s, db, task := newRuntime(t)
 	manager := &assistantTaskManager{}
 	s.Manager = manager
-	router, token, runID := assistantRuntimeCallerMode(t, s, task, "")
+	router, token, runID := assistantRuntimeCallerMode(t, s, task, "inspect")
 	binding, err := s.Repo.AssistantBinding(context.Background(), "owner")
 	require.NoError(t, err)
 	require.Equal(t, "inspect", binding.ExecutionMode)
@@ -159,4 +159,12 @@ func TestAssistantAuthorityNativeResumeAndSteer(t *testing.T) {
 	require.Error(t, s.CheckAssistantSession(ctx, task, session, "another-profile"))
 	s.Authority.(*testAssistantAuthority).revision = "revoked"
 	require.Error(t, s.CheckAssistantSession(ctx, task, session, "personal"))
+}
+
+func TestAssistantBindingDefaultsToExecute(t *testing.T) {
+	s, _, task := newRuntime(t)
+	assistantRuntimeCallerMode(t, s, task, "")
+	binding, err := s.Repo.AssistantBinding(context.Background(), "owner")
+	require.NoError(t, err)
+	require.Equal(t, "execute", binding.ExecutionMode)
 }

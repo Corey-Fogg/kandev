@@ -1177,6 +1177,10 @@ func startGatewayAndServe(
 		closeBoundListeners(server, listeners, log)
 		return false
 	}
+	if !startOrchestrationRuntime(ctx, cfg, services, orchestratorSvc, repos, eventBus, addCleanup, log) {
+		closeBoundListeners(server, listeners, log)
+		return false
+	}
 	scheduling := startSchedulingRuntime(
 		ctx, repos, services, eventBus, orchestratorSvc, runProcessorSvc, log,
 		runsscheduler.TickIntervalFromConfig(cfg.Office.SchedulerTickMs),

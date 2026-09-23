@@ -19,7 +19,7 @@ export function useAssistantSetup(
     setBusy(true);
     setError(undefined);
     try {
-      await selectAssistant(id, binding?.version ?? 0, binding?.execution_mode ?? "inspect");
+      await selectAssistant(id, binding?.version ?? 0, binding?.execution_mode ?? "execute");
       onSelected();
     } catch (cause) {
       setError(cause);
