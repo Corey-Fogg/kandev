@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/kandev/kandev/internal/orchestration/models"
 	runmodels "github.com/kandev/kandev/internal/runs/models"
 	taskmodels "github.com/kandev/kandev/internal/task/models"
 )
@@ -34,6 +35,13 @@ type taskUpdate struct {
 	PendingPermissions int      `json:"pending_permissions,omitempty"`
 	PendingQuestions   int      `json:"pending_questions,omitempty"`
 	Questions          []string `json:"questions,omitempty"`
+	// Source and PullRequest say where the task came from and what it produced.
+	Source      *models.SourceIssue     `json:"source,omitempty"`
+	PullRequest *models.TaskPullRequest `json:"pr,omitempty"`
+	// StallOutcome is set on a stall update: no_progress, never_started or
+	// orphaned.
+	StallOutcome string `json:"stall_outcome,omitempty"`
+	StalledFor   string `json:"stalled_for,omitempty"`
 }
 
 // actionable reports whether the update warrants a coordinator turn: the
@@ -43,45 +51,67 @@ func (u taskUpdate) actionable() bool {
 	case "REVIEW", "COMPLETED", "FAILED", "WAITING_FOR_INPUT", "BLOCKED":
 		return true
 	}
-	return u.PendingPermissions+u.PendingQuestions > 0
+	return u.PendingPermissions+u.PendingQuestions > 0 || u.StallOutcome != ""
 }
 
 // taskCallback wakes the delegating coordinator with the task's digest. An
 // update whose digest was already queued for that coordinator is suppressed.
 func (s *Service) taskCallback(ctx context.Context, taskID string) error {
-	task, err := s.Tasks.GetTask(ctx, taskID)
-	if err != nil {
+	task, id, conversation, err := s.delegatingCoordinator(ctx, taskID)
+	if err != nil || id == "" {
 		return err
-	}
-	id, _ := task.Metadata["orchestration_chief_id"].(string)
-	if id == "" {
-		return nil
-	}
-	a, err := s.Personas.GetAgentInstance(ctx, id)
-	if err != nil || a.WorkspaceID != task.WorkspaceID {
-		return nil
-	}
-	conversation, err := s.Repo.EnsureAgentConversation(ctx, a)
-	if err != nil {
-		return err
-	}
-	if conversation.TaskID == taskID {
-		return nil
 	}
 	update, digest, err := s.describeTask(ctx, task)
 	if err != nil || !update.actionable() {
 		return err
 	}
 	key := fmt.Sprintf("workspace-task-callback:%s:%s:%s", id, taskID, digest)
-	return s.QueueTurn(ctx, id, conversation.TaskID, callbackReason, key, map[string]any{callbacksKey: []taskUpdate{update}})
+	return s.QueueTurn(ctx, id, conversation, callbackReason, key, map[string]any{callbacksKey: []taskUpdate{update}})
+}
+
+// delegatingCoordinator returns a delegated task, its coordinator and that
+// coordinator's conversation task. The coordinator id is empty when the task
+// was not delegated by a coordinator of its workspace, or is the
+// coordinator's own conversation.
+func (s *Service) delegatingCoordinator(ctx context.Context, taskID string) (*taskmodels.Task, string, string, error) {
+	task, err := s.Tasks.GetTask(ctx, taskID)
+	if err != nil {
+		return nil, "", "", err
+	}
+	id, _ := task.Metadata["orchestration_chief_id"].(string)
+	if id == "" {
+		return task, "", "", nil
+	}
+	a, err := s.Personas.GetAgentInstance(ctx, id)
+	if err != nil || a.WorkspaceID != task.WorkspaceID {
+		return task, "", "", nil
+	}
+	conversation, err := s.Repo.EnsureAgentConversation(ctx, a)
+	if err != nil {
+		return nil, "", "", err
+	}
+	if conversation.TaskID == taskID {
+		return task, "", "", nil
+	}
+	return task, id, conversation.TaskID, nil
 }
 
 // describeTask builds the task's update and a digest of every field that
 // makes an update new: state, latest session, full latest reply, error and
 // the identities of pending permissions and questions.
 func (s *Service) describeTask(ctx context.Context, task *taskmodels.Task) (taskUpdate, string, error) {
-	update := taskUpdate{TaskID: task.ID, Title: clip(task.Title, 300), State: string(task.State)}
+	update := taskUpdate{TaskID: task.ID, Title: clip(task.Title, 300), State: string(task.State), Source: models.TaskSourceIssue(task.Metadata)}
 	identity := []string{update.State}
+	if s.PullRequests != nil {
+		prs, err := s.PullRequests(ctx, []string{task.ID})
+		if err != nil {
+			return update, "", err
+		}
+		if pr, ok := prs[task.ID]; ok {
+			update.PullRequest = &pr
+			identity = append(identity, fmt.Sprintf("pr:%d:%s", pr.Number, pr.State))
+		}
+	}
 	if launch, ok := taskmodels.LoadTaskLaunchError(task.Metadata); ok {
 		update.Error = clip(launch.Code+": "+launch.Message, 300)
 		identity = append(identity, "launch:"+launch.Stamp())
@@ -233,6 +263,15 @@ func writeTaskUpdates(text *strings.Builder, updates []taskUpdate) {
 			fmt.Fprintf(text, ", session_id=%s, session_state=%s", u.SessionID, u.SessionState)
 		}
 		text.WriteString(")\n")
+		if u.StallOutcome != "" {
+			fmt.Fprintf(text, "  Stalled: %s after %s without progress.\n", u.StallOutcome, u.StalledFor)
+		}
+		if u.Source != nil {
+			fmt.Fprintf(text, "  Source issue: %s %s %s\n", u.Source.Tracker, u.Source.Key, u.Source.URL)
+		}
+		if u.PullRequest != nil {
+			fmt.Fprintf(text, "  Pull request: #%d %s %s\n", u.PullRequest.Number, u.PullRequest.State, u.PullRequest.URL)
+		}
 		if u.PendingPermissions+u.PendingQuestions > 0 {
 			fmt.Fprintf(text, "  Waiting on %d permission request(s) and %d question(s).\n", u.PendingPermissions, u.PendingQuestions)
 		}

@@ -36,10 +36,12 @@ func newOrchestrationRuntime(cfg *config.Config, repos *Repositories, services *
 		Repo:                    repos.Orchestration, Personas: personasSvc, Runs: repos.Runs,
 		Auth: runtimeauth.NewAgentAuth(""), Tasks: services.Task,
 		Manager: &workspaceAdminAdapter{
-			taskCreatorAdapter: &taskCreatorAdapter{taskSvc: services.Task, profiles: repos.AgentSettings, orch: orch, taskRepo: repos.Task, workflow: repos.Workflow},
+			taskCreatorAdapter: &taskCreatorAdapter{taskSvc: services.Task, profiles: repos.AgentSettings, orch: orch, taskRepo: repos.Task, workflow: repos.Workflow, pullRequests: githubTaskPullRequests(services.GitHub)},
 			workflows:          services.Workflow, stepEvents: stepevents.NewPublisher(eventBus, "orchestration", log),
 		},
-		APIURL: fmt.Sprintf("http://localhost:%d", apiPort),
+		APIURL:       fmt.Sprintf("http://localhost:%d", apiPort),
+		PullRequests: githubTaskPullRequests(services.GitHub),
+		SourceIssues: sourceIssueWriter{tasks: services.Task, jira: services.Jira, linear: services.Linear},
 		Start: func(ctx context.Context, launch orchestrationruntime.Launch) error {
 			_, err := orch.StartTaskWithRoute(ctx, launch.TaskID, launch.PersonaID, orchestrationLaunchContext(repos, launch), orchexecutor.RouteOverride{ExecutionProfileID: launch.ProfileID})
 			return err

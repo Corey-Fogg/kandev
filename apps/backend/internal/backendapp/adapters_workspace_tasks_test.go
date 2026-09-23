@@ -2,6 +2,7 @@ package backendapp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -119,9 +120,10 @@ func TestWorkspaceDelegationValidatesResources(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	again, err := adapter.CreateWorkspaceTask(ctx, spec)
-	if err != nil || again != id {
-		t.Fatalf("retry duplicated task: %s %v", again, err)
+	_, err = adapter.CreateWorkspaceTask(ctx, spec)
+	var duplicate *shared.DuplicateTaskError
+	if !errors.As(err, &duplicate) || duplicate.TaskID != id {
+		t.Fatalf("retry did not report the existing task: %v", err)
 	}
 	task, err := svc.GetTask(ctx, id)
 	if err != nil {

@@ -31,7 +31,7 @@ func (s *Service) Subscribe(eb bus.EventBus) (func(), error) {
 			_ = id.Unsubscribe()
 		}
 	}
-	for _, subject := range []string{events.TaskStateChanged, events.TaskMoved, events.SessionPendingActionChanged, events.AgentTurnMessageSaved, events.AgentCompleted, events.AgentStopped, events.AgentFailed} {
+	for _, subject := range []string{events.TaskStateChanged, events.TaskMoved, events.SessionPendingActionChanged, events.AgentStalled, events.TaskStalled, events.AgentTurnMessageSaved, events.AgentCompleted, events.AgentStopped, events.AgentFailed} {
 		id, err := eb.Subscribe(subject, s.onEvent)
 		if err != nil {
 			cleanup()
@@ -51,6 +51,8 @@ func (s *Service) onEvent(ctx context.Context, event *bus.Event) error {
 		return nil
 	}
 	switch event.Type {
+	case events.AgentStalled, events.TaskStalled:
+		return s.stallCallback(ctx, event.Type, taskID, data)
 	case events.TaskStateChanged, events.TaskMoved:
 		return s.taskCallback(ctx, taskID)
 	case events.SessionPendingActionChanged:

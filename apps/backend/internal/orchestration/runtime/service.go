@@ -56,6 +56,16 @@ type Service struct {
 	UpdateStatus            func(context.Context, string, string, string) error
 	APIURL                  string
 	mu                      sync.Mutex
+	// PullRequests returns the most relevant pull request per task id.
+	PullRequests func(context.Context, []string) (map[string]models.TaskPullRequest, error)
+	// SourceIssues writes back to the tracker issue a task was created from.
+	SourceIssues SourceIssueWriter
+}
+
+// SourceIssueWriter comments on and moves a task's source tracker issue. The
+// issue is resolved from the task's own metadata, never from the caller.
+type SourceIssueWriter interface {
+	UpdateSourceIssue(ctx context.Context, workspaceID, taskID string, update models.SourceIssueUpdate) (models.SourceIssueResult, error)
 }
 
 func (s *Service) QueueTurn(ctx context.Context, id, taskID, reason, key string, payload map[string]any) error {

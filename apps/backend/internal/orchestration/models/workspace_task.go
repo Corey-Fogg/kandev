@@ -14,6 +14,9 @@ type WorkspaceTaskSpec struct {
 	Title          string
 	Description    string
 	ExternalID     string
+	// Source records the tracker issue the task implements; it sets the
+	// issue metadata and ExternalID.
+	Source *SourceIssue
 }
 
 // WorkspaceTaskCommand manages an existing delivery task under a signed workspace.

@@ -2,8 +2,12 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
+	"errors"
+	"fmt"
 
 	"github.com/kandev/kandev/internal/db/dialect"
+	"github.com/kandev/kandev/internal/orchestration/models"
 )
 
 // ExecutionProfileDirectory intentionally omits credentials and environment values.
@@ -35,4 +39,24 @@ type OrchestratedTask struct {
 	ID    string `json:"id" db:"id"`
 	Title string `json:"title" db:"title"`
 	State string `json:"state" db:"state"`
+}
+
+// TaskForSourceIssue returns the workspace task recorded for a tracker issue,
+// either by the issue metadata an issue watch writes or by the issue's
+// external id, preferring an unarchived task. The id is empty when none exists.
+func (r *Repository) TaskForSourceIssue(ctx context.Context, workspaceID, metadataKey, issueKey, externalID string) (string, bool, error) {
+	if metadataKey != models.MetaJiraIssueKey && metadataKey != models.MetaLinearIssueIdentifier {
+		return "", false, fmt.Errorf("unsupported source metadata key %q", metadataKey)
+	}
+	var row struct {
+		ID       string `db:"id"`
+		Archived int    `db:"archived"`
+	}
+	query := "SELECT id, CASE WHEN archived_at IS NULL THEN 0 ELSE 1 END AS archived FROM tasks WHERE workspace_id=? AND (" +
+		dialect.JSONExtract(r.ro.DriverName(), "metadata", metadataKey) + "=? OR external_id=?) ORDER BY archived, updated_at DESC, id LIMIT 1"
+	err := r.ro.GetContext(ctx, &row, r.ro.Rebind(query), workspaceID, issueKey, externalID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	return row.ID, row.Archived == 1, err
 }

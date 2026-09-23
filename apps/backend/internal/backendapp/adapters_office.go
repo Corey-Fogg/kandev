@@ -172,6 +172,7 @@ type taskCreatorAdapter struct {
 		GetAgentProfile(context.Context, string) (*settingsmodels.AgentProfile, error)
 	}
 	clarifications clarificationBundleResolver
+	pullRequests   taskPullRequestLookup
 }
 
 func (a *taskCreatorAdapter) CreateOfficeTask(ctx context.Context, workspaceID, projectID, assigneeAgentID, title, description string) (string, error) {

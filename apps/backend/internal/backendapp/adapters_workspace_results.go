@@ -178,11 +178,15 @@ func (a *taskCreatorAdapter) WorkspaceTaskSummaries(ctx context.Context, workspa
 	for _, task := range tasks {
 		rows = append(rows, workspaceTaskSummary(task))
 	}
+	if err := a.enrichTaskSummaries(ctx, rows); err != nil {
+		return nil, false, err
+	}
 	return rows, page*limit < total, nil
 }
 
 func workspaceTaskSummary(task *models.Task) shared.WorkspaceTaskSummary {
-	return shared.WorkspaceTaskSummary{ID: task.ID, WorkspaceID: task.WorkspaceID, Title: workspaceExportText(task.Title, 300), State: string(task.State), WorkflowID: task.WorkflowID, WorkflowStepID: task.WorkflowStepID}
+	return shared.WorkspaceTaskSummary{ID: task.ID, WorkspaceID: task.WorkspaceID, Title: workspaceExportText(task.Title, 300), State: string(task.State), WorkflowID: task.WorkflowID, WorkflowStepID: task.WorkflowStepID,
+		UpdatedAt: task.UpdatedAt, ParentID: task.ParentID, ExternalID: workspaceExportText(task.ExternalID, 300), Source: shared.TaskSourceIssue(task.Metadata)}
 }
 
 func workspaceExportText(value string, limit int) string {

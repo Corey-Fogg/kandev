@@ -48,6 +48,7 @@ func RegisterRoutes(g *gin.RouterGroup, h *Handler) {
 	g.POST("/runtime/tasks", h.createTask)
 	g.POST("/runtime/tasks/:id/manage", h.manageTask)
 	g.POST("/runtime/tasks/:id/status", h.updateTask)
+	g.POST("/runtime/tasks/:id/source-issue", h.updateSourceIssue)
 	g.POST("/runtime/comments", h.runtimeComment)
 }
 

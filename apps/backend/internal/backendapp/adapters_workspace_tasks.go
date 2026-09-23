@@ -22,6 +22,10 @@ func (a *taskCreatorAdapter) CreateWorkspaceTask(ctx context.Context, spec share
 		return "", err
 	}
 	metadata := map[string]interface{}{"orchestration_chief_id": spec.ChiefID, "orchestration_managed": true}
+	if spec.Source != nil {
+		maps.Copy(metadata, spec.Source.Metadata())
+		spec.ExternalID = spec.Source.ExternalID()
+	}
 	profileID, err := a.directWorkerProfile(ctx, spec, metadata)
 	if err != nil {
 		return "", err
@@ -41,6 +45,12 @@ func (a *taskCreatorAdapter) CreateWorkspaceTask(ctx context.Context, spec share
 	}
 	result, err := a.taskSvc.CreateTask(ctx, req)
 	if err != nil {
+		return "", err
+	}
+	if result.Outcome != taskservice.CreateTaskOutcomeCreated {
+		return "", &shared.DuplicateTaskError{TaskID: result.Task.ID, Archived: result.Task.ArchivedAt != nil}
+	}
+	if _, _, err := a.taskSvc.SettleExternalID(ctx, result.Task.ID, result.Task.ExternalID); err != nil {
 		return "", err
 	}
 	return result.Task.ID, nil

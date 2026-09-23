@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -56,16 +57,17 @@ func (h *Handler) createTask(c *gin.Context) {
 		return
 	}
 	var req struct {
-		ProjectID      string `json:"project_id"`
-		Title          string `json:"title"`
-		Description    string `json:"description"`
-		WorkflowID     string `json:"workflow_id"`
-		WorkflowStepID string `json:"workflow_step_id"`
-		ExecutionMode  string `json:"execution_mode"`
-		RepositoryID   string `json:"repository_id"`
-		AssigneeID     string `json:"assignee"`
-		ExternalID     string `json:"external_id"`
-		ParentID       string `json:"parent_id"`
+		ProjectID      string              `json:"project_id"`
+		Title          string              `json:"title"`
+		Description    string              `json:"description"`
+		WorkflowID     string              `json:"workflow_id"`
+		WorkflowStepID string              `json:"workflow_step_id"`
+		ExecutionMode  string              `json:"execution_mode"`
+		RepositoryID   string              `json:"repository_id"`
+		AssigneeID     string              `json:"assignee"`
+		ExternalID     string              `json:"external_id"`
+		ParentID       string              `json:"parent_id"`
+		Source         *models.SourceIssue `json:"source"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		fail(c, err)
@@ -83,12 +85,48 @@ func (h *Handler) createTask(c *gin.Context) {
 		c.AbortWithStatusJSON(422, gin.H{errorResponseKey: "execution_mode must be design or execute"})
 		return
 	}
-	id, err := h.Service.Manager.CreateWorkspaceTask(c.Request.Context(), models.WorkspaceTaskSpec{WorkspaceID: claims.WorkspaceID, ChiefID: claims.AgentProfileID, WorkflowID: req.WorkflowID, WorkflowStepID: req.WorkflowStepID, ExecutionMode: req.ExecutionMode, RepositoryID: req.RepositoryID, AssigneeID: req.AssigneeID, Title: title, Description: req.Description, ExternalID: req.ExternalID, ParentID: req.ParentID})
+	if req.Source != nil {
+		source, ok := h.sourceForCreate(c, claims.WorkspaceID, *req.Source, req.ExternalID)
+		if !ok {
+			return
+		}
+		req.Source = &source
+	}
+	id, err := h.Service.Manager.CreateWorkspaceTask(c.Request.Context(), models.WorkspaceTaskSpec{WorkspaceID: claims.WorkspaceID, ChiefID: claims.AgentProfileID, WorkflowID: req.WorkflowID, WorkflowStepID: req.WorkflowStepID, ExecutionMode: req.ExecutionMode, RepositoryID: req.RepositoryID, AssigneeID: req.AssigneeID, Title: title, Description: req.Description, ExternalID: req.ExternalID, ParentID: req.ParentID, Source: req.Source})
+	var duplicate *models.DuplicateTaskError
+	if errors.As(err, &duplicate) {
+		c.JSON(http.StatusOK, gin.H{"id": duplicate.TaskID, duplicateKey: true, archivedKey: duplicate.Archived})
+		return
+	}
 	if err != nil {
 		fail(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"id": id, titleKey: title, titleTruncatedKey: truncated})
+}
+
+// sourceForCreate validates a create_task source issue and answers with the
+// existing task when the workspace already has one for that issue.
+func (h *Handler) sourceForCreate(c *gin.Context, workspaceID string, raw models.SourceIssue, externalID string) (models.SourceIssue, bool) {
+	source, err := models.NormalizeSourceIssue(raw)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{errorResponseKey: err.Error()})
+		return source, false
+	}
+	if externalID != "" && strings.TrimSpace(externalID) != source.ExternalID() {
+		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{errorResponseKey: "external_id must be omitted or equal " + source.ExternalID() + " when source is set"})
+		return source, false
+	}
+	existing, archived, err := h.Service.Repo.TaskForSourceIssue(c.Request.Context(), workspaceID, source.MetadataKey(), source.Key, source.ExternalID())
+	if err != nil {
+		fail(c, err)
+		return source, false
+	}
+	if existing != "" {
+		c.JSON(http.StatusOK, gin.H{"id": existing, duplicateKey: true, archivedKey: archived})
+		return source, false
+	}
+	return source, true
 }
 
 func (h *Handler) manageTask(c *gin.Context) {
