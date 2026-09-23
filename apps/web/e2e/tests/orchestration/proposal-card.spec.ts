@@ -121,6 +121,9 @@ test("a task proposal renders as a card that can be edited, approved or dismisse
   await expect(chat.getByTestId("proposals-pending-banner")).toHaveText(
     "2 task proposals await your decision",
   );
+  // The banner moves focus to the first card awaiting a decision.
+  await chat.getByTestId("proposals-pending-banner").click();
+  await expect(approveCard).toBeFocused();
 
   // Edit, then approve with only the changed title.
   await approveCard.getByRole("button", { name: "Edit", exact: true }).click();
@@ -150,6 +153,7 @@ test("a task proposal renders as a card that can be edited, approved or dismisse
   await dismissCard.getByRole("button", { name: "Confirm dismissal", exact: true }).click();
   expect((await dismissed).request().postDataJSON()).toEqual({ reason: "Not needed this week" });
   await expect(dismissCard).toHaveAttribute("data-status", "dismissed");
+  await expect(dismissCard, "focus lands on the decided card").toBeFocused();
   await expect(dismissCard.getByText("Reason: Not needed this week")).toBeVisible();
   await expect(chat.getByTestId("proposals-pending-banner")).toHaveCount(0);
 });

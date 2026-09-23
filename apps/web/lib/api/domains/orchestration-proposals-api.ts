@@ -36,6 +36,8 @@ export type TaskProposal = {
   decided_by: string;
   created_at: string;
   decided_at: string | null;
+  /** When the approval now running claimed the proposal; set only while approving. */
+  claimed_at?: string | null;
 };
 
 /** Fields the user changed while approving; an absent field keeps the proposed value. */

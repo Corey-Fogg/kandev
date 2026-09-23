@@ -11,6 +11,7 @@ vi.mock("@/lib/api/domains/orchestration-proposals-api", () => ({
 
 import { mergeProposal, useConversationProposals } from "./use-conversation-proposals";
 
+const TEN = "2026-09-23T10:00:00Z";
 const comment = (id: string, createdAt: string, source?: string) =>
   ({ id, createdAt, source, authorType: "agent", content: "" }) as TaskComment;
 const proposal = (id: string, status: TaskProposal["status"] = "pending") =>
@@ -35,7 +36,7 @@ afterEach(() => {
 
 it("re-reads when a new proposal comment appears and counts pending cards", async () => {
   api.list.mockResolvedValueOnce({ proposals: [proposal("p1")] });
-  const first = [comment("p1", "2026-09-23T10:00:00Z", "proposal")];
+  const first = [comment("p1", TEN, "proposal")];
   const { result, rerender } = render({ ws: "ws", id: "jeb", comments: first });
   await waitFor(() => expect(result.current.pendingCount).toBe(1));
   expect(result.current.firstPendingId).toBe("p1");
@@ -65,7 +66,7 @@ it("rejects a stale list after the orchestrator changes", async () => {
   api.list.mockImplementation((_ws: string, id: string) =>
     id === "old" ? stale.promise : Promise.resolve({ proposals: [proposal("fresh")] }),
   );
-  const comments = [comment("fresh", "2026-09-23T10:00:00Z", "proposal")];
+  const comments = [comment("fresh", TEN, "proposal")];
   const { result, rerender } = render({ ws: "ws", id: "old", comments });
   rerender({ ws: "ws", id: "new", comments });
   await waitFor(() => expect(result.current.byId.has("fresh")).toBe(true));
@@ -80,4 +81,39 @@ it("never moves a decided proposal back to pending", () => {
   expect(mergeProposal(proposal("p", "pending"), proposal("p", "dismissed")).status).toBe(
     "dismissed",
   );
+});
+
+it("lets a fresher read move an approving card back to pending", () => {
+  expect(mergeProposal(proposal("p", "approving"), proposal("p", "pending")).status).toBe(
+    "pending",
+  );
+  expect(mergeProposal(proposal("p", "pending"), proposal("p", "approving")).status).toBe(
+    "approving",
+  );
+  expect(mergeProposal(proposal("p", "dismissed"), proposal("p", "approving")).status).toBe(
+    "dismissed",
+  );
+});
+
+it("reads nothing for a conversation without proposal comments", async () => {
+  const comments = [comment("c1", TEN)];
+  const { rerender } = render({ ws: "ws", id: "jeb", comments });
+  rerender({ ws: "ws", id: "jeb", comments: [...comments, comment("c2", "2026-09-23T11:00:00Z")] });
+  await act(async () => undefined);
+  expect(api.list).not.toHaveBeenCalled();
+});
+
+it("re-reads on new chat messages only while a proposal awaits a decision", async () => {
+  api.list.mockResolvedValueOnce({ proposals: [proposal("p1")] });
+  const first = [comment("p1", TEN, "proposal")];
+  const { result, rerender } = render({ ws: "ws", id: "jeb", comments: first });
+  await waitFor(() => expect(result.current.pendingCount).toBe(1));
+  api.list.mockResolvedValueOnce({ proposals: [proposal("p1", "approved")] });
+  const second = [...first, comment("c2", "2026-09-23T11:00:00Z")];
+  rerender({ ws: "ws", id: "jeb", comments: second });
+  await waitFor(() => expect(result.current.byId.get("p1")?.status).toBe("approved"));
+  expect(api.list).toHaveBeenCalledTimes(2);
+  rerender({ ws: "ws", id: "jeb", comments: [...second, comment("c3", "2026-09-23T12:00:00Z")] });
+  await act(async () => undefined);
+  expect(api.list).toHaveBeenCalledTimes(2);
 });

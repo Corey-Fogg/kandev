@@ -6,20 +6,21 @@ import {
   type TaskProposal,
 } from "@/lib/api/domains/orchestration-proposals-api";
 
-const DECIDED_RANK: Record<TaskProposal["status"], number> = {
-  pending: 0,
-  approving: 1,
-  approved: 2,
-  dismissed: 2,
-};
+/**
+ * Only a settled decision is sticky. `approving` is not: a failed approval
+ * returns the proposal to pending on the server, and the next read must be
+ * able to show that.
+ */
+const SETTLED: readonly string[] = ["approved", "dismissed"];
 
 /**
- * Keeps the more decided of two copies of one proposal, so a list read that
- * started before a decision cannot put an approved card back to pending.
+ * Keeps a settled copy of one proposal over an undecided one, so a list read
+ * that started before a decision cannot put an approved card back to pending;
+ * otherwise the newer read wins.
  */
 export function mergeProposal(current: TaskProposal | undefined, next: TaskProposal) {
   if (!current) return next;
-  return DECIDED_RANK[next.status] >= DECIDED_RANK[current.status] ? next : current;
+  return SETTLED.includes(current.status) && !SETTLED.includes(next.status) ? current : next;
 }
 
 /** `listedFor` is the proposal comment set the latest committed list read was requested for. */
@@ -50,8 +51,10 @@ function newestCommentId(comments: TaskComment[]) {
 
 /**
  * The task proposals behind a coordinator conversation's proposal comments. It
- * re-reads when a proposal comment appears or the newest comment changes, reads
- * an older proposal missing from the list once, and forgets everything when the
+ * reads nothing while the conversation has no proposal comment, re-reads when a
+ * proposal comment appears, and also when the newest comment changes while a
+ * proposal still awaits a decision (a decision made elsewhere). It reads an
+ * older proposal missing from the list once, and forgets everything when the
  * workspace or orchestrator changes.
  */
 export function useConversationProposals(
@@ -112,9 +115,22 @@ export function useConversationProposals(
   );
   const refresh = useCallback(() => read(idsKeyRef.current), [read]);
 
+  const awaitingAny = ids.some((id) => {
+    const status = current.byId.get(id)?.status;
+    return status ? AWAITING.includes(status) : !current.unavailable.has(id);
+  });
+  const awaitingRef = useRef(awaitingAny);
+  awaitingRef.current = awaitingAny;
+  const readFor = useRef("");
   useEffect(() => {
+    if (!idsKey) return;
+    // A new proposal comment or scope always reads; a newer chat message reads
+    // only while a proposal still awaits a decision.
+    const key = `${scope}\n${idsKey}`;
+    if (readFor.current === key && !awaitingRef.current) return;
+    readFor.current = key;
     void read(idsKey);
-  }, [read, idsKey, newest]);
+  }, [read, scope, idsKey, newest]);
 
   useEffect(() => {
     if (fetched.current.scope !== scope) fetched.current = { scope, ids: new Set() };
@@ -135,6 +151,7 @@ export function useConversationProposals(
 
   const pendingIds = ids.filter((id) => AWAITING.includes(current.byId.get(id)?.status ?? ""));
   return {
+    count: ids.length,
     byId: current.byId,
     unavailable: current.unavailable,
     pendingCount: pendingIds.length,

@@ -78,6 +78,9 @@ type TaskProposal struct {
 	DecidedBy          string        `json:"decided_by" db:"decided_by"`
 	CreatedAt          time.Time     `json:"created_at" db:"created_at"`
 	DecidedAt          *time.Time    `json:"decided_at" db:"decided_at"`
+	// ClaimedAt is when the running approval claimed the proposal; clients
+	// offer a retry only once that claim is stale.
+	ClaimedAt *time.Time `json:"claimed_at,omitempty" db:"claimed_at"`
 }
 
 // DecodeSpecs fills Spec and FinalSpec from their stored JSON.

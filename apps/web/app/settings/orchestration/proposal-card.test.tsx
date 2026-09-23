@@ -5,10 +5,11 @@ import type { TaskComment } from "@/app/office/tasks/[id]/types";
 import type { TaskProposal } from "@/lib/api/domains/orchestration-proposals-api";
 import { ProposalCatalogContext } from "@/lib/orchestration/proposal-catalog";
 
-const api = vi.hoisted(() => ({ approve: vi.fn(), dismiss: vi.fn() }));
+const api = vi.hoisted(() => ({ approve: vi.fn(), dismiss: vi.fn(), get: vi.fn() }));
 vi.mock("@/lib/api/domains/orchestration-proposals-api", () => ({
   approveTaskProposal: api.approve,
   dismissTaskProposal: api.dismiss,
+  getTaskProposal: api.get,
 }));
 vi.mock("@/components/task/simple/markdown-comment", () => ({
   MarkdownComment: ({ content }: { content: string }) => <p>{content}</p>,
@@ -66,6 +67,7 @@ afterEach(() => {
   cleanup();
   api.approve.mockReset();
   api.dismiss.mockReset();
+  api.get.mockReset();
 });
 
 it("shows the proposed task with catalog names, source and criteria", () => {
@@ -160,4 +162,66 @@ it("approves an edited proposal with only the changed fields", async () => {
 it("falls back to the comment body until the proposal loads", () => {
   renderCard(undefined);
   expect(screen.getByText("**Proposed task:** Fix parser")).toBeTruthy();
+});
+
+it("re-reads the proposal after a failed approval so a released claim shows as pending", async () => {
+  api.approve.mockRejectedValue(new ApiError("bad", 422, { error: "title is required" }));
+  api.get.mockResolvedValue(base);
+  const onChange = renderCard({ ...base, status: "pending" });
+  fireEvent.click(screen.getByTestId(APPROVE));
+  expect((await screen.findByRole("alert")).textContent).toBe("Add a title before approving.");
+  await waitFor(() => expect(onChange).toHaveBeenCalledWith(base));
+  expect(api.get).toHaveBeenCalledWith("ws", "jeb", "p1");
+});
+
+it("hides approve while another approval is running and offers a retry once it is stale", () => {
+  const recent = new Date(Date.now() - 60_000).toISOString();
+  renderCard({ ...base, status: "approving", claimed_at: recent });
+  expect(screen.queryByTestId(APPROVE)).toBeNull();
+  expect(screen.getByRole("status").textContent).toContain("Saving your decision");
+  cleanup();
+  const stale = new Date(Date.now() - 10 * 60_000).toISOString();
+  renderCard({ ...base, status: "approving", claimed_at: stale });
+  expect(screen.getByRole("button", { name: "Retry approval" })).toBeTruthy();
+});
+
+it("explains why a 409 changed the card", async () => {
+  const approving = { ...base, status: "approving" as const };
+  api.approve.mockRejectedValue(
+    new ApiError("conflict", 409, { error: "proposal_approval_in_progress", proposal: approving }),
+  );
+  const onChange = renderCard(base);
+  fireEvent.click(screen.getByTestId(APPROVE));
+  await waitFor(() => expect(onChange).toHaveBeenCalledWith(approving));
+  expect(screen.getByRole("status").textContent).toContain(
+    "Another approval is still creating this task.",
+  );
+});
+
+it("moves focus into the edit and dismiss forms and back to their trigger", async () => {
+  renderCard(base);
+  fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+  await waitFor(() =>
+    expect(document.activeElement).toBe(screen.getByTestId("proposal-edit-title")),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  await waitFor(() =>
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Edit" })),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+  await waitFor(() =>
+    expect(document.activeElement).toBe(screen.getByTestId("proposal-dismiss-reason")),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  await waitFor(() =>
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Dismiss" })),
+  );
+});
+
+it("focuses the card after its own decision", async () => {
+  api.dismiss.mockResolvedValue({ proposal: { ...base, status: "dismissed" } });
+  renderCard(base);
+  fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+  fireEvent.click(screen.getByRole("button", { name: "Confirm dismissal" }));
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("proposal-card")));
 });

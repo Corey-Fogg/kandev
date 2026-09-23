@@ -81,7 +81,7 @@ func (r *Repository) migrateUndecidedSourceIndex() error {
 	return err
 }
 
-const proposalColumns = `id,agent_id,workspace_id,conversation_task_id,run_id,request_hash,source_key,spec,final_spec,edited,status,task_id,duplicate,dismiss_reason,decided_by,created_at,decided_at`
+const proposalColumns = `id,agent_id,workspace_id,conversation_task_id,run_id,request_hash,source_key,spec,final_spec,edited,status,task_id,duplicate,dismiss_reason,decided_by,created_at,decided_at,claimed_at`
 
 // CreateProposal stores a proposal and its conversation comment together.
 // The comment's id is the proposal id. A replay of the same request in the
