@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+
+	"github.com/kandev/kandev/internal/agentctl/server/config"
 )
 
 // Shared subcommand literals so goconst doesn't flag duplicates across
@@ -14,14 +16,6 @@ import (
 // added when the office costs CLI joined memory + task as `get`-style
 // readers.
 const (
-	subcmdMemory          = "memory"
-	subcmdWorkspace       = "workspace"
-	subcmdTask            = "task"
-	subcmdCapabilities    = "capabilities"
-	subcmdContext         = "context"
-	subcmdComment         = "comment"
-	assistantEnabledValue = "true"
-
 	subcmdList   = "list"
 	subcmdCreate = "create"
 	subcmdGet    = "get"
@@ -29,20 +23,15 @@ const (
 
 // runKandevCLI dispatches the kandev subcommand to the appropriate handler.
 // Returns an exit code (0 = success, non-zero = error).
-const orchestrationAPIPrefix = "/api/v1/orchestration"
-
 func runKandevCLI(args []string) int {
 	if len(args) == 0 {
 		printUsage()
 		return 1
 	}
-	if os.Getenv("KANDEV_RUNTIME_API_PREFIX") == orchestrationAPIPrefix {
-		return runOrchestrationCLI(args)
-	}
 	switch args[0] {
-	case subcmdWorkspace:
-		return workspaceCatalog()
-	case subcmdTask:
+	case config.BrokerMCPSubcommand:
+		return runOrchestratorMCP()
+	case "task":
 		// Singular `task` group (get/update/create) stays for back
 		// compat with skills authored before the plural rollout.
 		// New skills should prefer `tasks` which covers list/move/
@@ -50,11 +39,11 @@ func runKandevCLI(args []string) int {
 		return runTaskCmd(args[1:])
 	case "tasks":
 		return runTasksCmd(args[1:])
-	case subcmdComment:
+	case "comment":
 		return runCommentCmd(args[1:])
 	case "agents":
 		return runAgentsCmd(args[1:])
-	case subcmdMemory:
+	case "memory":
 		return runMemoryCmd(args[1:])
 	case "checkout":
 		return runCheckoutCmd(args[1:])
@@ -77,14 +66,6 @@ func runKandevCLI(args []string) int {
 }
 
 func printUsage() {
-	if os.Getenv("KANDEV_RUNTIME_API_PREFIX") == orchestrationAPIPrefix {
-		if os.Getenv("KANDEV_PERSONAL_ASSISTANT_ENABLED") == assistantEnabledValue {
-			fmt.Fprintln(os.Stderr, "Usage: agentctl kandev <workspace|objective|context|capabilities|task|comment|memory> [flags]")
-		} else {
-			fmt.Fprintln(os.Stderr, "Usage: agentctl kandev <workspace|task|comment|memory> [flags]")
-		}
-		return
-	}
 	fmt.Fprintln(os.Stderr, "Usage: agentctl kandev <command> [flags]")
 	fmt.Fprintln(os.Stderr,
 		"Commands: task, tasks, comment, agents, memory, checkout, label, doc, routines, approvals, projects, budget")
@@ -149,36 +130,4 @@ func getWithQuery(basePath string, values url.Values) int {
 	}
 	body, status, doErr := client.do("GET", basePath+q, nil)
 	return handleResponse(body, status, doErr)
-}
-
-func runOrchestrationCLI(args []string) int {
-	if args[0] == "assistant-mcp" {
-		return runAssistantMCP()
-	}
-	if (args[0] == "objective" || args[0] == subcmdContext || args[0] == subcmdCapabilities) && os.Getenv("KANDEV_PERSONAL_ASSISTANT_ENABLED") != assistantEnabledValue {
-		cliError("personal_assistant_disabled")
-		return 1
-	}
-	switch args[0] {
-	case subcmdCapabilities:
-		return runCapabilitiesCmd(args[1:])
-	case subcmdContext:
-		return runContextCmd(args[1:])
-	case "objective":
-		return runObjectiveCmd(args[1:])
-	case subcmdWorkspace:
-		return workspaceCatalog()
-	case subcmdTask:
-		return runTaskCmd(args[1:])
-	case subcmdComment:
-		return runCommentCmd(args[1:])
-	case subcmdMemory:
-		return runMemoryCmd(args[1:])
-	case "--help", "help", "-h":
-		printUsage()
-		return 0
-	default:
-		cliError("command is unavailable for workspace orchestration; use workspace, objective, context, capabilities, task, comment or memory")
-		return 1
-	}
 }

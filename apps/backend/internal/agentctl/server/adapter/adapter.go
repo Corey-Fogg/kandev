@@ -278,9 +278,7 @@ type Config struct {
 	WorkDir string
 
 	// AutoApprove automatically approves permission requests
-	AutoApprove       bool
-	ToolPolicy        string
-	ToolPolicyVersion string
+	AutoApprove bool
 
 	// McpServers is a list of MCP servers to configure for the agent
 	McpServers []McpServerConfig
@@ -329,6 +327,14 @@ type Config struct {
 	// ProviderGatewayAuth authenticates the ACP agent against an
 	// OpenAI-compatible gateway right after initialize.
 	ProviderGatewayAuth *acpprovider.GatewayAuth
+
+	// BrokerRestricted denies ACP host filesystem, terminal, mode and
+	// configuration operations for a broker-only coordinator.
+	BrokerRestricted bool
+	// ToolPolicy selects a provider session policy for a broker-restricted
+	// agent, and ToolPolicyVersion is the provider version it requires.
+	ToolPolicy        string
+	ToolPolicyVersion string
 }
 
 // ToSharedConfig converts this Config to the shared.Config used by transport adapters.
@@ -348,8 +354,6 @@ func (c *Config) ToSharedConfig() *shared.Config {
 	return &shared.Config{
 		WorkDir:                   c.WorkDir,
 		AutoApprove:               c.AutoApprove,
-		ToolPolicy:                c.ToolPolicy,
-		ToolPolicyVersion:         c.ToolPolicyVersion,
 		McpServers:                mcpServers,
 		AgentID:                   c.AgentID,
 		AgentName:                 c.AgentName,
@@ -364,6 +368,9 @@ func (c *Config) ToSharedConfig() *shared.Config {
 		NotificationQueueCapacity: c.NotificationQueueCapacity,
 		PromptCancelJoinTimeout:   c.PromptCancelJoinTimeout,
 		ProviderGatewayAuth:       c.ProviderGatewayAuth,
+		BrokerRestricted:          c.BrokerRestricted,
+		ToolPolicy:                c.ToolPolicy,
+		ToolPolicyVersion:         c.ToolPolicyVersion,
 	}
 }
 

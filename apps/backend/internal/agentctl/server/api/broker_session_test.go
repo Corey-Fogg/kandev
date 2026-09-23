@@ -12,18 +12,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type assistantSessionCapture struct {
+type brokerSessionCapture struct {
 	mcpCaptureAdapter
 	resetServers []types.McpServer
 }
 
-func (a *assistantSessionCapture) ResetSession(_ context.Context, servers []types.McpServer) (string, error) {
+func (a *brokerSessionCapture) ResetSession(_ context.Context, servers []types.McpServer) (string, error) {
 	a.resetServers = servers
 	return "reset-session", nil
 }
 
-// @covers AC-ORCHESTRATION-ASSISTANT-004.1
-func TestAssistantSessionLifecycleAttachesOnlyManagedBroker(t *testing.T) {
+func TestBrokerSessionLifecycleAttachesOnlyManagedBroker(t *testing.T) {
 	for _, localMCP := range []bool{false, true} {
 		for _, operation := range []string{"new", "load", "reset"} {
 			t.Run(operation+map[bool]string{false: "/without-local", true: "/with-local"}[localMCP], func(t *testing.T) {
@@ -31,17 +30,17 @@ func TestAssistantSessionLifecycleAttachesOnlyManagedBroker(t *testing.T) {
 				if localMCP {
 					s = newTestServerWithMCP(t)
 				}
-				profile := mcpprofile.New(mcpprofile.SurfaceAssistantBroker, nil, nil)
+				profile := mcpprofile.New(mcpprofile.SurfaceOrchestratorBroker, nil, nil)
 				s.cfg.McpProfile = &profile
 				s.cfg.AgentEnv = []string{"KANDEV_API_KEY=synthetic-broker-token", "KANDEV_RUN_ID=example-run"}
-				config.RefreshAssistantPolicy(s.cfg)
-				capture := &assistantSessionCapture{}
+				config.RefreshBrokerPolicy(s.cfg)
+				capture := &brokerSessionCapture{}
 				s.procMgr.SetAdapterForTest(capture)
 				msg, err := ws.NewRequest("request", "agent.session."+operation, LoadSessionRequest{
 					SessionID: "existing-session",
 					McpServers: []types.McpServer{
 						{Name: "ambient", Type: "http", URL: "https://example.invalid/mcp"},
-						{Name: "kandev_assistant", Type: "stdio", Command: "untrusted-broker"},
+						{Name: "kandev_orchestrator", Type: "stdio", Command: "untrusted-broker"},
 					},
 				})
 				require.NoError(t, err)
@@ -61,10 +60,9 @@ func TestAssistantSessionLifecycleAttachesOnlyManagedBroker(t *testing.T) {
 				require.Equal(t, ws.MessageTypeResponse, response.Type)
 				executable, err := os.Executable()
 				require.NoError(t, err)
-				require.Equal(t, []types.McpServer{{Name: "kandev_assistant", Type: "stdio", Command: executable,
-					Args: []string{"kandev", "assistant-mcp"},
-					Env: map[string]string{"KANDEV_API_KEY": "synthetic-broker-token", "KANDEV_RUN_ID": "example-run",
-						"KANDEV_ORCHESTRATOR_SCOPE": "private"}}}, servers)
+				require.Equal(t, []types.McpServer{{Name: config.BrokerMCPServerName, Type: "stdio", Command: executable,
+					Args: []string{"kandev", config.BrokerMCPSubcommand},
+					Env:  map[string]string{"KANDEV_API_KEY": "synthetic-broker-token", "KANDEV_RUN_ID": "example-run"}}}, servers)
 			})
 		}
 	}

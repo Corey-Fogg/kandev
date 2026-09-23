@@ -9,6 +9,12 @@ const BrokerPolicyMetadataKey = "orchestration_broker_policy"
 // retired assistant surface name. It selects the same broker surface.
 const legacyBrokerPolicyMetadataKey = "assistant_broker_policy"
 
+// IsBroker reports whether the profile selects the broker surface, including
+// a stored profile that still names the retired assistant surface.
+func (c Context) IsBroker() bool {
+	return c.Surface == SurfaceOrchestratorBroker || c.Surface == legacyAssistantBroker
+}
+
 // SessionUsesBroker reports whether session metadata pins the broker surface.
 // Any non-empty policy value counts, so an unrecognised value fails closed.
 func SessionUsesBroker(metadata map[string]any) bool {

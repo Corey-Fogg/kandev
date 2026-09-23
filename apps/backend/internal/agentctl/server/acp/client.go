@@ -347,7 +347,7 @@ func (c *Client) resolvePath(reqPath string) (string, error) {
 // ReadTextFile reads a text file
 func (c *Client) ReadTextFile(ctx context.Context, p acp.ReadTextFileRequest) (acp.ReadTextFileResponse, error) {
 	if c.restrictedTools {
-		return acp.ReadTextFileResponse{}, fmt.Errorf("assistant policy denies host operations")
+		return acp.ReadTextFileResponse{}, fmt.Errorf("broker policy denies host operations")
 	}
 	_, span := shared.TraceProtocolRequest(ctx, shared.ProtocolACP, "", "request.read_file")
 	defer span.End()
@@ -393,7 +393,7 @@ func (c *Client) ReadTextFile(ctx context.Context, p acp.ReadTextFileRequest) (a
 // WriteTextFile writes a text file
 func (c *Client) WriteTextFile(ctx context.Context, p acp.WriteTextFileRequest) (acp.WriteTextFileResponse, error) {
 	if c.restrictedTools {
-		return acp.WriteTextFileResponse{}, fmt.Errorf("assistant policy denies host operations")
+		return acp.WriteTextFileResponse{}, fmt.Errorf("broker policy denies host operations")
 	}
 	_, span := shared.TraceProtocolRequest(ctx, shared.ProtocolACP, "", "request.write_file")
 	defer span.End()
@@ -428,7 +428,7 @@ func (c *Client) WriteTextFile(ctx context.Context, p acp.WriteTextFileRequest) 
 // CreateTerminal starts a command in a new terminal.
 func (c *Client) CreateTerminal(ctx context.Context, p acp.CreateTerminalRequest) (acp.CreateTerminalResponse, error) {
 	if c.restrictedTools {
-		return acp.CreateTerminalResponse{}, fmt.Errorf("assistant policy denies host operations")
+		return acp.CreateTerminalResponse{}, fmt.Errorf("broker policy denies host operations")
 	}
 	_, span := shared.TraceProtocolRequest(ctx, shared.ProtocolACP, "", "request.create_terminal")
 	defer span.End()
@@ -463,7 +463,7 @@ func (c *Client) CreateTerminal(ctx context.Context, p acp.CreateTerminalRequest
 // KillTerminal sends SIGTERM to a terminal's process.
 func (c *Client) KillTerminal(ctx context.Context, p acp.KillTerminalRequest) (acp.KillTerminalResponse, error) {
 	if c.restrictedTools {
-		return acp.KillTerminalResponse{}, fmt.Errorf("assistant policy denies host operations")
+		return acp.KillTerminalResponse{}, fmt.Errorf("broker policy denies host operations")
 	}
 	_, span := shared.TraceProtocolRequest(ctx, shared.ProtocolACP, "", "request.kill_terminal")
 	defer span.End()
@@ -480,7 +480,7 @@ func (c *Client) KillTerminal(ctx context.Context, p acp.KillTerminalRequest) (a
 // TerminalOutput returns the current output of a terminal.
 func (c *Client) TerminalOutput(ctx context.Context, p acp.TerminalOutputRequest) (acp.TerminalOutputResponse, error) {
 	if c.restrictedTools {
-		return acp.TerminalOutputResponse{}, fmt.Errorf("assistant policy denies host operations")
+		return acp.TerminalOutputResponse{}, fmt.Errorf("broker policy denies host operations")
 	}
 	_, span := shared.TraceProtocolRequest(ctx, shared.ProtocolACP, "", "request.terminal_output")
 	defer span.End()
@@ -509,7 +509,7 @@ func (c *Client) TerminalOutput(ctx context.Context, p acp.TerminalOutputRequest
 // ReleaseTerminal kills (if running) and releases a terminal.
 func (c *Client) ReleaseTerminal(ctx context.Context, p acp.ReleaseTerminalRequest) (acp.ReleaseTerminalResponse, error) {
 	if c.restrictedTools {
-		return acp.ReleaseTerminalResponse{}, fmt.Errorf("assistant policy denies host operations")
+		return acp.ReleaseTerminalResponse{}, fmt.Errorf("broker policy denies host operations")
 	}
 	_, span := shared.TraceProtocolRequest(ctx, shared.ProtocolACP, "", "request.release_terminal")
 	defer span.End()
@@ -523,7 +523,7 @@ func (c *Client) ReleaseTerminal(ctx context.Context, p acp.ReleaseTerminalReque
 // WaitForTerminalExit blocks until the terminal's command exits.
 func (c *Client) WaitForTerminalExit(ctx context.Context, p acp.WaitForTerminalExitRequest) (acp.WaitForTerminalExitResponse, error) {
 	if c.restrictedTools {
-		return acp.WaitForTerminalExitResponse{}, fmt.Errorf("assistant policy denies host operations")
+		return acp.WaitForTerminalExitResponse{}, fmt.Errorf("broker policy denies host operations")
 	}
 	_, span := shared.TraceProtocolRequest(ctx, shared.ProtocolACP, "", "request.wait_for_terminal_exit")
 	defer span.End()

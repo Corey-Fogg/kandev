@@ -20,7 +20,6 @@ type AgentClaims struct {
 	RunID          string `json:"run_id,omitempty"`
 	SessionID      string `json:"session_id"`
 	Capabilities   string `json:"capabilities,omitempty"`
-	Audience       string `json:"aud,omitempty"`
 	ExpiresAt      int64  `json:"exp"`
 	IssuedAt       int64  `json:"iat"`
 }
@@ -98,9 +97,6 @@ func (a *AgentAuth) mintRuntimeWithExpiry(
 		Capabilities:   capabilities,
 		ExpiresAt:      now.Add(duration).Unix(),
 		IssuedAt:       now.Unix(),
-	}
-	if capabilities == "assistant_broker" {
-		claims.Audience = "kandev:assistant-broker"
 	}
 	return signJWT(a.signingKey, &claims)
 }

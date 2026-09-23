@@ -55,6 +55,18 @@ func TestLegacyAutomationHasNoQuestionCapability(t *testing.T) {
 	}
 }
 
+func TestLegacyAssistantSurfaceResolvesToBroker(t *testing.T) {
+	if got := New("assistant-broker-v1", nil, nil).Surface; got != SurfaceOrchestratorBroker {
+		t.Fatalf("surface = %q, want %q", got, SurfaceOrchestratorBroker)
+	}
+	if !(Context{Surface: "assistant-broker-v1"}).IsBroker() || !New(SurfaceOrchestratorBroker, nil, nil).IsBroker() {
+		t.Fatal("broker surfaces must report IsBroker")
+	}
+	if New(SurfaceConversation, nil, nil).IsBroker() {
+		t.Fatal("conversation surface is not a broker")
+	}
+}
+
 func TestSessionUsesBrokerAcceptsCurrentAndLegacyKeys(t *testing.T) {
 	cases := []struct {
 		metadata map[string]any

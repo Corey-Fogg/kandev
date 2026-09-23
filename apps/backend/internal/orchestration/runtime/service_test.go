@@ -85,6 +85,7 @@ func TestConversationRunsWithoutOffice(t *testing.T) {
 		for _, key := range []string{"KANDEV_PERSONAL_ASSISTANT_ENABLED", "KANDEV_CLI", "KANDEV_INTENT_REVISION"} {
 			require.NotContains(t, l.Env, key)
 		}
+		require.Contains(t, l.Prompt, "kandev_orchestrator MCP tools", "the prompt names the broker server the coordinator receives")
 		return l.OnSessionPrepared(ctx, "session")
 	}
 	for _, key := range []string{"first", "second"} {

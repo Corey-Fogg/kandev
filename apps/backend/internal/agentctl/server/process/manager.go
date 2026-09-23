@@ -1435,10 +1435,7 @@ func (m *Manager) startOneShot() error {
 // buildAdapterConfig constructs the adapter configuration and initialises the
 // protocol adapter, including merging any adapter-provided environment variables.
 func (m *Manager) buildAdapterConfig() error {
-	if err := config.ValidateAssistantCommand(m.cfg, m.cfg.AgentArgs); err != nil {
-		return err
-	}
-	config.RefreshAssistantPolicy(m.cfg)
+	config.RefreshBrokerPolicy(m.cfg)
 	mcpServers := make([]adapter.McpServerConfig, len(m.cfg.McpServers))
 	for i, mcp := range m.cfg.McpServers {
 		mcpServers[i] = adapter.McpServerConfig{
@@ -1463,11 +1460,14 @@ func (m *Manager) buildAdapterConfig() error {
 		PromptCancelJoinTimeout:   m.cfg.PromptCancelJoinTimeout,
 		ProviderGatewayAuth:       m.cfg.ProviderGatewayAuth,
 	}
-	// The managed Claude broker policy preapproves only Kandev MCP calls.
-	// Workspace account configuration remains valid without a private binding.
-	if m.cfg.AssistantRestricted() || (m.cfg.BrokerRestricted() && m.cfg.AgentType == "claude-acp") {
-		m.adapterCfg.ToolPolicy = config.AssistantToolPolicy
-		m.adapterCfg.ToolPolicyVersion = config.ClaudeACPCommandVersion(m.cfg.AgentArgs)
+	// A broker coordinator gets no ACP host operations on any provider. Claude
+	// additionally receives a session policy that preapproves only the broker.
+	if m.cfg.BrokerRestricted() {
+		m.adapterCfg.BrokerRestricted = true
+		if m.cfg.AgentType == "claude-acp" {
+			m.adapterCfg.ToolPolicy = config.BrokerToolPolicy
+			m.adapterCfg.ToolPolicyVersion = config.ClaudeACPCommandVersion(m.cfg.AgentArgs)
+		}
 	}
 
 	// Configure one-shot mode when a continue command is provided.
@@ -1789,9 +1789,6 @@ func (m *Manager) configure(command string, agentArgs []string, agentArgsPresent
 		args = config.ParseCommand(command)
 	}
 	if err := config.ValidateCommandArgs(args); err != nil {
-		return err
-	}
-	if err := config.ValidateAssistantCommand(m.cfg, args); err != nil {
 		return err
 	}
 	if continueArgsPresent {

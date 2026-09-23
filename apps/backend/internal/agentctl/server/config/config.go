@@ -658,7 +658,7 @@ func (c *Config) NewInstanceConfig(port int, overrides *InstanceOverrides) *Inst
 	if cfg.AgentEnv == nil {
 		cfg.AgentEnv = CollectAgentEnv(nil)
 	}
-	applyAssistantPolicy(cfg)
+	applyBrokerPolicy(cfg)
 
 	return cfg
 }

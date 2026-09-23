@@ -9,13 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAssistantReadOnlyAdapterNewAndResume(t *testing.T) {
+func TestClaudeBrokerAdapterNewAndResume(t *testing.T) {
 	a, capture := newSessionRequestCaptureAdapter(t, acpsdk.McpCapabilities{})
 	a.cfg.ToolPolicy = "claude-broker-v1"
 	a.cfg.ToolPolicyVersion = "0.76.0"
 	a.agentID = "claude-acp"
 	a.agentInfo = &AgentInfo{Name: "@agentclientprotocol/claude-agent-acp", Version: "0.76.0"}
-	servers := []types.McpServer{{Name: "kandev_assistant", Command: "/owned/agentctl", Args: []string{"kandev", "assistant-mcp"}}, {Name: "untrusted", Command: "mutate"}}
+	servers := []types.McpServer{{Name: "kandev_orchestrator", Command: "/owned/agentctl", Args: []string{"kandev", "orchestrator-mcp"}}, {Name: "untrusted", Command: "mutate"}}
 	_, err := a.NewSession(context.Background(), servers)
 	require.ErrorContains(t, err, "attachment")
 	_, err = a.NewSession(context.Background(), servers[:1])
@@ -25,7 +25,8 @@ func TestAssistantReadOnlyAdapterNewAndResume(t *testing.T) {
 	require.Empty(t, options["tools"])
 	require.Empty(t, options["settingSources"])
 	require.Equal(t, true, options["strictMcpConfig"])
-	require.Equal(t, map[string]any{"disableAllHooks": true}, options["settings"])
+	require.Equal(t, map[string]any{"disableAllHooks": true, "permissions": map[string]any{"allow": []any{"mcp__kandev_orchestrator__*"}}}, options["settings"])
+	require.NotContains(t, options, "allowedTools", "a bare allowedTools entry would shadow canUseTool")
 	require.Equal(t, map[string]any{"disable-slash-commands": nil, "permission-mode": "dontAsk"}, options["extraArgs"])
 	require.NoError(t, a.LoadSession(context.Background(), "previous-restricted-session", servers[:1]))
 	require.Equal(t, capture.newRequest.Meta, capture.loadRequest.Meta)
@@ -36,7 +37,7 @@ func TestAssistantReadOnlyAdapterNewAndResume(t *testing.T) {
 	require.True(t, response.Cancelled)
 }
 
-func TestAssistantReadOnlyAdapterRejectsUnprovenVersion(t *testing.T) {
+func TestClaudeBrokerAdapterRejectsUnprovenVersion(t *testing.T) {
 	a, _ := newSessionRequestCaptureAdapter(t, acpsdk.McpCapabilities{})
 	a.cfg.ToolPolicy = "claude-broker-v1"
 	a.agentID = "claude-acp"
@@ -45,8 +46,8 @@ func TestAssistantReadOnlyAdapterRejectsUnprovenVersion(t *testing.T) {
 	require.ErrorContains(t, err, "unsupported")
 }
 
-func TestAssistantAdapterRequiresHandshakeToMatchLaunchedVersion(t *testing.T) {
-	servers := []types.McpServer{{Name: "kandev_assistant", Command: "/owned/agentctl", Args: []string{"kandev", "assistant-mcp"}}}
+func TestClaudeBrokerAdapterRequiresHandshakeToMatchLaunchedVersion(t *testing.T) {
+	servers := []types.McpServer{{Name: "kandev_orchestrator", Command: "/owned/agentctl", Args: []string{"kandev", "orchestrator-mcp"}}}
 	for _, row := range []struct {
 		launched, reported string
 		ok                 bool
@@ -69,9 +70,9 @@ func TestAssistantAdapterRequiresHandshakeToMatchLaunchedVersion(t *testing.T) {
 	}
 }
 
-func TestAssistantRestrictedSessionAcceptsProfileModeAndEffortOnly(t *testing.T) {
+func TestBrokerSessionAcceptsProfileModeAndEffortOnly(t *testing.T) {
 	a, _ := newSessionRequestCaptureAdapter(t, acpsdk.McpCapabilities{})
-	a.cfg.ToolPolicy = "claude-broker-v1"
+	a.cfg.BrokerRestricted = true
 	for _, mode := range []string{"default", "auto"} {
 		require.NoError(t, a.SetMode(context.Background(), mode))
 	}
@@ -89,4 +90,18 @@ func errString(err error) string {
 		return ""
 	}
 	return err.Error()
+}
+
+func TestNonClaudeBrokerSessionHasNoHostCapabilitiesOrProviderPolicy(t *testing.T) {
+	a, capture := newSessionRequestCaptureAdapter(t, acpsdk.McpCapabilities{})
+	a.cfg.BrokerRestricted = true
+	a.agentID = "codex-acp"
+	require.Equal(t, acpsdk.ClientCapabilities{}, a.clientCapabilities())
+	servers := []types.McpServer{{Name: "kandev_orchestrator", Command: "/owned/agentctl", Args: []string{"kandev", "orchestrator-mcp"}}}
+	_, err := a.NewSession(context.Background(), servers)
+	require.NoError(t, err)
+	require.Nil(t, capture.newRequest.Meta)
+	require.Len(t, capture.newRequest.McpServers, 1)
+	require.ErrorContains(t, a.SetMode(context.Background(), "full-access"), "forbids")
+	require.ErrorContains(t, a.SetConfigOption(context.Background(), "approval", "never"), "forbids")
 }

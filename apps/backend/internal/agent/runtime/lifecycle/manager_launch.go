@@ -613,14 +613,6 @@ func (m *Manager) buildAgentCommandWithContext(
 	if err != nil {
 		return agentCommands{}, err
 	}
-	if err := validateAssistantCommand(req, profileInfo, agentConfig, managedRuntimeVersion, cliFlagTokens, commandPrefixTokens); err != nil {
-		return agentCommands{}, err
-	}
-	if assistantRestrictedLaunch(req) {
-		autoApprove = false
-		preferNative = false
-		permissionValues = map[string]bool{}
-	}
 	// Only pass SessionID (for --resume flag) if the agent supports recovery.
 	// Agents with CanRecover=false (e.g. Auggie) use history context injection instead.
 	sessionID := req.ACPSessionID

@@ -119,7 +119,7 @@ func (a *Adapter) newSession(ctx context.Context, mcpServers []types.McpServer) 
 	ctx, span := shared.TraceProtocolRequest(ctx, shared.ProtocolACP, a.agentID, "session.new")
 	defer span.End()
 
-	if _, err := a.assistantSessionMeta(mcpServers); err != nil {
+	if _, err := a.brokerSessionMeta(mcpServers); err != nil {
 		return "", err
 	}
 	caps := effectiveMcpCapabilities(a.capabilities.McpCapabilities, a.cfg)
@@ -131,7 +131,7 @@ func (a *Adapter) newSession(ctx context.Context, mcpServers []types.McpServer) 
 		}
 		a.emitMCPAttachmentEvidence(ctx, decision.Server, kind, decision.ReasonCode, "")
 	}
-	meta, err := a.assistantSessionMeta(filteredServers)
+	meta, err := a.brokerSessionMeta(filteredServers)
 	if err != nil {
 		return "", err
 	}
@@ -493,7 +493,7 @@ func (a *Adapter) LoadSession(ctx context.Context, sessionID string, mcpServers 
 	defer span.End()
 
 	// Filter MCP servers by agent capabilities (same logic as NewSession).
-	if _, err := a.assistantSessionMeta(mcpServers); err != nil {
+	if _, err := a.brokerSessionMeta(mcpServers); err != nil {
 		return err
 	}
 	caps := effectiveMcpCapabilities(a.capabilities.McpCapabilities, a.cfg)
@@ -516,7 +516,7 @@ func (a *Adapter) LoadSession(ctx context.Context, sessionID string, mcpServers 
 	delete(a.usageBySession, sessionID)
 	a.mu.Unlock()
 
-	meta, err := a.assistantSessionMeta(filteredServers)
+	meta, err := a.brokerSessionMeta(filteredServers)
 	if err != nil {
 		return err
 	}
@@ -882,13 +882,13 @@ func currentModelFromConfig(options []streams.ConfigOption) string {
 
 // SetMode changes the agent's session mode via ACP session/set_mode.
 func (a *Adapter) SetMode(ctx context.Context, modeID string) error {
-	if a.assistantRestricted() {
+	if a.brokerRestricted() {
 		// The broker pins its own permission mode; the profile's default and
 		// auto modes are accepted without changing it.
 		if modeID == "default" || modeID == "auto" {
 			return nil
 		}
-		return fmt.Errorf("assistant policy forbids mode changes")
+		return fmt.Errorf("broker policy forbids mode changes")
 	}
 	a.mu.RLock()
 	conn := a.acpConn
@@ -1138,8 +1138,8 @@ func (a *Adapter) maybeEmitAuthRequired(err error) bool {
 // harmless.
 func (a *Adapter) SetConfigOption(ctx context.Context, configID, value string) error {
 	// Model and reasoning effort change depth, not the tool surface.
-	if a.assistantRestricted() && configID != "model" && configID != "effort" {
-		return fmt.Errorf("assistant policy forbids configuration changes")
+	if a.brokerRestricted() && configID != "model" && configID != "effort" {
+		return fmt.Errorf("broker policy forbids configuration changes")
 	}
 	a.mu.RLock()
 	conn := a.acpConn

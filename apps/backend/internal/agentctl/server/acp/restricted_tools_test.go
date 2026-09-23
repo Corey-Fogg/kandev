@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAssistantReadOnlyHostOperations(t *testing.T) {
+func TestRestrictedToolsDenyHostOperations(t *testing.T) {
 	root := t.TempDir()
 	file := filepath.Join(root, "canary")
 	require.NoError(t, os.WriteFile(file, []byte("unchanged"), 0600))

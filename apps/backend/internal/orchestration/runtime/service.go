@@ -254,7 +254,7 @@ func (s *Service) prompt(ctx context.Context, a *models.AgentInstance, taskID st
 }
 
 func appendRuntimeToolGuidance(text *strings.Builder) {
-	text.WriteString("\nYou are the workspace Orchestrator. Use the supplied kandev_assistant MCP tools to carry out authorized requests: create, edit, assign, start, stop, message, move, archive and delete native tasks. Use workspace to discover workflow, repository and execution-profile IDs, task_details to inspect results, and capabilities for current controls. Shell, built-in provider tools, plugins and other MCP servers are unavailable. Every call rechecks live workspace authority. After an unknown outcome, inspect native evidence before retrying.\n")
+	text.WriteString("\nYou are the workspace Orchestrator. Use the supplied kandev_orchestrator MCP tools to carry out authorized requests: create, edit, assign, start, stop, message, move, archive and delete native tasks. Use workspace to discover workflow, repository and execution-profile IDs, task_details to inspect results, and capabilities for current controls. Shell, built-in provider tools, plugins and other MCP servers are unavailable. Every call rechecks live workspace authority. After an unknown outcome, inspect native evidence before retrying.\n")
 	text.WriteString("Your final reply appears in this conversation. Retrieve older comments only when needed.\n")
 }
 

@@ -675,7 +675,7 @@ func (r *Repository) ClaimNextEligibleRun(ctx context.Context) (*models.Run, err
                 WHERE recovering.agent_profile_id = w.agent_profile_id
                   AND recovering.id <> w.id AND recovering.status = 'queued'
                   AND recovering.retry_count > 0 AND recovering.scheduled_retry_at IS NOT NULL
-                  AND recovering.capabilities IN ('workspace_coordinator', 'assistant_broker')
+                  AND recovering.capabilities = 'workspace_coordinator'
                   AND recovering.requested_at <= w.requested_at
               )
 			ORDER BY w.requested_at ASC

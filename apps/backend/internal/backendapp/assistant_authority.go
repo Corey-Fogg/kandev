@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 
 	"github.com/kandev/kandev/internal/agent/agents"
 	"github.com/kandev/kandev/internal/agent/managedruntime"
@@ -15,6 +16,18 @@ import (
 )
 
 const assistantClaudeAgent = "claude-acp"
+
+// assistantClaudeACPVersion is the Claude ACP release default a retained
+// assistant binding reports as supported.
+func assistantClaudeACPVersion() string {
+	return agents.MustDefaultManagedNPMRuntimeVersion(agents.NewClaudeACP().ManagedNPMRuntime().Package)
+}
+
+// assistantProfileEnvAllowed accepts only a literal absolute Claude account
+// directory as profile environment.
+func assistantProfileEnvAllowed(key, value, secretID string) bool {
+	return key == "CLAUDE_CONFIG_DIR" && secretID == "" && filepath.IsAbs(value) && filepath.Clean(value) == value
+}
 
 type authorityProfiles interface {
 	GetAgent(context.Context, string) (*settings.Agent, error)
@@ -73,7 +86,7 @@ func (a assistantAuthorityReader) claudeVersion(ctx context.Context) (string, er
 }
 
 func assistantRestrictionCompatibility(agent *settings.Agent, profile *settings.AgentProfile, executor *taskmodels.Executor, preset *taskmodels.ExecutorProfile, version string) string {
-	if agent.Name != assistantClaudeAgent || agent.TUIConfig != nil || profile.CLIPassthrough || version != agents.AssistantClaudeACPVersion() {
+	if agent.Name != assistantClaudeAgent || agent.TUIConfig != nil || profile.CLIPassthrough || version != assistantClaudeACPVersion() {
 		return "unsupported_provider_or_version"
 	}
 	if reason := assistantProfileCompatibility(profile); reason != "" {
@@ -117,7 +130,7 @@ func assistantProfileCompatibility(profile *settings.AgentProfile) string {
 		return "unsupported_profile_overrides"
 	}
 	for _, env := range profile.EnvVars {
-		if !agents.AssistantProfileEnvAllowed(env.Key, env.Value, env.SecretID) {
+		if !assistantProfileEnvAllowed(env.Key, env.Value, env.SecretID) {
 			return "unsupported_profile_overrides"
 		}
 	}

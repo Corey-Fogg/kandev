@@ -71,7 +71,7 @@ func TestAssistantReadOnlySupportedMatrix(t *testing.T) {
 			profile := &settings.AgentProfile{}
 			executor := &taskmodels.Executor{Type: taskmodels.ExecutorTypeLocal, Status: taskmodels.ExecutorStatusActive}
 			preset := &taskmodels.ExecutorProfile{}
-			version := agents.AssistantClaudeACPVersion()
+			version := assistantClaudeACPVersion()
 			switch change {
 			case "codex":
 				agent.Name = "codex-acp"
@@ -107,7 +107,7 @@ func TestAssistantReadOnlyCanonicalProviderIdentity(t *testing.T) {
 			result := assistantRestrictionCompatibility(
 				&settings.Agent{ID: row.id, Name: row.name}, &settings.AgentProfile{},
 				&taskmodels.Executor{Type: taskmodels.ExecutorTypeLocal, Status: taskmodels.ExecutorStatusActive},
-				&taskmodels.ExecutorProfile{}, agents.AssistantClaudeACPVersion(),
+				&taskmodels.ExecutorProfile{}, assistantClaudeACPVersion(),
 			)
 			require.Equal(t, row.supported, result == "", result)
 		})
@@ -120,19 +120,19 @@ func TestAssistantClaudeProfileSupportsModelAndEffort(t *testing.T) {
 	preset := &taskmodels.ExecutorProfile{}
 	profile := &settings.AgentProfile{Model: "claude-sonnet-4-5", ConfigOptions: map[string]string{"effort": "high"}}
 
-	require.Empty(t, assistantRestrictionCompatibility(agent, profile, executor, preset, agents.AssistantClaudeACPVersion()))
+	require.Empty(t, assistantRestrictionCompatibility(agent, profile, executor, preset, assistantClaudeACPVersion()))
 
 	profile.ConfigOptions = map[string]string{"unsupported-option": "value"}
-	require.Equal(t, "unsupported_profile_overrides", assistantRestrictionCompatibility(agent, profile, executor, preset, agents.AssistantClaudeACPVersion()))
+	require.Equal(t, "unsupported_profile_overrides", assistantRestrictionCompatibility(agent, profile, executor, preset, assistantClaudeACPVersion()))
 	profile.ConfigOptions = map[string]string{"effort": "high", "unsupported-option": "value"}
-	require.Equal(t, "unsupported_profile_overrides", assistantRestrictionCompatibility(agent, profile, executor, preset, agents.AssistantClaudeACPVersion()))
+	require.Equal(t, "unsupported_profile_overrides", assistantRestrictionCompatibility(agent, profile, executor, preset, assistantClaudeACPVersion()))
 }
 
 func TestAssistantClaudeProfileAcceptsOnlyAccountDirectoryEnv(t *testing.T) {
 	agent := &settings.Agent{ID: "claude-acp", Name: "claude-acp"}
 	executor := &taskmodels.Executor{Type: taskmodels.ExecutorTypeLocal, Status: taskmodels.ExecutorStatusActive}
 	preset := &taskmodels.ExecutorProfile{}
-	version := agents.AssistantClaudeACPVersion()
+	version := assistantClaudeACPVersion()
 	for _, row := range []struct {
 		env       settings.ProfileEnvVar
 		supported bool
@@ -150,8 +150,8 @@ func TestAssistantClaudeProfileAcceptsOnlyAccountDirectoryEnv(t *testing.T) {
 }
 
 func TestAssistantPolicyFollowsReleaseClaudeRuntime(t *testing.T) {
-	want, err := agents.DefaultManagedNPMRuntimeVersion(agents.AssistantClaudeACPPackage)
+	want, err := agents.DefaultManagedNPMRuntimeVersion(agents.NewClaudeACP().ManagedNPMRuntime().Package)
 	require.NoError(t, err)
-	require.Equal(t, want, agents.AssistantClaudeACPVersion())
+	require.Equal(t, want, assistantClaudeACPVersion())
 	require.Equal(t, want, agents.NewClaudeACP().ManagedNPMRuntime().DefaultVersionOrPinned())
 }
