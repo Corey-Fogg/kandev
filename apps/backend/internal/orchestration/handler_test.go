@@ -22,6 +22,14 @@ import (
 
 func testHandler(t *testing.T) (*gin.Engine, *sqlite.Repository) {
 	t.Helper()
+	router, repo, _ := configuredHandler(t, nil)
+	return router, repo
+}
+
+// configuredHandler serves the configuration routes over an in-memory store;
+// customize adjusts the handler before its routes are registered.
+func configuredHandler(t *testing.T, customize func(*Handler)) (*gin.Engine, *sqlite.Repository, *sqlx.DB) {
+	t.Helper()
 	db, err := sqlx.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatal(err)
@@ -37,7 +45,7 @@ func testHandler(t *testing.T) (*gin.Engine, *sqlite.Repository) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.Exec(`CREATE TABLE workspaces (id TEXT PRIMARY KEY); INSERT INTO workspaces(id) VALUES ('ws'),('other')`); err != nil {
+	if _, err = db.Exec(`CREATE TABLE workspaces (id TEXT PRIMARY KEY); INSERT INTO workspaces(id) VALUES ('ws'),('other'); CREATE TABLE tasks (id TEXT PRIMARY KEY, title TEXT)`); err != nil {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
@@ -56,8 +64,12 @@ func testHandler(t *testing.T) (*gin.Engine, *sqlite.Repository) {
 	}
 	svc := &personas.Service{Profiles: profiles, Repo: repo}
 	router := gin.New()
-	RegisterRoutes(router.Group("/api/v1/orchestration"), &Handler{Registry: repo, Repo: repo, Agents: svc})
-	return router, repo
+	handler := &Handler{Registry: repo, Repo: repo, Agents: svc}
+	if customize != nil {
+		customize(handler)
+	}
+	RegisterRoutes(router.Group("/api/v1/orchestration", signedIn), handler)
+	return router, repo, db
 }
 func request(t *testing.T, r *gin.Engine, method, path string, body any) *httptest.ResponseRecorder {
 	t.Helper()
@@ -75,6 +87,13 @@ func TestOrchestratorsUseProfilesAndScopeConfiguration(t *testing.T) {
 	r, repo := testHandler(t)
 	path := "/api/v1/orchestration/workspaces/ws/orchestrators"
 	cfg := configuration{Name: "Chief", RoleID: "chief-of-staff", ProfileID: "personal", Instructions: "Coordinate work", Context: "Use task agents"}
+	for _, profile := range []string{"foreign", "disabled", "missing"} {
+		bad := cfg
+		bad.ProfileID = profile
+		if w := request(t, r, http.MethodPost, path, bad); w.Code != 400 {
+			t.Fatalf("accepted %s: %d", profile, w.Code)
+		}
+	}
 	created := request(t, r, http.MethodPost, path, cfg)
 	if created.Code != 201 {
 		t.Fatalf("create %d %s", created.Code, created.Body.String())
@@ -87,19 +106,12 @@ func TestOrchestratorsUseProfilesAndScopeConfiguration(t *testing.T) {
 	cfg.Name = "Second"
 	cfg.ProfileID = "work"
 	second := request(t, r, http.MethodPost, path, cfg)
-	if second.Code != 201 {
-		t.Fatal(second.Body.String())
+	if second.Code != http.StatusConflict || !bytes.Contains(second.Body.Bytes(), []byte(`"orchestrator_id":"`+id+`"`)) {
+		t.Fatalf("second orchestrator = %d %s", second.Code, second.Body.String())
 	}
 	ids, err := repo.ListOrchestratorIDs(context.Background(), "ws")
-	if err != nil || len(ids) != 2 {
+	if err != nil || len(ids) != 1 {
 		t.Fatalf("instances: %v %v", ids, err)
-	}
-	for _, profile := range []string{"foreign", "disabled", "missing"} {
-		cfg.ProfileID = profile
-		bad := request(t, r, http.MethodPost, path, cfg)
-		if bad.Code != 400 {
-			t.Fatalf("accepted %s: %d", profile, bad.Code)
-		}
 	}
 	foreign := request(t, r, http.MethodGet, "/api/v1/orchestration/workspaces/other/orchestrators/"+id, nil)
 	if foreign.Code != 404 {
