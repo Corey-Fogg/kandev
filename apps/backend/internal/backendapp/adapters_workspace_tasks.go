@@ -181,6 +181,8 @@ func (a *taskCreatorAdapter) dispatchWorkspaceTask(ctx context.Context, task *mo
 		return a.adoptWorkspaceTask(ctx, task, command)
 	case "start":
 		return a.startWorkspaceTask(ctx, task, command.DirectProfile)
+	case "repair_session":
+		return a.repairWorkspaceSession(ctx, task, command)
 	case "edit":
 		return a.editWorkspaceTask(ctx, task, command)
 	case "move":

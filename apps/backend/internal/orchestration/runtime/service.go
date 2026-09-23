@@ -268,7 +268,7 @@ func (s *Service) prompt(ctx context.Context, a *models.AgentInstance, taskID st
 	}
 	if callback, ok := payload["callback"]; ok {
 		data, _ := json.Marshal(callback)
-		fmt.Fprintf(&text, "\nTask update: %s\nInspect this task's current state/result and post only new information in this chat. Review is not completion; do not repeat an answered question or restart work.\n", data)
+		fmt.Fprintf(&text, "\nTask update: %s\nInspect this task's current state/result and post only new information in this chat. Review is not completion; do not repeat an answered question or restart work. If the task's session stopped on a provider login or OAuth refresh error, call manage_task with action repair_session once, then report the outcome.\n", data)
 	}
 	appendRuntimeToolGuidance(&text, payload)
 	return text.String(), nil
