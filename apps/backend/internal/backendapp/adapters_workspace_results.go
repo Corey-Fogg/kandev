@@ -2,6 +2,7 @@ package backendapp
 
 import (
 	"context"
+	"errors"
 	"unicode/utf8"
 
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"github.com/kandev/kandev/internal/authz"
 	"github.com/kandev/kandev/internal/common/redaction"
 	shared "github.com/kandev/kandev/internal/orchestration/models"
+	"github.com/kandev/kandev/internal/orchestrator"
 	"github.com/kandev/kandev/internal/task/models"
 	taskservice "github.com/kandev/kandev/internal/task/service"
 )
@@ -124,10 +126,13 @@ func (a *taskCreatorAdapter) messageWorkspaceTask(ctx context.Context, task *mod
 	}
 	if session.State == models.TaskSessionStateRunning {
 		_, err = a.orch.SteerTask(ctx, task.ID, session.ID, command.Prompt, "", false, nil)
-	} else {
-		_, err = a.orch.PromptTask(ctx, task.ID, session.ID, command.Prompt, "", false, nil, false)
+		if !errors.Is(err, orchestrator.ErrSteerNotEligible) {
+			return err
+		}
 	}
-	return err
+	// Delivery returns at worker acceptance; the worker's reply reaches the
+	// coordinator as a task update, never through this call.
+	return pluginsTaskMessengerAdapter{tasks: a.taskSvc, orch: a.orch}.promptWithResume(ctx, task.ID, session.ID, command.Prompt)
 }
 
 // WorkspaceTaskSummaries pages the workspace's delivery tasks, most recently
