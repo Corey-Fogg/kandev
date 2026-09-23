@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kandev/kandev/internal/office/shared"
+	shared "github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/task/models"
 )
 

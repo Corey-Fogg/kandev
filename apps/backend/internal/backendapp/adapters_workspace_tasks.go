@@ -2,12 +2,10 @@ package backendapp
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
 
-	"github.com/kandev/kandev/internal/office/routing"
 	shared "github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/task/models"
 	taskservice "github.com/kandev/kandev/internal/task/service"
@@ -22,11 +20,8 @@ func (a *taskCreatorAdapter) CreateWorkspaceTask(ctx context.Context, spec share
 	if err := a.validateWorkspaceEntry(ctx, workflowID, spec); err != nil {
 		return "", err
 	}
-	metadata := map[string]interface{}{"orchestration_chief_id": spec.ChiefID}
-	if spec.DirectProfile {
-		metadata["orchestration_managed"] = true
-	}
-	profileID, err := a.workspaceWorkerProfile(ctx, spec, metadata)
+	metadata := map[string]interface{}{"orchestration_chief_id": spec.ChiefID, "orchestration_managed": true}
+	profileID, err := a.directWorkerProfile(ctx, spec, metadata)
 	if err != nil {
 		return "", err
 	}
@@ -96,45 +91,6 @@ func (a *taskCreatorAdapter) workspaceDeliveryWorkflow(ctx context.Context, work
 	return eligible[0].ID, nil
 }
 
-func (a *taskCreatorAdapter) workspaceWorkerProfile(ctx context.Context, spec shared.WorkspaceTaskSpec, metadata map[string]interface{}) (string, error) {
-	if spec.DirectProfile {
-		return a.directWorkerProfile(ctx, spec, metadata)
-	}
-	return a.legacyWorkerProfile(ctx, spec, metadata)
-}
-
-func (a *taskCreatorAdapter) legacyWorkerProfile(ctx context.Context, spec shared.WorkspaceTaskSpec, metadata map[string]interface{}) (string, error) {
-	if spec.AssigneeID == "" {
-		return "", nil
-	}
-	if a.profiles == nil {
-		return "", fmt.Errorf("profile store unavailable")
-	}
-	persona, err := a.profiles.GetAgentProfile(ctx, spec.AssigneeID)
-	if err != nil || persona == nil || persona.WorkspaceID != spec.WorkspaceID || persona.Role == "" {
-		return "", fmt.Errorf("worker must be a persona in this workspace")
-	}
-	override, err := routing.ReadAgentOverrides(persona.Settings)
-	if err != nil {
-		return "", err
-	}
-	profile, err := a.profiles.GetAgentProfile(ctx, override.ExecutionProfileID)
-	if err != nil || profile == nil || !profile.Enabled || profile.Role != "" || (profile.WorkspaceID != "" && profile.WorkspaceID != spec.WorkspaceID) {
-		return "", fmt.Errorf("worker requires an enabled execution profile")
-	}
-	metadata[models.MetaKeyAgentProfileID] = profile.ID
-	metadata["orchestration_execution_profile_id"] = profile.ID
-	metadata["orchestration_persona_id"] = persona.ID
-	var executor struct {
-		ProfileID string `json:"executor_profile_id"`
-	}
-	_ = json.Unmarshal([]byte(persona.ExecutorPreference), &executor)
-	if executor.ProfileID != "" {
-		metadata[models.MetaKeyExecutorProfileID] = executor.ProfileID
-	}
-	return profile.ID, nil
-}
-
 func (a *taskCreatorAdapter) WorkspaceCatalog(ctx context.Context, workspaceID string) (any, error) {
 	workflows, err := a.taskSvc.ListWorkflows(ctx, workspaceID, false)
 	if err != nil {
@@ -177,7 +133,7 @@ func (a *taskCreatorAdapter) dispatchWorkspaceTask(ctx context.Context, task *mo
 	case "adopt", "assign":
 		return a.adoptWorkspaceTask(ctx, task, command)
 	case "start":
-		return a.startWorkspaceTask(ctx, task, command.DirectProfile)
+		return a.startAssignedWorkspaceTask(ctx, task)
 	case "repair_session":
 		return a.repairWorkspaceSession(ctx, task, command)
 	case "edit":
@@ -192,26 +148,10 @@ func (a *taskCreatorAdapter) dispatchWorkspaceTask(ctx context.Context, task *mo
 		if a.orch == nil {
 			return fmt.Errorf("orchestrator unavailable")
 		}
-		return a.orch.StopTask(ctx, task.ID, "workspace chief requested stop", false)
+		return a.orch.StopTask(ctx, task.ID, "coordinator requested stop", false)
 	default:
 		return fmt.Errorf("unsupported task action")
 	}
-}
-
-func (a *taskCreatorAdapter) startWorkspaceTask(ctx context.Context, task *models.Task, direct bool) error {
-	if direct {
-		return a.startAssignedWorkspaceTask(ctx, task)
-	}
-	if a.orch == nil {
-		return fmt.Errorf("orchestrator unavailable")
-	}
-	profile, _ := task.Metadata["orchestration_execution_profile_id"].(string)
-	if profile == "" {
-		return fmt.Errorf("assign a worker before starting delegated work")
-	}
-	executor, _ := task.Metadata[models.MetaKeyExecutorProfileID].(string)
-	_, err := a.orch.StartTask(ctx, task.ID, profile, "", executor, "", task.Description, task.WorkflowStepID, false, false, nil)
-	return err
 }
 
 func (a *taskCreatorAdapter) requireIdleWorkspaceTask(ctx context.Context, taskID string) error {
@@ -229,14 +169,12 @@ func (a *taskCreatorAdapter) requireIdleWorkspaceTask(ctx context.Context, taskI
 }
 
 func (a *taskCreatorAdapter) adoptWorkspaceTask(ctx context.Context, task *models.Task, command shared.WorkspaceTaskCommand) error {
-	if command.DirectProfile && command.AssigneeID != "" {
+	if command.AssigneeID != "" {
 		return a.assignDirectWorkspaceTask(ctx, task, command)
 	}
-	if command.Action == "adopt" && command.AssigneeID == "" && a.taskRepo != nil {
-		if command.DirectProfile {
-			if _, err := a.taskRepo.SetTaskMetadataKeyIfNotArchived(ctx, task.ID, "orchestration_managed", true); err != nil {
-				return err
-			}
+	if command.Action == "adopt" && a.taskRepo != nil {
+		if _, err := a.taskRepo.SetTaskMetadataKeyIfNotArchived(ctx, task.ID, "orchestration_managed", true); err != nil {
+			return err
 		}
 		return a.observeWorkspaceTask(ctx, task.ID, command.ChiefID)
 	}
@@ -247,19 +185,6 @@ func (a *taskCreatorAdapter) adoptWorkspaceTask(ctx context.Context, task *model
 	metadata := maps.Clone(task.Metadata)
 	if metadata == nil {
 		metadata = map[string]interface{}{}
-	}
-	if command.AssigneeID != "" {
-		selected := maps.Clone(metadata)
-		_, err := a.workspaceWorkerProfile(ctx, shared.WorkspaceTaskSpec{WorkspaceID: command.WorkspaceID, AssigneeID: command.AssigneeID}, selected)
-		if err != nil {
-			return err
-		}
-		previous, _ := metadata["orchestration_execution_profile_id"].(string)
-		next, _ := selected["orchestration_execution_profile_id"].(string)
-		if previous != "" && previous != next {
-			return fmt.Errorf("reassignment cannot change the task's pinned account")
-		}
-		metadata = selected
 	}
 	metadata["orchestration_chief_id"] = command.ChiefID
 	_, err := a.taskSvc.UpdateTask(ctx, task.ID, &taskservice.UpdateTaskRequest{Metadata: metadata})

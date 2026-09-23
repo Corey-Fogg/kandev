@@ -2333,10 +2333,6 @@ func (s *Service) moveTaskToWorkflowStep(ctx context.Context, taskID, workflowSt
 // This ensures the initial task start uses the step's agent — not just the
 // workspace default the frontend sends.
 func (s *Service) resolveEffectiveAgentProfile(ctx context.Context, taskID, workflowStepID, callerProfileID string) (string, error) {
-	if pinned := s.orchestrationProfile(ctx, taskID); pinned != "" {
-		return pinned, nil
-	}
-
 	if s.workflowStepGetter == nil {
 		s.logger.Debug("resolveEffectiveAgentProfile: no workflowStepGetter, using caller profile",
 			zap.String("task_id", taskID),

@@ -20,7 +20,6 @@ import (
 
 // Run reason constants.
 const (
-	RunReasonWorkspaceTaskCallback = "workspace_task_callback"
 	RunReasonTaskAssigned          = "task_assigned"
 	RunReasonTaskComment           = "task_comment"
 	RunReasonTaskBlockersResolved  = "task_blockers_resolved"
@@ -90,25 +89,6 @@ func (s *Service) QueueRun(
 	ctx context.Context,
 	agentInstanceID, reason, payload, idempotencyKey string,
 ) (runsservice.QueueOutcome, error) {
-	return s.queueRun(ctx, agentInstanceID, reason, payload, idempotencyKey, true)
-}
-
-// QueueDistinctRun enqueues a run that must never merge into another queued
-// run for the same agent and reason. Conversation callbacks and delegation
-// batches each carry a distinct result; coalescing would overwrite one with
-// the next. Idempotency-key deduplication still applies.
-func (s *Service) QueueDistinctRun(
-	ctx context.Context,
-	agentInstanceID, reason, payload, idempotencyKey string,
-) (runsservice.QueueOutcome, error) {
-	return s.queueRun(ctx, agentInstanceID, reason, payload, idempotencyKey, false)
-}
-
-func (s *Service) queueRun(
-	ctx context.Context,
-	agentInstanceID, reason, payload, idempotencyKey string,
-	coalesce bool,
-) (runsservice.QueueOutcome, error) {
 	agent, err := s.guardAgentStatus(ctx, agentInstanceID)
 	if err != nil {
 		return runsservice.QueueOutcomeNone, err
@@ -119,13 +99,12 @@ func (s *Service) queueRun(
 
 	if s.runsService != nil {
 		return s.runsService.QueueRun(ctx, runsservice.QueueRunRequest{
-			Reason:            reason,
-			IdempotencyKey:    idempotencyKey,
-			Payload:           payloadWithAgent(payload, agentInstanceID),
-			DisableCoalescing: !coalesce,
+			Reason:         reason,
+			IdempotencyKey: idempotencyKey,
+			Payload:        payloadWithAgent(payload, agentInstanceID),
 		})
 	}
-	return s.queueRunInline(ctx, agentInstanceID, reason, payload, idempotencyKey, coalesce)
+	return s.queueRunInline(ctx, agentInstanceID, reason, payload, idempotencyKey)
 }
 
 // queueRunInline performs the legacy in-office insert path used when
@@ -134,7 +113,6 @@ func (s *Service) queueRun(
 func (s *Service) queueRunInline(
 	ctx context.Context,
 	agentInstanceID, reason, payload, idempotencyKey string,
-	coalesce bool,
 ) (runsservice.QueueOutcome, error) {
 	if idempotencyKey != "" {
 		dup, err := s.repo.CheckIdempotencyKey(ctx, idempotencyKey, IdempotencyWindowHours)
@@ -146,13 +124,9 @@ func (s *Service) queueRunInline(
 		}
 	}
 
-	coalesced := false
-	if coalesce {
-		var err error
-		coalesced, err = s.repo.CoalesceRun(ctx, agentInstanceID, reason, CoalesceWindowSeconds, payload)
-		if err != nil {
-			return runsservice.QueueOutcomeNone, fmt.Errorf("coalesce check: %w", err)
-		}
+	coalesced, err := s.repo.CoalesceRun(ctx, agentInstanceID, reason, CoalesceWindowSeconds, payload)
+	if err != nil {
+		return runsservice.QueueOutcomeNone, fmt.Errorf("coalesce check: %w", err)
 	}
 	if coalesced {
 		s.logger.Debug("run coalesced",
@@ -186,8 +160,8 @@ func (s *Service) queueRunInline(
 
 	s.logger.Info("run queued",
 		zap.String("id", req.ID),
-		zap.String(participantTypeAgent, agentInstanceID),
-		zap.String(conversationReasonKey, reason))
+		zap.String("agent", agentInstanceID),
+		zap.String("reason", reason))
 
 	s.publishRunQueued(ctx, req, idempotencyKey)
 	return runsservice.QueueOutcomeQueued, nil
@@ -203,7 +177,7 @@ func payloadWithAgent(payload, agentInstanceID string) map[string]any {
 	if payload != "" {
 		_ = json.Unmarshal([]byte(payload), &out)
 	}
-	out[eventKeyAgentProfileID] = agentInstanceID
+	out["agent_profile_id"] = agentInstanceID
 	return out
 }
 
@@ -218,17 +192,17 @@ func (s *Service) publishRunQueued(ctx context.Context, req *models.Run, idempot
 	}
 	taskID, commentID := commentkeys.IdentityFromPayload(req.Payload)
 	data := map[string]interface{}{
-		conversationRunIDKey:   req.ID,
-		eventKeyAgentProfileID: req.AgentProfileID,
-		conversationReasonKey:  req.Reason,
-		conversationTaskIDKey:  taskID,
-		"comment_id":           commentID,
-		"idempotency_key":      idempotencyKey,
+		"run_id":           req.ID,
+		"agent_profile_id": req.AgentProfileID,
+		"reason":           req.Reason,
+		"task_id":          taskID,
+		"comment_id":       commentID,
+		"idempotency_key":  idempotencyKey,
 	}
 	event := bus.NewEvent(events.OfficeRunQueued, "office-service", data)
 	if err := s.eb.Publish(ctx, events.OfficeRunQueued, event); err != nil {
 		s.logger.Debug("publish run queued event failed",
-			zap.String(conversationRunIDKey, req.ID),
+			zap.String("run_id", req.ID),
 			zap.Error(err))
 	}
 }

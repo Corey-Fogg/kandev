@@ -3132,10 +3132,6 @@ func (s *Service) switchSessionForStepWithPoliciesAndCandidateAndRoute(
 ) (*models.TaskSession, error) {
 	startPolicy = models.NormalizeWorkflowProfileSessionStartPolicy(string(startPolicy))
 	endPolicy = models.NormalizeWorkflowProfileSessionEndPolicy(string(endPolicy))
-	if pinned := s.orchestrationProfile(ctx, taskID); pinned != "" {
-		newAgentProfileID = pinned
-	}
-
 	s.logger.Info("switching session for workflow step agent profile change",
 		zap.String("task_id", taskID),
 		zap.String("current_session", currentSession.ID),

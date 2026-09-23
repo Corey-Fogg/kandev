@@ -24,10 +24,6 @@ func NewHandler(svc *ChannelService) *Handler {
 
 // RegisterRoutes registers channel routes on the given router group.
 func RegisterRoutes(api *gin.RouterGroup, h *Handler) {
-	api.POST("/workspaces/:wsId/agents/:id/conversation", h.openConversation)
-	api.GET("/workspaces/:wsId/chief", h.getWorkspaceChief)
-	api.PUT("/workspaces/:wsId/chief", h.setWorkspaceChief)
-	api.POST("/workspaces/:wsId/agents/enable", h.enableWorkspaceAgents)
 	api.GET("/agents/:id/channels", h.listChannels)
 	api.POST("/agents/:id/channels", h.setupChannel)
 	api.DELETE("/agents/:id/channels/:channelId", h.deleteChannel)
@@ -37,7 +33,7 @@ func RegisterRoutes(api *gin.RouterGroup, h *Handler) {
 func (h *Handler) listChannels(c *gin.Context) {
 	channels, err := h.svc.ListChannelsByAgent(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{errorResponseKey: err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, ChannelListResponse{Channels: channels})
@@ -46,7 +42,7 @@ func (h *Handler) listChannels(c *gin.Context) {
 func (h *Handler) setupChannel(c *gin.Context) {
 	var req CreateChannelRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{errorResponseKey: err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	channel := &models.Channel{
@@ -57,7 +53,7 @@ func (h *Handler) setupChannel(c *gin.Context) {
 		Status:         models.ChannelStatus(req.Status),
 	}
 	if err := h.svc.SetupChannel(c.Request.Context(), channel); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{errorResponseKey: err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"channel": channel})
@@ -65,7 +61,7 @@ func (h *Handler) setupChannel(c *gin.Context) {
 
 func (h *Handler) deleteChannel(c *gin.Context) {
 	if err := h.svc.DeleteChannel(c.Request.Context(), c.Param("channelId")); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{errorResponseKey: err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})
@@ -85,27 +81,23 @@ func (h *Handler) channelInbound(c *gin.Context) {
 	channelID := c.Param("channelId")
 	channel, err := h.svc.GetChannelByID(c.Request.Context(), channelID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{errorResponseKey: "channel not found"})
-		return
-	}
-	if channel.Platform == "web" {
-		c.JSON(http.StatusForbidden, gin.H{errorResponseKey: "native conversations do not accept webhooks"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "channel not found"})
 		return
 	}
 
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 64*1024)
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{errorResponseKey: "failed to read body"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read body"})
 		return
 	}
 	text := string(body)
 	if text == "" {
-		c.JSON(http.StatusBadRequest, gin.H{errorResponseKey: "empty message body"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "empty message body"})
 		return
 	}
 	if channel.WebhookSecret != "" && !verifyWebhookSignature(channel.WebhookSecret, string(channel.Platform), body, webhookSignature(c)) {
-		c.JSON(http.StatusUnauthorized, gin.H{errorResponseKey: "invalid signature"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid signature"})
 		return
 	}
 
@@ -114,7 +106,7 @@ func (h *Handler) channelInbound(c *gin.Context) {
 	const authorName = "external"
 
 	if err := h.svc.HandleChannelInbound(c.Request.Context(), channelID, authorName, text); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{errorResponseKey: err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})

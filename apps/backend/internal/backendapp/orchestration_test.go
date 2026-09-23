@@ -1,60 +1,31 @@
 package backendapp
 
 import (
-	"context"
-	"github.com/gin-gonic/gin"
-	"github.com/jmoiron/sqlx"
-	"github.com/kandev/kandev/internal/common/config"
-	officemodels "github.com/kandev/kandev/internal/office/models"
-	officesqlite "github.com/kandev/kandev/internal/office/repository/sqlite"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/gin-gonic/gin"
+	"github.com/jmoiron/sqlx"
+	"github.com/kandev/kandev/internal/common/config"
+	officesqlite "github.com/kandev/kandev/internal/office/repository/sqlite"
 )
 
-func TestOrchestrationFlagGuardsRuntimeAndLegacyRoutes(t *testing.T) {
-	adapter, svc := newOfficeTaskAdapterHarness(t)
-	database := sqlx.NewDb(adapter.taskRepo.DB(), "sqlite3")
-	repo, err := officesqlite.NewWithDB(database, database, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx := context.Background()
-	if _, err := database.Exec(`INSERT INTO agents (id,name,created_at,updated_at) VALUES ('test-agent','test-agent',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`); err != nil {
-		t.Fatal(err)
-	}
-	a := &officemodels.AgentInstance{ID: "orchestrator", AgentID: "test-agent", WorkspaceID: "ws-1", Name: "Chief", Role: officemodels.AgentRoleAssistant}
-	if err = repo.CreateAgentInstance(ctx, a); err != nil {
-		t.Fatal(err)
-	}
-	if err = repo.RegisterOrchestrator(ctx, a.ID, a.WorkspaceID, "chief-of-staff"); err != nil {
-		t.Fatal(err)
-	}
-	for _, enabled := range []bool{false, true} {
-		allowed, e := orchestrationRunGuard(config.FeaturesConfig{Orchestration: enabled, Office: !enabled}, repo)(ctx, a.ID)
-		if e != nil || allowed != enabled {
-			t.Fatalf("flag %v: %v %v", enabled, allowed, e)
-		}
-	}
-	for _, features := range []config.FeaturesConfig{{}, {Orchestration: true}, {Office: true}} {
-		legacy, e := orchestrationRunGuard(features, repo)(ctx, "legacy")
-		if e != nil || !legacy {
-			t.Fatalf("unowned non-orchestrator run must keep upstream behavior under %+v: %v %v", features, legacy, e)
-		}
-	}
-	channel, err := repo.EnsureAgentConversation(ctx, a)
+func TestOrchestrationFlagGuardsLegacyRoutes(t *testing.T) {
+	a, svc, repo, conversation := coordinatorConversationFixture(t)
+	database := sqlx.NewDb(a.taskRepo.DB(), "sqlite3")
+	office, err := officesqlite.NewWithDB(database, database, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, enabled := range []bool{false, true} {
 		router := gin.New()
-		p := routeParams{features: config.FeaturesConfig{Orchestration: enabled, Office: !enabled}, officeRepo: repo, taskSvc: svc}
+		p := routeParams{features: config.FeaturesConfig{Orchestration: enabled, Office: !enabled}, officeRepo: office, orchestrationRepo: repo, taskSvc: svc}
 		g := router.Group("/api/v1/office", orchestrationCompatibilityGate(p))
 		g.GET("/tasks/:id", func(c *gin.Context) { c.Status(200) })
 		w := httptest.NewRecorder()
-		router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/office/tasks/"+channel.TaskID, nil))
-		want := 404
-		if w.Code != want {
+		router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/office/tasks/"+conversation, nil))
+		if w.Code != http.StatusNotFound {
 			t.Fatalf("conversation flag %v: %d", enabled, w.Code)
 		}
 	}

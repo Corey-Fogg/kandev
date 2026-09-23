@@ -141,6 +141,9 @@ func provideRepositories(ctx context.Context, cfg *config.Config, log *logger.Lo
 		return nil, nil, nil, fmt.Errorf("office repo: %w", err)
 	}
 	cleanups = append(cleanups, officeCleanup)
+	// Registered orchestrator personas belong to the orchestration runtime;
+	// Office neither lists them nor handles their task events.
+	officeRepo.SetExternalAgents(orchestrationRepo)
 	if err := checkStartupContext(ctx, "terminal repositories"); err != nil {
 		return nil, nil, nil, err
 	}

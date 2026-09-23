@@ -2,16 +2,12 @@ package backendapp
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/jmoiron/sqlx"
 	settingsstore "github.com/kandev/kandev/internal/agent/settings/store"
-	"github.com/kandev/kandev/internal/common/config"
 	"github.com/kandev/kandev/internal/common/logger"
 	mcpprofile "github.com/kandev/kandev/internal/mcp/profile"
-	officestore "github.com/kandev/kandev/internal/office/repository/sqlite"
 	orchestrationmodels "github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/orchestration/personas"
 	orchestrationruntime "github.com/kandev/kandev/internal/orchestration/runtime"
@@ -23,18 +19,30 @@ import (
 
 // @covers AC-ORCHESTRATION-ASSISTANT-010.1, AC-ORCHESTRATION-ASSISTANT-010.3
 func TestOrchestratorFeatureGateNativeRunMatrix(t *testing.T) {
-	a, _, _, _ := coordinatorConversationFixture(t)
+	a, _, repo, taskID := coordinatorConversationFixture(t)
+	ctx := context.Background()
 	db := sqlx.NewDb(a.taskRepo.DB(), "sqlite3")
-	office, err := officestore.NewWithDB(db, db, nil)
+	log, err := logger.NewLogger(logger.LoggingConfig{Level: "error"})
 	require.NoError(t, err)
-	for _, orchestration := range []bool{false, true} {
-		t.Run(fmt.Sprintf("orchestration=%v", orchestration), func(t *testing.T) {
-			var features config.FeaturesConfig
-			require.NoError(t, json.Unmarshal([]byte(fmt.Sprintf(`{"orchestration":%v}`, orchestration)), &features))
-			allowed, err := orchestrationRunGuard(features, office)(context.Background(), "fixture-chief")
+	runs := runstore.NewWithDB(db, db)
+	require.NoError(t, runs.Migrate())
+	queue := runservice.New(runs, nil, log, nil)
+	for _, agent := range []string{"fixture-chief", "office-worker"} {
+		_, err := queue.QueueRun(ctx, runservice.QueueRunRequest{AgentProfileID: agent, TaskID: taskID, Reason: "task_comment", IdempotencyKey: "gate-" + agent})
+		require.NoError(t, err)
+	}
+	s := &orchestrationruntime.Service{Repo: repo, Runs: runs}
+	for range 2 {
+		run, err := runs.ClaimNextEligibleRun(ctx)
+		require.NoError(t, err)
+		handled, err := s.Process(ctx, run)
+		if run.AgentProfileID == "office-worker" {
 			require.NoError(t, err)
-			require.Equal(t, orchestration, allowed)
-		})
+			require.False(t, handled, "a run of an unregistered persona stays with Office")
+			continue
+		}
+		require.True(t, handled, "a registered coordinator's run is never handed to Office")
+		require.ErrorIs(t, err, orchestrationruntime.ErrOrchestrationDisabled)
 	}
 }
 

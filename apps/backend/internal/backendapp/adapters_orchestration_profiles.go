@@ -22,8 +22,6 @@ func (a *taskCreatorAdapter) directWorkerProfile(ctx context.Context, spec share
 	}
 	metadata[models.MetaKeyAgentProfileID] = profile.ID
 	metadata["orchestration_managed"] = true
-	delete(metadata, "orchestration_execution_profile_id")
-	delete(metadata, "orchestration_persona_id")
 	return profile.ID, nil
 }
 func (a *taskCreatorAdapter) assignDirectWorkspaceTask(ctx context.Context, task *models.Task, command shared.WorkspaceTaskCommand) error {

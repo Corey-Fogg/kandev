@@ -47,9 +47,28 @@ func TestUnregisteredCoordinatorKeepsOfficeBehaviour(t *testing.T) {
 	allowed, err = orchestrationBrowserRouteAllowed(ctx, params, "/api/v1/office/agents/fixture-chief")
 	require.NoError(t, err)
 	require.True(t, allowed)
-	allowed, err = orchestrationRunGuard(params.features, office)(ctx, "fixture-chief")
+}
+
+func TestOfficeAgentListsExcludeRegisteredCoordinators(t *testing.T) {
+	a, _, repo, _ := coordinatorConversationFixture(t)
+	ctx := context.Background()
+	db := sqlx.NewDb(a.taskRepo.DB(), "sqlite3")
+	office, err := officestore.NewWithDB(db, db, nil)
 	require.NoError(t, err)
-	require.True(t, allowed)
+	office.SetExternalAgents(repo)
+	listed := func() bool {
+		agents, err := office.ListAgentInstances(ctx, "ws-1")
+		require.NoError(t, err)
+		for _, agent := range agents {
+			if agent.ID == "fixture-chief" {
+				return true
+			}
+		}
+		return false
+	}
+	require.False(t, listed(), "Office never lists a registered coordinator")
+	require.NoError(t, repo.UnregisterOrchestrator(ctx, "fixture-chief"))
+	require.True(t, listed())
 }
 
 func TestCoordinatorListingExcludesConversation(t *testing.T) {

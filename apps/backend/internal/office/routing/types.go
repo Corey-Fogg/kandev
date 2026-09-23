@@ -271,7 +271,6 @@ type WorkspaceConfig struct {
 // ("inherit" by default, "override" to replace) keep the inheritance
 // model explicit so the UI does not have to guess.
 type AgentOverrides struct {
-	ExecutionProfileID  string       `json:"execution_profile_id,omitempty"`
 	ProviderOrderSource string       `json:"provider_order_source,omitempty"`
 	ProviderOrder       []ProviderID `json:"provider_order,omitempty"`
 	TierSource          string       `json:"tier_source,omitempty"`
@@ -285,7 +284,7 @@ type AgentOverrides struct {
 
 // IsZero reports whether the override blob carries no overrides.
 func (o AgentOverrides) IsZero() bool {
-	return o.ExecutionProfileID == "" && o.ProviderOrderSource == "" && len(o.ProviderOrder) == 0 &&
+	return o.ProviderOrderSource == "" && len(o.ProviderOrder) == 0 &&
 		o.TierSource == "" && o.Tier == "" &&
 		o.TierPerReasonSource == "" && len(o.TierPerReason) == 0
 }
@@ -391,7 +390,7 @@ func ValidateAgentOverridesAgainstWorkspace(
 	if err := ValidateAgentOverrides(ov, known); err != nil {
 		return err
 	}
-	if cfg == nil || ov.ExecutionProfileID != "" {
+	if cfg == nil {
 		return nil
 	}
 	order := effectiveOrderForValidation(ov, cfg)

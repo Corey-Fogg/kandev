@@ -180,7 +180,7 @@ func newTestDepsWithLogger(t *testing.T, log *logger.Logger) *testDeps {
 	// initSchema can succeed.
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS workflows (
 		id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL DEFAULT '',
-		workflow_template_id TEXT DEFAULT '', name TEXT NOT NULL, is_system INTEGER NOT NULL DEFAULT 0,
+		workflow_template_id TEXT DEFAULT '', name TEXT NOT NULL,
 		description TEXT DEFAULT '', created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL
 	)`)
 	if err != nil {

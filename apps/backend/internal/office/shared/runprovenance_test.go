@@ -7,7 +7,7 @@ import (
 )
 
 // TestClassifyRunProvenance_AttendedAllowlist pins AC-OFFICE-BUDGET-007.2's
-// exact 21-literal attended allowlist (17 current + 4 legacy).
+// exact 20-literal attended allowlist (16 current + 4 legacy).
 func TestClassifyRunProvenance_AttendedAllowlist(t *testing.T) {
 	attended := []string{
 		"task_assigned",

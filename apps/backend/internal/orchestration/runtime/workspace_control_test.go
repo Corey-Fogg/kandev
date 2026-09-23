@@ -82,7 +82,6 @@ func TestWorkspaceControlUsesSignedScope(t *testing.T) {
 		require.Equal(t, "request", got.RequestID)
 		require.Equal(t, "generation", got.PendingID)
 		require.Equal(t, "once", got.OptionID)
-		require.True(t, got.DirectProfile)
 	}
 	_, finishErr := s.Runs.FinishRun(context.Background(), run, "finished", nil)
 	require.NoError(t, finishErr)

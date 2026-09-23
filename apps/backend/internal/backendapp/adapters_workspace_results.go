@@ -121,11 +121,6 @@ func (a *taskCreatorAdapter) messageWorkspaceTask(ctx context.Context, task *mod
 	if err != nil || session.TaskID != task.ID {
 		return fmt.Errorf("session must belong to this task")
 	}
-	pinned, _ := task.Metadata["orchestration_execution_profile_id"].(string)
-	managed, _ := task.Metadata["orchestration_managed"].(bool)
-	if !managed && pinned != "" && session.AgentProfileID != pinned {
-		return fmt.Errorf("session does not use the task's pinned account")
-	}
 	if session.State == models.TaskSessionStateRunning {
 		_, err = a.orch.SteerTask(ctx, task.ID, session.ID, command.Prompt, "", false, nil)
 	} else {

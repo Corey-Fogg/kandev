@@ -157,16 +157,6 @@ func (h *Handler) createAgent(c *gin.Context) {
 			return
 		}
 	}
-	if req.ExecutionProfileID != "" {
-		if err := h.svc.ConfigurePinnedProfile(c.Request.Context(), agent, req.ExecutionProfileID); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-	}
-	if err := models.SetDelegationContext(agent, req.DelegationContext); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
 	if err := h.svc.CreateAgentInstanceWithCaller(c.Request.Context(), agent, agentCallerFromCtx(c), req.Reason); err != nil {
 		if code := agentValidationErrorCode(err); code != "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "code": code})
@@ -220,12 +210,6 @@ func (h *Handler) updateAgent(c *gin.Context) {
 			"error": "agent_profile_id no longer selects an Office runtime; update the agent routing override or workspace tier profiles",
 		})
 		return
-	}
-	if req.DelegationContext != nil {
-		if err := models.SetDelegationContext(agent, *req.DelegationContext); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
 	}
 	applyAgentUpdates(agent, req)
 	if err := h.svc.UpdateAgentInstance(ctx, agent); err != nil {
@@ -301,12 +285,6 @@ func requestBodyHasKey(body []byte, key string) (bool, error) {
 func (h *Handler) applyRoutingOverride(
 	c *gin.Context, agent *models.AgentInstance, ov routing.AgentOverrides,
 ) error {
-	if ov.ExecutionProfileID != "" {
-		if err := h.svc.ConfigurePinnedProfile(c.Request.Context(), agent, ov.ExecutionProfileID); err != nil {
-			respondRoutingValidation(c, err)
-			return err
-		}
-	}
 	known := h.svc.KnownProviders()
 	cfg, err := h.svc.GetWorkspaceRouting(c.Request.Context(), agent.WorkspaceID)
 	if err != nil {

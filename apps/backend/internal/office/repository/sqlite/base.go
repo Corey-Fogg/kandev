@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	tasksqlite "github.com/kandev/kandev/internal/task/repository/sqlite"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -14,6 +13,7 @@ import (
 	"github.com/kandev/kandev/internal/db"
 	"github.com/kandev/kandev/internal/db/dialect"
 	runssqlite "github.com/kandev/kandev/internal/runs/repository/sqlite"
+	tasksqlite "github.com/kandev/kandev/internal/task/repository/sqlite"
 )
 
 // newParticipantUUID is a thin wrapper over uuid.New so the migration
@@ -95,6 +95,10 @@ type Repository struct {
 	// before the companion alert-level insert, so a test can prove the
 	// pair rolls back together.
 	failBudgetExceededCompanionErr error
+
+	// externalAgents lists agent profiles owned by a runtime outside Office.
+	// Nil means Office owns every agent profile.
+	externalAgents ExternalAgents
 }
 
 // NewWithDB creates a new office repository with existing database connections.
@@ -152,9 +156,6 @@ func (r *Repository) initSchema() error {
 		return fmt.Errorf("recreate office_budget_claims: %w", err)
 	}
 	if err := r.createExtensionTables(); err != nil {
-		return err
-	}
-	if err := r.createOrchestrationTables(); err != nil {
 		return err
 	}
 	if err := r.runMigrations(); err != nil {
@@ -634,8 +635,6 @@ func (r *Repository) createActivityTables() error {
 	CREATE INDEX IF NOT EXISTS idx_activity_workspace_created ON office_activity_log(workspace_id, created_at DESC);
 	CREATE INDEX IF NOT EXISTS idx_activity_run_id ON office_activity_log(run_id) WHERE run_id != '';
 	CREATE INDEX IF NOT EXISTS idx_activity_session_id ON office_activity_log(session_id) WHERE session_id != '';
-
-
 	`)
 	return err
 }
@@ -744,8 +743,6 @@ func (r *Repository) createTaskExtensionTables() error {
 		CHECK (task_id != blocker_task_id)
 	);
 
-
-
 	-- office_task_participants was removed in ADR 0005 Wave C. Reviewer
 	-- and approver rows are now stored in workflow_step_participants
 	-- (dual-scoped on task_id + step_id). The migration that copies any
@@ -756,11 +753,7 @@ func (r *Repository) createTaskExtensionTables() error {
 
 func (r *Repository) createWorkspaceGovernanceTable() error {
 	_, err := r.db.Exec(`
-	CREATE TABLE IF NOT EXISTS office_workspace_chief (
- workspace_id TEXT PRIMARY KEY,
- agent_profile_id TEXT NOT NULL
- );
- CREATE TABLE IF NOT EXISTS office_workspace_governance (
+	CREATE TABLE IF NOT EXISTS office_workspace_governance (
 		workspace_id TEXT NOT NULL,
 		key          TEXT NOT NULL,
 		value        INTEGER NOT NULL DEFAULT 0,

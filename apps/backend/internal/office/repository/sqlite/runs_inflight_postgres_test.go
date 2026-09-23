@@ -23,9 +23,6 @@ import (
 func TestPostgresHasInFlightRunForTask(t *testing.T) {
 	db := testutil.OpenIsolatedPostgres(t, testutil.PostgresDSNFromEnv(t))
 	ctx := context.Background()
-	if _, _, err := settingsstore.Provide(db, db, nil); err != nil {
-		t.Fatalf("init settings store: %v", err)
-	}
 
 	// runs is created by the task repository's schema init, mirroring
 	// production boot order (see failure_postgres_test.go).

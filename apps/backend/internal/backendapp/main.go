@@ -1598,10 +1598,6 @@ func newRunProcessorService(
 		TaskCanceller:      orchestratorSvc,
 		AgentctlBinaryPath: agentctlBinaryPath,
 		EventBus:           eventBus,
-		// The orchestration runtime owns registered conversations and task
-		// callbacks; Office must not execute or re-handle them.
-		RunAllowed:            orchestrationRunGuard(cfg.Features, repos.Office),
-		ExternalOrchestration: true,
 	})
 	svc.SetRunSessionLauncher(newOfficeRunSessionLauncher(repos.Office, lifecycleMgr, log))
 	return svc
@@ -1623,12 +1619,6 @@ func wireOfficeSvcsDependencies(
 	// Wire the event bus into the dashboard service for status-change events.
 	services.OfficeSvcs.Dashboard.SetEventBus(eventBus)
 	services.OfficeSvcs.Channels.SetEventBus(eventBus)
-	services.OfficeSvcs.Channels.SetWorkflowEnsurer(&workflowEnsurerAdapter{repo: repos.Task})
-	services.OfficeSvcs.Channels.SetConversationPublisher(func(ctx context.Context, taskID string) {
-		if task, err := services.Task.GetTask(ctx, taskID); err == nil {
-			services.Task.PublishTaskUpdated(ctx, task)
-		}
-	})
 	// Wire the office service as the channel relay's run resolver so
 	// relayed-comment activity rows get tagged with the originating
 	// run id (Tasks Touched on the run detail page).
@@ -2004,7 +1994,6 @@ func wireWorkflowEngineForOffice(
 	// Build the dispatcher. The session resolver is the task repo,
 	// which exposes GetActiveTaskSessionByTaskID.
 	dispatcher := officeenginedispatcher.New(eng, repos.Task, log)
-	dispatcher.SetConversationHandler(officeSvc.QueueNativeConversation)
 	officeSvc.SetWorkflowEngineDispatcher(dispatcher)
 	log.Info("workflow engine dispatcher wired for office")
 

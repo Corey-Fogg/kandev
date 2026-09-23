@@ -289,7 +289,7 @@ func (h *Handler) createTask(c *gin.Context) {
 		c.AbortWithStatusJSON(422, gin.H{errorResponseKey: "execution_mode must be design or execute"})
 		return
 	}
-	id, err := h.Service.Manager.CreateWorkspaceTask(c.Request.Context(), models.WorkspaceTaskSpec{DirectProfile: true, WorkspaceID: claims.WorkspaceID, ChiefID: claims.AgentProfileID, WorkflowID: req.WorkflowID, WorkflowStepID: req.WorkflowStepID, ExecutionMode: req.ExecutionMode, RepositoryID: req.RepositoryID, AssigneeID: req.AssigneeID, Title: req.Title, Description: req.Description, ExternalID: req.ExternalID, ParentID: req.ParentID})
+	id, err := h.Service.Manager.CreateWorkspaceTask(c.Request.Context(), models.WorkspaceTaskSpec{WorkspaceID: claims.WorkspaceID, ChiefID: claims.AgentProfileID, WorkflowID: req.WorkflowID, WorkflowStepID: req.WorkflowStepID, ExecutionMode: req.ExecutionMode, RepositoryID: req.RepositoryID, AssigneeID: req.AssigneeID, Title: req.Title, Description: req.Description, ExternalID: req.ExternalID, ParentID: req.ParentID})
 	if err != nil {
 		fail(c, err)
 		return
@@ -312,7 +312,6 @@ func (h *Handler) manageTask(c *gin.Context) {
 			return
 		}
 	}
-	req.DirectProfile = true
 	req.WorkspaceID = claims.WorkspaceID
 	req.ChiefID = claims.AgentProfileID
 	req.TaskID = c.Param("id")

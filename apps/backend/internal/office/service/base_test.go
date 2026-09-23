@@ -56,7 +56,6 @@ func newTestService(t *testing.T, overrides ...service.ServiceOptions) *service.
 		assignee_user_id TEXT NOT NULL DEFAULT '',
 		assignment_generation INTEGER NOT NULL DEFAULT 0,
 		description TEXT DEFAULT '',
-		metadata TEXT DEFAULT '{}',
 		identifier TEXT DEFAULT '',
 		workflow_id TEXT DEFAULT '',
 		workflow_step_id TEXT DEFAULT '',
@@ -82,12 +81,6 @@ func newTestService(t *testing.T, overrides ...service.ServiceOptions) *service.
 		office_workflow_id TEXT DEFAULT ''
 	)`); err != nil {
 		t.Fatalf("create workspaces table: %v", err)
-	}
-	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS workflows (
-		id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL DEFAULT '',
-		workflow_template_id TEXT NOT NULL DEFAULT '', is_system INTEGER NOT NULL DEFAULT 0
-	)`); err != nil {
-		t.Fatal(err)
 	}
 	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS workflow_steps (
 		id TEXT PRIMARY KEY,

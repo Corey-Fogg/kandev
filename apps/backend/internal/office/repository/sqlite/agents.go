@@ -229,10 +229,10 @@ func (r *Repository) ListAgentInstances(ctx context.Context, workspaceID string)
 		err    error
 	)
 	if workspaceID == "" {
-		query := `SELECT ` + agentInstanceColumns + ` FROM agent_profiles WHERE ` + agentInstanceFilter + ` AND NOT EXISTS(SELECT 1 FROM workspace_orchestrators o WHERE o.agent_id=agent_profiles.id) ORDER BY created_at`
+		query := `SELECT ` + agentInstanceColumns + ` FROM agent_profiles WHERE ` + agentInstanceFilter + ` ORDER BY created_at`
 		err = r.ro.SelectContext(ctx, &agents, query)
 	} else {
-		query := `SELECT ` + agentInstanceColumns + ` FROM agent_profiles WHERE workspace_id = ? AND deleted_at IS NULL AND NOT EXISTS(SELECT 1 FROM workspace_orchestrators o WHERE o.agent_id=agent_profiles.id) ORDER BY created_at`
+		query := `SELECT ` + agentInstanceColumns + ` FROM agent_profiles WHERE workspace_id = ? AND deleted_at IS NULL ORDER BY created_at`
 		err = r.ro.SelectContext(ctx, &agents, r.ro.Rebind(query), workspaceID)
 	}
 	if err != nil {
@@ -241,7 +241,7 @@ func (r *Repository) ListAgentInstances(ctx context.Context, workspaceID string)
 	if agents == nil {
 		agents = []*models.AgentInstance{}
 	}
-	return agents, nil
+	return r.withoutExternalAgents(ctx, agents)
 }
 
 // ListAgentInstancesByIDs returns the office agent_profiles rows whose ids
@@ -649,7 +649,7 @@ type AgentListFilter struct {
 func (r *Repository) ListAgentInstancesFiltered(
 	ctx context.Context, workspaceID string, filter AgentListFilter,
 ) ([]*models.AgentInstance, error) {
-	conds := []string{agentInstanceFilter, `NOT EXISTS(SELECT 1 FROM workspace_orchestrators o WHERE o.agent_id=agent_profiles.id)`}
+	conds := []string{agentInstanceFilter}
 	var args []interface{}
 	if workspaceID != "" {
 		conds = append(conds, "workspace_id = ?")
@@ -677,7 +677,7 @@ func (r *Repository) ListAgentInstancesFiltered(
 	if agents == nil {
 		agents = []*models.AgentInstance{}
 	}
-	return agents, nil
+	return r.withoutExternalAgents(ctx, agents)
 }
 
 // normalizeAgentJSONArray returns "[]" for empty values; otherwise the input.

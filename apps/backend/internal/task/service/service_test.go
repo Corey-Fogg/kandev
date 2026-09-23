@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	settingsstore "github.com/kandev/kandev/internal/agent/settings/store"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -205,9 +204,6 @@ func createTestServiceWithSessionsRepo(
 	// enables foreign_keys=ON. Running both migrations here mirrors
 	// production startup so service-layer tests catch cross-package
 	// constraint regressions automatically.
-	if _, _, err := settingsstore.Provide(sqlxDB, sqlxDB, nil); err != nil {
-		t.Fatal(err)
-	}
 	if _, err := officesqlite.NewWithDB(sqlxDB, sqlxDB, nil); err != nil {
 		t.Fatalf("failed to apply office migrations: %v", err)
 	}

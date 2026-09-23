@@ -3,7 +3,6 @@ package models
 // WorkspaceTaskSpec selects existing Kanban resources for delegated work.
 // WorkspaceID is supplied by the authenticated runtime, never by the agent payload.
 type WorkspaceTaskSpec struct {
-	DirectProfile  bool
 	WorkspaceID    string
 	WorkflowID     string
 	WorkflowStepID string
@@ -19,7 +18,6 @@ type WorkspaceTaskSpec struct {
 
 // WorkspaceTaskCommand manages an existing delivery task under a signed workspace.
 type WorkspaceTaskCommand struct {
-	DirectProfile  bool   `json:"-"`
 	SessionID      string `json:"session_id"`
 	Prompt         string `json:"prompt"`
 	Mode           string `json:"mode,omitempty"`

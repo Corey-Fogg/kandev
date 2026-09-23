@@ -41,16 +41,13 @@ import (
 func (s *Service) dispatchEngineTrigger(
 	ctx context.Context, taskID string, trigger engine.Trigger, payload any, opID string,
 ) error {
-	if handled, err := s.QueueNativeConversation(ctx, taskID, trigger, payload, opID); handled || err != nil {
-		return err
-	}
 	if s.engineDispatcher == nil {
 		return nil
 	}
 	if err := s.engineDispatcher.HandleTrigger(ctx, taskID, trigger, payload, opID); err != nil {
 		if errors.Is(err, shared.ErrEngineNoSession) {
 			s.logger.Debug("engine trigger skipped: no active session",
-				zap.String(conversationTaskIDKey, taskID),
+				zap.String("task_id", taskID),
 				zap.String("trigger", string(trigger)))
 			return nil
 		}
@@ -84,7 +81,7 @@ func (s *Service) dispatchEngineTriggerForRecovery(
 		_, err := d.HandleTriggerHandled(ctx, taskID, trigger, payload, opID)
 		if errors.Is(err, shared.ErrEngineNoSession) {
 			s.logger.Debug("engine recovery trigger skipped: no active session",
-				zap.String(conversationTaskIDKey, taskID),
+				zap.String("task_id", taskID),
 				zap.String("trigger", string(trigger)))
 			return false, nil
 		}
@@ -118,8 +115,6 @@ type TaskMovedData struct {
 // publishTaskEventWithExtra's caller at task-creation time (never re-read);
 // nil means the publishing event predates this field or is not a creation.
 type TaskUpdatedData struct {
-	State                  string `json:"state"`
-	UpdatedAt              string `json:"updated_at"`
 	TaskID                 string `json:"task_id"`
 	WorkspaceID            string `json:"workspace_id"`
 	AssigneeAgentProfileID string `json:"assignee_agent_profile_id"`
@@ -302,8 +297,6 @@ func (s *Service) RegisterEventSubscribers(eb bus.EventBus) error {
 		handler bus.EventHandler
 	}{
 		{events.TaskCreated, s.handleTaskCreated},
-		{events.TaskStateChanged, s.handleWorkspaceTaskEvent},
-		{events.TaskMoved, s.handleWorkspaceTaskEvent},
 		{events.TaskUpdated, s.handleTaskUpdated},
 		{events.TaskMoved, s.handleTaskMoved},
 		{events.OfficeApprovalResolved, s.handleApprovalResolved},
@@ -384,7 +377,7 @@ func (s *Service) handleAgentTurnMessageSaved(ctx context.Context, event *bus.Ev
 	exists, err := s.repo.HasCommentWithSourceAndBody(ctx, data.TaskID, "session", agentText)
 	if err != nil {
 		s.logger.Warn("hasCommentWithSourceAndBody check failed",
-			zap.String(conversationTaskIDKey, data.TaskID), zap.Error(err))
+			zap.String("task_id", data.TaskID), zap.Error(err))
 	}
 	if exists {
 		return nil
@@ -405,8 +398,8 @@ func (s *Service) handleAgentTurnMessageSaved(ctx context.Context, event *bus.Ev
 		authorID = data.AgentProfileID
 	} else if id, lookupErr := s.repo.GetSessionAgentProfileID(ctx, data.TaskID, data.SessionID); lookupErr != nil {
 		s.logger.Warn("session agent profile lookup failed",
-			zap.String(conversationTaskIDKey, data.TaskID),
-			zap.String(conversationSessionIDKey, data.SessionID),
+			zap.String("task_id", data.TaskID),
+			zap.String("session_id", data.SessionID),
 			zap.Error(lookupErr))
 	} else if id != "" {
 		authorID = id
@@ -414,14 +407,14 @@ func (s *Service) handleAgentTurnMessageSaved(ctx context.Context, event *bus.Ev
 
 	comment := &models.TaskComment{
 		TaskID:     data.TaskID,
-		AuthorType: participantTypeAgent,
+		AuthorType: "agent",
 		AuthorID:   authorID,
 		Body:       agentText,
 		Source:     "session",
 	}
 	if cErr := s.repo.CreateTaskComment(ctx, comment); cErr != nil {
 		s.logger.Error("failed to create agent session comment",
-			zap.String(conversationTaskIDKey, data.TaskID), zap.Error(cErr))
+			zap.String("task_id", data.TaskID), zap.Error(cErr))
 		return cErr
 	}
 	s.publishCommentCreated(ctx, comment)
@@ -436,10 +429,10 @@ func (s *Service) handleAgentTurnMessageSaved(ctx context.Context, event *bus.Ev
 	// don't get attributed.
 	if runID := s.ResolveRunForTask(ctx, data.TaskID); runID != "" {
 		s.AppendRunEvent(ctx, runID, "step", "info", map[string]interface{}{
-			conversationTaskIDKey:    data.TaskID,
-			conversationSessionIDKey: data.SessionID,
-			"comment_id":             comment.ID,
-			"chars":                  len(agentText),
+			"task_id":    data.TaskID,
+			"session_id": data.SessionID,
+			"comment_id": comment.ID,
+			"chars":      len(agentText),
 		})
 	}
 	return nil
@@ -545,8 +538,8 @@ func (s *Service) warnIfReviewDecisionMissing(ctx context.Context, run *models.R
 	has, err := s.repo.HasActiveStepDecision(ctx, taskID, stepID, run.AgentProfileID)
 	if err != nil {
 		s.logger.Warn("failed to check step decision presence",
-			zap.String(conversationTaskIDKey, taskID),
-			zap.String(conversationRunIDKey, run.ID),
+			zap.String("task_id", taskID),
+			zap.String("run_id", run.ID),
 			zap.Error(err))
 		return
 	}
@@ -554,15 +547,15 @@ func (s *Service) warnIfReviewDecisionMissing(ctx context.Context, run *models.R
 		return
 	}
 	s.logger.Warn("review/approval run finished without a recorded step decision",
-		zap.String(conversationTaskIDKey, taskID),
-		zap.String(conversationRunIDKey, run.ID),
+		zap.String("task_id", taskID),
+		zap.String("run_id", run.ID),
 		zap.String("stage_type", stageType),
 		zap.String("step_id", stepID),
-		zap.String(eventKeyAgentProfileID, run.AgentProfileID))
+		zap.String("agent_profile_id", run.AgentProfileID))
 	s.AppendRunEvent(ctx, run.ID, "decision.missing", string(models.RunEventLevelWarn), map[string]interface{}{
-		conversationTaskIDKey: taskID,
-		"stage_type":          stageType,
-		"step_id":             stepID,
+		"task_id":    taskID,
+		"stage_type": stageType,
+		"step_id":    stepID,
 	})
 }
 
@@ -789,7 +782,7 @@ func (s *Service) recordRunOutputSummary(ctx context.Context, run *models.Run, d
 	summary, err := s.lookupFinalAgentMessage(ctx, run, data)
 	if err != nil {
 		s.logger.Warn("run output summary: final agent message lookup failed",
-			zap.String(conversationRunIDKey, run.ID), zap.Error(err))
+			zap.String("run_id", run.ID), zap.Error(err))
 		return
 	}
 	if summary == "" {
@@ -797,7 +790,7 @@ func (s *Service) recordRunOutputSummary(ctx context.Context, run *models.Run, d
 	}
 	if updateErr := s.repo.UpdateRunOutputSummary(ctx, run.ID, summary, ""); updateErr != nil {
 		s.logger.Warn("run output summary: update failed",
-			zap.String(conversationRunIDKey, run.ID), zap.Error(updateErr))
+			zap.String("run_id", run.ID), zap.Error(updateErr))
 	}
 }
 
@@ -983,8 +976,8 @@ func (s *Service) dispatchAgentErrorTrigger(
 			ErrorMessage:    errMsg,
 		}, key); err != nil {
 		s.logger.Error("engine trigger on_agent_error failed",
-			zap.String(conversationTaskIDKey, taskID),
-			zap.String(conversationRunIDKey, run.ID),
+			zap.String("task_id", taskID),
+			zap.String("run_id", run.ID),
 			zap.Error(err))
 	}
 }
@@ -1030,13 +1023,13 @@ func (s *Service) tryPostStartFallback(
 	agent, err := s.GetAgentFromConfig(ctx, run.AgentProfileID)
 	if err != nil {
 		s.logger.Warn("post-start fallback: agent lookup failed",
-			zap.String(conversationRunIDKey, run.ID), zap.Error(err))
+			zap.String("run_id", run.ID), zap.Error(err))
 		return false
 	}
 	handled, err := rd.HandlePostStartFailure(ctx, run, agent, errorMessage, providerError)
 	if err != nil {
 		s.logger.Warn("post-start fallback failed",
-			zap.String(conversationRunIDKey, run.ID), zap.Error(err))
+			zap.String("run_id", run.ID), zap.Error(err))
 		return false
 	}
 	return handled
@@ -1112,8 +1105,8 @@ func (s *Service) handlePromptUsage(ctx context.Context, event *bus.Event) error
 			// failed lookup, which would reproduce the exact symptom this
 			// fallback exists to fix.
 			s.logger.Warn("session agent profile lookup failed",
-				zap.String(conversationTaskIDKey, data.TaskID),
-				zap.String(conversationSessionIDKey, data.SessionID),
+				zap.String("task_id", data.TaskID),
+				zap.String("session_id", data.SessionID),
 				zap.Error(lookupErr))
 		} else {
 			sessionAgentProfileID = id
@@ -1142,7 +1135,7 @@ func (s *Service) handlePromptUsage(ctx context.Context, event *bus.Event) error
 			ctx, fields.WorkspaceID, costEvent.AgentProfileID, costEvent.ProjectID,
 		); err != nil {
 			s.logger.Warn("post-event budget check failed",
-				zap.String(conversationTaskIDKey, data.TaskID), zap.Error(err))
+				zap.String("task_id", data.TaskID), zap.Error(err))
 		}
 	}
 	return nil
@@ -1193,19 +1186,19 @@ func (s *Service) publishCostRecorded(ctx context.Context, workspaceID string, c
 		return
 	}
 	data := map[string]interface{}{
-		eventKeyWorkspaceID:      workspaceID,
-		conversationTaskIDKey:    costEvent.TaskID,
-		conversationSessionIDKey: costEvent.SessionID,
-		eventKeyAgentProfileID:   costEvent.AgentProfileID,
-		"project_id":             costEvent.ProjectID,
-		"model":                  costEvent.Model,
-		"provider":               costEvent.Provider,
-		"cost_subcents":          costEvent.CostSubcents,
+		"workspace_id":     workspaceID,
+		"task_id":          costEvent.TaskID,
+		"session_id":       costEvent.SessionID,
+		"agent_profile_id": costEvent.AgentProfileID,
+		"project_id":       costEvent.ProjectID,
+		"model":            costEvent.Model,
+		"provider":         costEvent.Provider,
+		"cost_subcents":    costEvent.CostSubcents,
 	}
 	event := bus.NewEvent(events.OfficeCostRecorded, "office-service", data)
 	if err := s.eb.Publish(ctx, events.OfficeCostRecorded, event); err != nil {
 		s.logger.Debug("publish cost recorded event failed",
-			zap.String(conversationTaskIDKey, costEvent.TaskID), zap.Error(err))
+			zap.String("task_id", costEvent.TaskID), zap.Error(err))
 	}
 }
 
@@ -1509,7 +1502,7 @@ func (s *Service) handleCommentCreated(ctx context.Context, event *bus.Event) er
 	}
 	if err := s.queueCommentRun(ctx, *data); err != nil {
 		s.logger.Error("queue comment run failed",
-			zap.String(conversationTaskIDKey, data.TaskID),
+			zap.String("task_id", data.TaskID),
 			zap.String("comment_id", data.CommentID),
 			zap.Error(err))
 	}
@@ -1597,7 +1590,7 @@ func (s *Service) resolveApprovalTaskID(ctx context.Context, approvalID string) 
 	if err := json.Unmarshal([]byte(a.Payload), &raw); err != nil {
 		return ""
 	}
-	if id, ok := raw[conversationTaskIDKey].(string); ok {
+	if id, ok := raw["task_id"].(string); ok {
 		return id
 	}
 	return ""

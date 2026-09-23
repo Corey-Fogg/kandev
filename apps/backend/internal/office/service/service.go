@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/kandev/kandev/internal/agentctl/types/streams"
@@ -349,8 +348,6 @@ type TaskPRLister interface {
 // Required fields: Repo and Logger. All other fields are optional and may be
 // set to nil/zero to disable the corresponding feature.
 type ServiceOptions struct {
-	ExternalOrchestration   bool
-	RunAllowed              func(context.Context, string) (bool, error)
 	Repo                    *sqlite.Repository
 	Logger                  *logger.Logger
 	CfgLoader               *configloader.ConfigLoader
@@ -374,9 +371,6 @@ type ServiceOptions struct {
 
 // Service provides office business logic.
 type Service struct {
-	workspaceCallbackMu     sync.Mutex
-	runAllowed              func(context.Context, string) (bool, error)
-	externalOrchestration   bool
 	repo                    *sqlite.Repository
 	cfgLoader               *configloader.ConfigLoader
 	cfgWriter               *configloader.FileWriter
@@ -559,8 +553,6 @@ func NewService(opts ServiceOptions) *Service {
 			"instead of launching an agent")
 	}
 	svc := &Service{
-		runAllowed:              opts.RunAllowed,
-		externalOrchestration:   opts.ExternalOrchestration,
 		repo:                    opts.Repo,
 		logger:                  log,
 		cfgLoader:               opts.CfgLoader,

@@ -7,27 +7,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kandev/kandev/internal/agent/runtimeauth"
 	"github.com/kandev/kandev/internal/auth/authn"
-	"github.com/kandev/kandev/internal/common/config"
 	"github.com/kandev/kandev/internal/office/agents"
-	officesqlite "github.com/kandev/kandev/internal/office/repository/sqlite"
 	"github.com/kandev/kandev/internal/orchestration"
+	orchestrationstore "github.com/kandev/kandev/internal/orchestration/repository/sqlite"
 	orchestrationruntime "github.com/kandev/kandev/internal/orchestration/runtime"
 	"net/http"
 	"strings"
 )
-
-// orchestrationRunGuard decides whether the shared run processor may execute a
-// persona's run. Registered orchestrators run only while orchestration is
-// enabled; any other persona keeps upstream behavior.
-func orchestrationRunGuard(features config.FeaturesConfig, repo *officesqlite.Repository) func(context.Context, string) (bool, error) {
-	return func(ctx context.Context, id string) (bool, error) {
-		role, err := repo.OrchestratorRoleID(ctx, id)
-		if err != nil {
-			return false, err
-		}
-		return role == "" || features.Orchestration, nil
-	}
-}
 
 func registerOrchestration(p routeParams) {
 	if !p.features.Orchestration || p.services.Orchestration == nil {
@@ -54,7 +40,7 @@ func orchestrationCompatibilityGate(p routeParams) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		caller := agents.CallerFromContext(c)
 		if caller != nil {
-			legacy, err := legacyOfficePersona(c.Request.Context(), p.officeRepo, caller.ID)
+			legacy, err := legacyOfficePersona(c.Request.Context(), p.orchestrationRepo, caller.ID)
 			allowed := p.features.Office && legacy
 			if err != nil || !allowed {
 				c.AbortWithStatusJSON(http.StatusNotFound, gin.H{errKey: "feature disabled"})
@@ -93,10 +79,10 @@ func orchestrationBrowserRouteAllowed(ctx context.Context, p routeParams, path s
 	default:
 		return true, nil
 	}
-	return legacyOfficePersona(ctx, p.officeRepo, id)
+	return legacyOfficePersona(ctx, p.orchestrationRepo, id)
 }
 
-func legacyOfficePersona(ctx context.Context, repo *officesqlite.Repository, id string) (bool, error) {
+func legacyOfficePersona(ctx context.Context, repo *orchestrationstore.Repository, id string) (bool, error) {
 	role, err := repo.OrchestratorRoleID(ctx, id)
 	return role == "", err
 }

@@ -3,7 +3,6 @@ package backendapp
 import (
 	"context"
 	"database/sql"
-	settingsstore "github.com/kandev/kandev/internal/agent/settings/store"
 	"path/filepath"
 	"testing"
 	"time"
@@ -262,9 +261,6 @@ func newOfficeTaskAdapterHarness(t *testing.T) (*taskCreatorAdapter, *taskservic
 	if _, err := worktree.NewSQLiteStore(database, database); err != nil {
 		t.Fatalf("worktree store: %v", err)
 	}
-	if _, _, err := settingsstore.Provide(database, database, nil); err != nil {
-		t.Fatal(err)
-	}
 	if _, err := officesqlite.NewWithDB(database, database, nil); err != nil {
 		t.Fatalf("office migrations: %v", err)
 	}
@@ -301,13 +297,13 @@ func newOfficeTaskAdapterHarness(t *testing.T) (*taskCreatorAdapter, *taskservic
 	if err != nil {
 		t.Fatal(err)
 	}
-	taskSvc.SetWorkflowStepGetter(&assistantTestSteps{Repository: workflow})
+	taskSvc.SetWorkflowStepGetter(&workflowTestSteps{Repository: workflow})
 	return &taskCreatorAdapter{taskSvc: taskSvc, taskRepo: repo, workflow: workflow}, taskSvc
 }
 
-type assistantTestSteps struct{ *workflowrepo.Repository }
+type workflowTestSteps struct{ *workflowrepo.Repository }
 
-func (s *assistantTestSteps) GetNextStepByPosition(ctx context.Context, id string, position int) (*wfmodels.WorkflowStep, error) {
+func (s *workflowTestSteps) GetNextStepByPosition(ctx context.Context, id string, position int) (*wfmodels.WorkflowStep, error) {
 	rows, err := s.ListStepsByWorkflow(ctx, id)
 	if err != nil {
 		return nil, err
@@ -318,28 +314,4 @@ func (s *assistantTestSteps) GetNextStepByPosition(ctx context.Context, id strin
 		}
 	}
 	return nil, nil
-}
-
-func TestChiefCreatesTaskOnExistingKanbanWorkflow(t *testing.T) {
-	adapter, svc := newOfficeTaskAdapterHarness(t)
-	ctx := context.Background()
-	ws, err := svc.CreateWorkspace(ctx, &taskservice.CreateWorkspaceRequest{Name: "Existing board"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	wf, err := svc.CreateWorkflow(ctx, &taskservice.CreateWorkflowRequest{WorkspaceID: ws.ID, Name: "Delivery"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	id, err := adapter.CreateOfficeTaskAsAgent(ctx, ws.ID, "", "", "Review", "Read-only review")
-	if err != nil {
-		t.Fatalf("chief must create on existing board: %v", err)
-	}
-	task, err := svc.GetTask(ctx, id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if task.WorkflowID != wf.ID || task.IsFromOffice {
-		t.Fatalf("task must retain Kanban ownership: %+v", task)
-	}
 }

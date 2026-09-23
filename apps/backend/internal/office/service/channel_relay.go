@@ -39,16 +39,13 @@ func (r *ChannelRelay) RelayComment(ctx context.Context, comment *models.TaskCom
 	if comment.ReplyChannelID == "" {
 		return nil // not a channel comment
 	}
-	if comment.AuthorType != participantTypeAgent {
+	if comment.AuthorType != "agent" {
 		return nil // only relay agent comments
 	}
 
 	channel, err := r.svc.GetChannelByID(ctx, comment.ReplyChannelID)
 	if err != nil {
 		return fmt.Errorf("load channel %s: %w", comment.ReplyChannelID, err)
-	}
-	if channel.Platform == "web" {
-		return nil // Native replies are already persisted as task comments.
 	}
 
 	config, err := parseChannelConfig(channel.Config)

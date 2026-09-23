@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	settingsmodels "github.com/kandev/kandev/internal/agent/settings/models"
-	"github.com/kandev/kandev/internal/office/shared"
+	shared "github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/orchestrator"
 	"github.com/kandev/kandev/internal/task/models"
 	taskservice "github.com/kandev/kandev/internal/task/service"
@@ -85,7 +85,7 @@ func (p workspaceTestProfiles) GetAgentProfile(_ context.Context, id string) (*s
 	return profile, nil
 }
 
-func TestWorkspaceDelegationValidatesResourcesAndRetainsAccount(t *testing.T) {
+func TestWorkspaceDelegationValidatesResources(t *testing.T) {
 	adapter, svc := newOfficeTaskAdapterHarness(t)
 	ctx := context.Background()
 	ws, err := svc.CreateWorkspace(ctx, &taskservice.CreateWorkspaceRequest{Name: "Board"})
@@ -101,12 +101,10 @@ func TestWorkspaceDelegationValidatesResourcesAndRetainsAccount(t *testing.T) {
 		t.Fatal(err)
 	}
 	adapter.profiles = workspaceTestProfiles{
-		"worker":          {ID: "worker", WorkspaceID: ws.ID, Role: "worker", Settings: `{"routing":{"execution_profile_id":"work"}}`},
-		"work":            {ID: "work", Enabled: true, Model: "default"},
-		"personal-worker": {ID: "personal-worker", WorkspaceID: ws.ID, Role: "worker", Settings: `{"routing":{"execution_profile_id":"personal"}}`},
-		"personal":        {ID: "personal", Enabled: true, Model: "default"},
+		"worker": {ID: "worker", WorkspaceID: ws.ID, Role: "worker", Enabled: true, Model: "default"},
+		"work":   {ID: "work", Enabled: true, Model: "default"},
 	}
-	spec := shared.WorkspaceTaskSpec{WorkspaceID: ws.ID, ChiefID: "chief", AssigneeID: "worker", Title: "Review", ExternalID: "review-1"}
+	spec := shared.WorkspaceTaskSpec{WorkspaceID: ws.ID, ChiefID: "chief", AssigneeID: "work", Title: "Review", ExternalID: "review-1"}
 	if _, err := adapter.CreateWorkspaceTask(ctx, spec); err == nil {
 		t.Fatal("ambiguous workflow accepted")
 	}
@@ -127,7 +125,7 @@ func TestWorkspaceDelegationValidatesResourcesAndRetainsAccount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if task.IsFromOffice || task.Metadata[models.MetaKeyAgentProfileID] != "work" || task.Metadata["orchestration_chief_id"] != "chief" {
+	if task.IsFromOffice || task.Metadata[models.MetaKeyAgentProfileID] != "work" || task.Metadata["orchestration_chief_id"] != "chief" || task.Metadata["orchestration_managed"] != true {
 		t.Fatalf("incorrect execution ownership: %+v", task)
 	}
 	command := shared.WorkspaceTaskCommand{WorkspaceID: "foreign", ChiefID: "chief", TaskID: id, Action: "adopt"}
@@ -136,9 +134,9 @@ func TestWorkspaceDelegationValidatesResourcesAndRetainsAccount(t *testing.T) {
 	}
 	command.WorkspaceID = ws.ID
 	command.Action = "assign"
-	command.AssigneeID = "personal-worker"
+	command.AssigneeID = "worker"
 	if err := adapter.ManageWorkspaceTask(ctx, command); err == nil {
-		t.Fatal("reassignment changed account")
+		t.Fatal("assignment to an Office persona accepted")
 	}
 }
 
@@ -196,15 +194,19 @@ func TestWorkspaceTaskDetailsReadsBoundedWorkerMessages(t *testing.T) {
 	}
 }
 
-func TestWorkspaceMessageRejectsForeignSessionAndAccount(t *testing.T) {
+func TestWorkspaceMessageRejectsForeignSession(t *testing.T) {
 	adapter, _ := newOfficeTaskAdapterHarness(t)
 	adapter.orch = &orchestrator.Service{}
 	ctx := context.Background()
-	task := &models.Task{ID: "message-task", WorkspaceID: "ws-1", Title: "Review", Metadata: map[string]interface{}{"orchestration_execution_profile_id": "work"}}
+	task := &models.Task{ID: "message-task", WorkspaceID: "ws-1", Title: "Review"}
 	if err := adapter.taskRepo.CreateTask(ctx, task); err != nil {
 		t.Fatal(err)
 	}
-	session := &models.TaskSession{ID: "message-session", TaskID: task.ID, AgentProfileID: "personal", State: models.TaskSessionStateWaitingForInput}
+	other := &models.Task{ID: "other-task", WorkspaceID: "ws-1", Title: "Other"}
+	if err := adapter.taskRepo.CreateTask(ctx, other); err != nil {
+		t.Fatal(err)
+	}
+	session := &models.TaskSession{ID: "other-session", TaskID: other.ID, AgentProfileID: "personal", State: models.TaskSessionStateWaitingForInput}
 	if err := adapter.taskRepo.CreateTaskSession(ctx, session); err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +230,7 @@ func TestOrchestratorUsesTaskProfilesWithoutProviderPin(t *testing.T) {
 		t.Fatal(err)
 	}
 	adapter.profiles = workspaceTestProfiles{"claude": {ID: "claude", Enabled: true}, "codex": {ID: "codex", Enabled: true}, "foreign": {ID: "foreign", Enabled: true, WorkspaceID: "other"}}
-	spec := shared.WorkspaceTaskSpec{WorkspaceID: ws.ID, WorkflowID: wf.ID, ChiefID: "coordinator", DirectProfile: true, AssigneeID: "claude", Title: "Delegated task"}
+	spec := shared.WorkspaceTaskSpec{WorkspaceID: ws.ID, WorkflowID: wf.ID, ChiefID: "coordinator", AssigneeID: "claude", Title: "Delegated task"}
 	id, err := adapter.CreateWorkspaceTask(ctx, spec)
 	if err != nil {
 		t.Fatal(err)
@@ -240,7 +242,7 @@ func TestOrchestratorUsesTaskProfilesWithoutProviderPin(t *testing.T) {
 	if task.Metadata["orchestration_execution_profile_id"] != nil {
 		t.Fatal("orchestration froze execution profile")
 	}
-	err = adapter.ManageWorkspaceTask(ctx, shared.WorkspaceTaskCommand{WorkspaceID: ws.ID, TaskID: id, ChiefID: "coordinator", DirectProfile: true, Action: "assign", AssigneeID: "codex"})
+	err = adapter.ManageWorkspaceTask(ctx, shared.WorkspaceTaskCommand{WorkspaceID: ws.ID, TaskID: id, ChiefID: "coordinator", Action: "assign", AssigneeID: "codex"})
 	if err != nil {
 		t.Fatal(err)
 	}

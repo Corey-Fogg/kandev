@@ -20,12 +20,12 @@ func TestWorkspaceOrchestratorNativeTaskLifecycle(t *testing.T) {
 	for i, id := range []string{"backlog", "progress", "done"} {
 		require.NoError(t, a.workflow.CreateStep(ctx, &wfmodels.WorkflowStep{ID: id, WorkflowID: wf.ID, Name: id, Position: i, AllowManualMove: true}))
 	}
-	id, err := a.CreateWorkspaceTask(ctx, shared.WorkspaceTaskSpec{WorkspaceID: "ws-1", ChiefID: "chief", WorkflowID: wf.ID, Title: "Synthetic task", Description: "Initial description", ExecutionMode: "execute", DirectProfile: true})
+	id, err := a.CreateWorkspaceTask(ctx, shared.WorkspaceTaskSpec{WorkspaceID: "ws-1", ChiefID: "chief", WorkflowID: wf.ID, Title: "Synthetic task", Description: "Initial description", ExecutionMode: "execute"})
 	require.NoError(t, err)
 	command := func(body string) error {
 		var command shared.WorkspaceTaskCommand
 		require.NoError(t, json.Unmarshal([]byte(body), &command))
-		command.WorkspaceID, command.ChiefID, command.TaskID, command.DirectProfile = "ws-1", "chief", id, true
+		command.WorkspaceID, command.ChiefID, command.TaskID = "ws-1", "chief", id
 		return a.ManageWorkspaceTask(ctx, command)
 	}
 	require.NoError(t, command(`{"action":"edit","title":"Updated synthetic task","description":"Revised description","priority":"high"}`))
@@ -56,7 +56,7 @@ func TestWorkspaceTaskMutationsRejectForeignAndConversationTasks(t *testing.T) {
 	} {
 		require.NoError(t, a.taskRepo.CreateTask(ctx, task))
 		for _, action := range []string{"edit", "move", "archive", "delete"} {
-			require.Error(t, a.ManageWorkspaceTask(ctx, shared.WorkspaceTaskCommand{WorkspaceID: "ws-1", TaskID: task.ID, Action: action, DirectProfile: true}))
+			require.Error(t, a.ManageWorkspaceTask(ctx, shared.WorkspaceTaskCommand{WorkspaceID: "ws-1", TaskID: task.ID, Action: action}))
 		}
 		_, err := a.taskRepo.GetTask(ctx, task.ID)
 		require.NoError(t, err)
@@ -75,7 +75,7 @@ func TestWorkspaceMoveHonorsReviewAndTargetPolicy(t *testing.T) {
 	require.NoError(t, a.taskRepo.CreateTask(ctx, task))
 	participant := &wfmodels.WorkflowStepParticipant{StepID: "review", Role: wfmodels.ParticipantRoleReviewer, AgentProfileID: "reviewer", DecisionRequired: true}
 	require.NoError(t, a.workflow.UpsertStepParticipant(ctx, participant))
-	cmd := shared.WorkspaceTaskCommand{WorkspaceID: "ws-1", TaskID: task.ID, Action: "move", WorkflowStepID: "done", DirectProfile: true}
+	cmd := shared.WorkspaceTaskCommand{WorkspaceID: "ws-1", TaskID: task.ID, Action: "move", WorkflowStepID: "done"}
 	require.ErrorContains(t, a.ManageWorkspaceTask(ctx, cmd), "pending")
 	current, err := svc.GetTask(ctx, task.ID)
 	require.NoError(t, err)
