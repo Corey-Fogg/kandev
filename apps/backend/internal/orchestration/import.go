@@ -26,9 +26,6 @@ func (h *Handler) importAgent(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{errorResponseKey: "assistant is already registered or working"})
 		return
 	}
-	if h.rejectExisting(c, a.ID) {
-		return
-	}
 	req, err := h.prepare(c, a)
 	if err != nil {
 		fail(c, err)
@@ -39,7 +36,7 @@ func (h *Handler) importAgent(c *gin.Context) {
 		return
 	}
 	if err = h.persistConfiguration(ctx, a, req, true); err != nil {
-		h.failConfiguration(c, err)
+		fail(c, err)
 		return
 	}
 	if err := h.Registry.ImportLegacyState(); err != nil {

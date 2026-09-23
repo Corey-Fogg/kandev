@@ -44,24 +44,26 @@ func createOrchestrator(t *testing.T, r *gin.Engine, body map[string]any) descri
 	return decodeOrchestrator(t, w.Body.Bytes())
 }
 
-func TestCreateReturnsDefaultsAndRejectsASecondOrchestrator(t *testing.T) {
+func TestCreateReturnsDefaultsAndAllowsSeveralOrchestrators(t *testing.T) {
 	r, repo, db := configuredHandler(t, nil)
 	first := createOrchestrator(t, r, map[string]any{"display_name": "  Jeb  ", "ask_before_create": true})
 	require.Equal(t, describedOrchestrator{ID: first.ID, Name: "Jeb", DisplayName: "Jeb", RoleName: "Chief of staff", AskBeforeCreate: true, AutoCommentSource: true}, first)
 
-	second := request(t, r, http.MethodPost, orchestratorsPath, map[string]any{"role_id": "chief-of-staff", "profile_id": "work"})
-	require.Equal(t, http.StatusConflict, second.Code)
-	require.JSONEq(t, `{"error":"orchestrator_exists","orchestrator_id":"`+first.ID+`"}`, second.Body.String())
-	var assistants int
-	require.NoError(t, db.Get(&assistants, `SELECT COUNT(*) FROM agent_profiles WHERE role='assistant' AND deleted_at IS NULL`))
-	require.Equal(t, 1, assistants, "a refused create leaves no profile behind")
+	second := createOrchestrator(t, r, map[string]any{"display_name": "Val", "profile_id": "work"})
+	require.NotEqual(t, first.ID, second.ID)
+	require.Equal(t, "Val", second.Name)
+	require.False(t, second.AskBeforeCreate, "each orchestrator keeps its own settings")
+	ids, err := repo.ListOrchestratorIDs(context.Background(), "ws")
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{first.ID, second.ID}, ids)
 
-	// A legacy assistant cannot be imported next to the workspace's orchestrator.
+	// A legacy assistant can be imported next to the workspace's orchestrators.
 	require.NoError(t, repo.UnregisterOrchestrator(context.Background(), first.ID))
-	replacement := createOrchestrator(t, r, nil)
 	imported := request(t, r, http.MethodPost, "/api/v1/orchestration/workspaces/ws/import/"+first.ID, map[string]any{"role_id": "chief-of-staff", "profile_id": "personal"})
-	require.Equal(t, http.StatusConflict, imported.Code)
-	require.Contains(t, imported.Body.String(), `"orchestrator_id":"`+replacement.ID+`"`)
+	require.Equal(t, http.StatusOK, imported.Code, imported.Body.String())
+	var assistants int
+	require.NoError(t, db.Get(&assistants, `SELECT COUNT(*) FROM workspace_orchestrators WHERE workspace_id='ws'`))
+	require.Equal(t, 2, assistants)
 }
 
 func TestPatchRenamesWhileWorking(t *testing.T) {

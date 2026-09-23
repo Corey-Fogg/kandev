@@ -5,12 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 
-	"github.com/jackc/pgx/v5/pgconn"
-	"go.uber.org/zap"
-
-	"github.com/kandev/kandev/internal/common/logger"
 	"github.com/kandev/kandev/internal/db"
 	"github.com/kandev/kandev/internal/orchestration/models"
 )
@@ -41,20 +36,10 @@ func (r *Repository) migrateAssignmentSettings() error {
 	return nil
 }
 
-// migrateSingleOrchestratorIndex enforces one orchestrator per workspace once
-// no workspace has more. Legacy duplicates are kept working; every replay
-// tries again, so the index appears after the extras are deleted.
-func (r *Repository) migrateSingleOrchestratorIndex() error {
-	var duplicated int
-	if err := r.db.Get(&duplicated, `SELECT COUNT(*) FROM (SELECT workspace_id FROM workspace_orchestrators GROUP BY workspace_id HAVING COUNT(*)>1) d`); err != nil {
-		return err
-	}
-	if duplicated > 0 {
-		logger.Default().Info("orchestration: skipping the one-orchestrator-per-workspace index while legacy workspaces have several",
-			zap.Int("workspaces", duplicated))
-		return nil
-	}
-	_, err := r.db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_workspace_orchestrators_one_per_workspace ON workspace_orchestrators(workspace_id)`)
+// migrateDropSingleOrchestratorIndex removes the one-orchestrator-per-workspace
+// index an earlier build created. A workspace may have several orchestrators.
+func (r *Repository) migrateDropSingleOrchestratorIndex() error {
+	_, err := r.db.Exec(`DROP INDEX IF EXISTS ux_workspace_orchestrators_one_per_workspace`)
 	return err
 }
 
@@ -75,50 +60,26 @@ func (r *Repository) OrchestratorAssignment(ctx context.Context, agentID string)
 	return &row, nil
 }
 
-// RegisterOrchestrator creates or imports a workspace's orchestrator. A
-// workspace has at most one: registering another returns
-// models.ErrOrchestratorExists.
+// RegisterOrchestrator creates or imports one of a workspace's orchestrators.
+// A workspace may have several.
 func (r *Repository) RegisterOrchestrator(ctx context.Context, agentID, workspaceID, roleID string) error {
 	defer r.invalidateRegistered()
 	result, err := r.db.ExecContext(ctx, r.db.Rebind(`INSERT INTO workspace_orchestrators (agent_id,workspace_id,role_id)
 		SELECT id,workspace_id,? FROM agent_profiles
 		WHERE id=? AND workspace_id=? AND deleted_at IS NULL AND role='assistant'
-		  AND NOT EXISTS (SELECT 1 FROM workspace_orchestrators o WHERE o.workspace_id=? AND o.agent_id<>?)
-		ON CONFLICT(agent_id) DO UPDATE SET role_id=excluded.role_id`), roleID, agentID, workspaceID, workspaceID, agentID)
-	if isUniqueViolation(err) {
-		return models.ErrOrchestratorExists
-	}
+		ON CONFLICT(agent_id) DO UPDATE SET role_id=excluded.role_id`), roleID, agentID, workspaceID)
 	if err != nil {
 		return err
 	}
 	n, err := result.RowsAffected()
-	if err != nil || n == 1 {
-		return err
+	if err == nil && n != 1 {
+		return fmt.Errorf("orchestrator must belong to this workspace")
 	}
-	var others int
-	if err := r.db.GetContext(ctx, &others, r.db.Rebind(`SELECT COUNT(*) FROM workspace_orchestrators WHERE workspace_id=? AND agent_id<>?`), workspaceID, agentID); err != nil {
-		return err
-	}
-	if others > 0 {
-		return models.ErrOrchestratorExists
-	}
-	return fmt.Errorf("orchestrator must belong to this workspace")
-}
-
-func isUniqueViolation(err error) bool {
-	if err == nil {
-		return false
-	}
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		return pgErr.Code == "23505"
-	}
-	return strings.Contains(err.Error(), "UNIQUE constraint failed: workspace_orchestrators.workspace_id")
+	return err
 }
 
 // UpdateOrchestratorRole changes an existing orchestrator's role and
-// refreshes its cached profile name. Legacy duplicate assignments stay
-// editable.
+// refreshes its cached profile name.
 func (r *Repository) UpdateOrchestratorRole(ctx context.Context, agentID, roleID string) error {
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {

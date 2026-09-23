@@ -106,11 +106,11 @@ func TestOrchestratorsUseProfilesAndScopeConfiguration(t *testing.T) {
 	cfg.Name = "Second"
 	cfg.ProfileID = "work"
 	second := request(t, r, http.MethodPost, path, cfg)
-	if second.Code != http.StatusConflict || !bytes.Contains(second.Body.Bytes(), []byte(`"orchestrator_id":"`+id+`"`)) {
+	if second.Code != http.StatusCreated {
 		t.Fatalf("second orchestrator = %d %s", second.Code, second.Body.String())
 	}
 	ids, err := repo.ListOrchestratorIDs(context.Background(), "ws")
-	if err != nil || len(ids) != 1 {
+	if err != nil || len(ids) != 2 {
 		t.Fatalf("instances: %v %v", ids, err)
 	}
 	foreign := request(t, r, http.MethodGet, "/api/v1/orchestration/workspaces/other/orchestrators/"+id, nil)

@@ -54,13 +54,11 @@ agent configuration.
   assignment, the system shall require a role, an enabled execution profile and
   an executor, and shall accept workspace context and delegation guidance. It
   shall not create a workspace, workflow or delivery task.
-- **AC-ORCHESTRATION-COORDINATOR-001.4:** A workspace shall have at most one
-  assignment. Adding or importing a second one shall be rejected as a conflict
-  that names the existing assignment. The same role can run under different
-  execution profiles in different workspaces, and each assignment shall keep
-  its own conversation, memory, delegated tasks and pause state. Workspaces
-  that already have several assignments from an earlier build shall keep all
-  of them working until a person deletes the extras.
+- **AC-ORCHESTRATION-COORDINATOR-001.4:** A workspace may have several
+  assignments, so work can be split across them. The same role can run under
+  different execution profiles in the same or different workspaces, and each
+  assignment shall keep its own conversation, memory, delegated tasks and
+  pause state.
 - **AC-ORCHESTRATION-COORDINATOR-001.5:** When an assignment is paused, the
   system shall start no new turn for it and shall not interrupt a running turn.
   Resuming shall not replay callbacks that were rejected while paused.
@@ -165,12 +163,12 @@ repeating effects.
 
 ### REQ-ORCHESTRATION-COORDINATOR-006: Named orchestrator and behavior settings
 
-**Intent:** Let a person name their workspace's orchestrator and choose how
-much it does on its own.
+**Intent:** Let a person run several named orchestrators in one workspace and
+choose how much each does on its own.
 
-**User story:** As a workspace administrator, I want to rename "Chief of Staff"
-to "Jeb" without changing the shared role, so that the chat, navigation and
-settings use the name I chose.
+**User story:** As a workspace administrator, I want to split work across
+several orchestrators and rename "Chief of Staff" to "Jeb" without changing the
+shared role, so that the chat, navigation and settings use the names I chose.
 
 #### Acceptance criteria
 
@@ -187,6 +185,11 @@ settings use the name I chose.
   completion (default off). The coordinator's prompt shall state them.
 - **AC-ORCHESTRATION-COORDINATOR-006.4:** A person with workspace-manage access
   shall be able to change the name and settings while a turn is running.
+- **AC-ORCHESTRATION-COORDINATOR-006.5:** A workspace shall accept several
+  assignments. Each keeps its own name, settings, conversation, proposals and
+  metrics, and write-back for a delegated task shall use the settings of the
+  assignment that delegated it. The navigation shall list every assignment by
+  name with its own pending-input badge.
 
 ## Out of scope
 

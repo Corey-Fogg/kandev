@@ -68,14 +68,16 @@ ID, executor preference and workspace context. The prompt reads the role at
 turn start, so saved role edits apply from the next turn, and states the
 instance name and settings.
 
-A workspace has one assignment. `RegisterOrchestrator` inserts only when no
-other assignment exists in the workspace and otherwise returns
-`ErrOrchestratorExists`; the create and import routes answer 409
-`orchestrator_exists` with the existing ID before creating a profile. The
-unique index `ux_workspace_orchestrators_one_per_workspace` is created on
-migration once no workspace has several assignments; while legacy duplicates
-remain it is skipped and every replay tries again. Updates use
-`UpdateOrchestratorRole`, so legacy duplicates stay editable.
+A workspace can have several assignments, each with its own instance name,
+settings and conversation, so work can be split across orchestrators.
+`RegisterOrchestrator` accepts any assistant profile of the workspace, and the
+migration drops the `ux_workspace_orchestrators_one_per_workspace` index an
+earlier build created (`DROP INDEX IF EXISTS`, so replays are safe). Proposals,
+acceptance criteria, write-back settings and metrics belong to one
+orchestrator: proposals are keyed by `agent_id`, a delegated task names its
+owner in `orchestration_chief_id`, and write-back reads that owner's
+settings. Each prompt names the workspace's other orchestrators so a
+coordinator leaves their tasks to them.
 
 The effective name is `display_name`, or the role name when it is empty.
 `personas.GetAgentInstance` reports it, so chat identity and automation targets

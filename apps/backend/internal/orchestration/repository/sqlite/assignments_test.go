@@ -89,38 +89,33 @@ func TestAssignmentMigrationsReplayWithDefaults(t *testing.T) {
 	})
 }
 
-func TestOneOrchestratorPerWorkspace(t *testing.T) {
+func TestSeveralOrchestratorsPerWorkspace(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, dsn string) {
 		repo, _ := assignmentRepo(t, dsn)
 		ctx := context.Background()
 		require.NoError(t, repo.RegisterOrchestrator(ctx, "chief", "ws", "chief-of-staff"))
 		require.NoError(t, repo.RegisterOrchestrator(ctx, "chief", "ws", "chief-of-staff"), "re-registering the same orchestrator is allowed")
-		require.ErrorIs(t, repo.RegisterOrchestrator(ctx, "second", "ws", "chief-of-staff"), models.ErrOrchestratorExists)
+		require.NoError(t, repo.RegisterOrchestrator(ctx, "second", "ws", "chief-of-staff"), "a workspace may have several orchestrators")
 		require.NoError(t, repo.RegisterOrchestrator(ctx, "elsewhere", "other", "chief-of-staff"))
 		require.Error(t, repo.RegisterOrchestrator(ctx, "elsewhere", "ws", "chief-of-staff"))
+		ids, err := repo.ListOrchestratorIDs(ctx, "ws")
+		require.NoError(t, err)
+		require.ElementsMatch(t, []string{"chief", "second"}, ids)
 	})
 }
 
-func TestSingleOrchestratorIndexWaitsForLegacyDuplicates(t *testing.T) {
-	repo, database := assignmentRepo(t, "")
-	ctx := context.Background()
-	indexExists := func() bool {
-		var count int
-		require.NoError(t, database.Get(&count, `SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='ux_workspace_orchestrators_one_per_workspace'`))
-		return count == 1
-	}
-	require.True(t, indexExists())
-	_, err := database.Exec(`DROP INDEX ux_workspace_orchestrators_one_per_workspace`)
-	require.NoError(t, err)
-	// An earlier build allowed several orchestrators in one workspace.
-	_, err = database.Exec(`INSERT INTO workspace_orchestrators(agent_id,workspace_id,role_id) VALUES('chief','ws','chief-of-staff'),('second','ws','chief-of-staff')`)
-	require.NoError(t, err)
-	require.NoError(t, repo.Migrate())
-	require.False(t, indexExists(), "the index is skipped while a workspace has two orchestrators")
-	require.NoError(t, repo.UpdateOrchestratorRole(ctx, "second", "chief-of-staff"), "legacy duplicates stay editable")
-	require.NoError(t, repo.UnregisterOrchestrator(ctx, "second"))
-	require.NoError(t, repo.Migrate())
-	require.True(t, indexExists(), "a replay creates the index once the duplicate is gone")
+func TestMigrationDropsSingleOrchestratorIndex(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, dsn string) {
+		repo, database := assignmentRepo(t, dsn)
+		ctx := context.Background()
+		// An earlier build created this index on existing databases.
+		_, err := database.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_workspace_orchestrators_one_per_workspace ON workspace_orchestrators(workspace_id)`)
+		require.NoError(t, err)
+		require.NoError(t, repo.Migrate())
+		require.NoError(t, repo.Migrate(), "dropping the index replays")
+		require.NoError(t, repo.RegisterOrchestrator(ctx, "chief", "ws", "chief-of-staff"))
+		require.NoError(t, repo.RegisterOrchestrator(ctx, "second", "ws", "chief-of-staff"))
+	})
 }
 
 func TestDisplayNameRenamesProfileAndConversation(t *testing.T) {
@@ -208,6 +203,18 @@ func TestProposalStoreIsIdempotentAndCascades(t *testing.T) {
 		require.Equal(t, "p1", duplicate.ID)
 		require.NoError(t, database.Get(&comments, `SELECT COUNT(*) FROM task_comments WHERE id='p3'`))
 		require.Zero(t, comments)
+
+		// Undecided proposals are deduplicated per orchestrator, not per workspace.
+		require.NoError(t, repo.RegisterOrchestrator(ctx, "second", "ws", "chief-of-staff"))
+		sibling := proposal("p4")
+		sibling.OrchestratorID = "second"
+		sibling, created, err = repo.CreateProposal(ctx, sibling, &models.TaskComment{TaskID: "conversation", AuthorType: "agent", AuthorID: "second", Body: "Proposed", Source: "proposal"})
+		require.NoError(t, err)
+		require.True(t, created, "another orchestrator may propose the same source issue")
+		require.Equal(t, "p4", sibling.ID)
+		mine, err := repo.ListProposals(ctx, "chief", "", 50)
+		require.NoError(t, err)
+		require.Len(t, mine, 1, "an orchestrator lists only its own proposals")
 
 		now := time.Now()
 		claimed, err := repo.ClaimProposalApproval(ctx, "p1", "first", now, now.Add(-5*time.Minute))

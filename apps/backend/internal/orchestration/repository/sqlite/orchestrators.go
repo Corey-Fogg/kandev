@@ -26,7 +26,7 @@ func (r *Repository) Migrate() error {
 	}
 	for _, migrate := range []func() error{
 		r.migrateIntake, r.ImportLegacyState, r.migrateRoleConfiguration,
-		r.migrateAssignmentSettings, r.migrateProposals, r.migrateSourceWriteBacks, r.migrateSingleOrchestratorIndex,
+		r.migrateAssignmentSettings, r.migrateProposals, r.migrateSourceWriteBacks, r.migrateDropSingleOrchestratorIndex,
 	} {
 		if err := migrate(); err != nil {
 			return err

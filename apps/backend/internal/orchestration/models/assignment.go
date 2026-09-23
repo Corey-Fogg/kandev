@@ -56,9 +56,6 @@ func (p OrchestratorPatch) ApplySettings(s OrchestratorSettings) OrchestratorSet
 // DisplayNameMaxRunes bounds an orchestrator's instance name.
 const DisplayNameMaxRunes = 60
 
-// ErrOrchestratorExists means the workspace already has an orchestrator.
-var ErrOrchestratorExists = errors.New("orchestrator_exists")
-
 // ErrInvalidDisplayName means an instance name is too long or not plain text.
 var ErrInvalidDisplayName = errors.New("display_name must be at most 60 characters of text without control characters")
 

@@ -19,7 +19,8 @@ routes use Kandev's authenticated identity and the caller's workspace access.
 
 ## Orchestrators
 
-A workspace has one orchestrator. It follows a global role template and has its
+A workspace can have several orchestrators, for example to split work across
+them. Each follows a global role template and has its
 own instance name: `display_name` (1 to 60 characters, no control characters;
 empty inherits the role name). Every response reports the effective name as
 `name`, the template name as `role_name`, and three behavior settings:
@@ -29,10 +30,10 @@ empty inherits the role name). Every response reports the effective name as
 | Route | Access | Result |
 | --- | --- | --- |
 | `GET /workspaces/:wsId/orchestrators` | read | `{"orchestrators": [...]}` |
-| `POST /workspaces/:wsId/orchestrators` | manage | 201 with the orchestrator; 409 `{"error":"orchestrator_exists","orchestrator_id"}` when the workspace has one |
+| `POST /workspaces/:wsId/orchestrators` | manage | 201 with the orchestrator |
 | `PUT /workspaces/:wsId/orchestrators/:id` | manage | Full configuration; the name and settings are optional. 409 while a turn runs |
 | `PATCH /workspaces/:wsId/orchestrators/:id` | manage | Any of `display_name` and the three settings; allowed while a turn runs; 400 when empty or invalid |
-| `POST /workspaces/:wsId/import/:id` | manage | Registers a legacy assistant; 409 `orchestrator_exists` when another is registered |
+| `POST /workspaces/:wsId/import/:id` | manage | Registers a legacy assistant as another orchestrator |
 | `GET /workspaces/:wsId/orchestrators/:id/metrics?days=7\|30` | read | Delegated outcomes, the same fields as the `metrics` tool; 422 for other windows |
 | `GET /workspaces/:wsId/orchestrators/:id/proposals?status=pending\|all&limit=1..50` | read | `{"proposals": [...]}`, newest first |
 | `GET /workspaces/:wsId/orchestrators/:id/proposals/:proposalId` | read | One proposal |
@@ -44,8 +45,8 @@ dismissed proposal, or dismissing an approved one, returns 409
 `proposal_already_decided` with the current proposal. Approving while another
 approval of the same proposal is still creating its task returns 409
 `proposal_approval_in_progress` with the current proposal. An invalid edit or a
-failed create returns 422 and leaves the proposal pending. A workspace that
-already has several orchestrators from an earlier build keeps them all working.
+failed create returns 422 and leaves the proposal pending. Proposals belong to
+one orchestrator: its routes see only that orchestrator's proposals.
 
 ## Conversations
 

@@ -119,9 +119,6 @@ func (h *Handler) prepare(c *gin.Context, a *models.AgentInstance) (*configurati
 	return &req, err
 }
 func (h *Handler) create(c *gin.Context) {
-	if h.rejectExisting(c, "") {
-		return
-	}
 	a := &models.AgentInstance{WorkspaceID: c.Param("wsId"), Role: models.AgentRoleAssistant, Status: models.AgentStatusIdle, MaxConcurrentSessions: 1}
 	req, err := h.prepare(c, a)
 	if err != nil {
@@ -135,7 +132,7 @@ func (h *Handler) create(c *gin.Context) {
 	if err = h.persistConfiguration(c.Request.Context(), a, req, true); err != nil {
 		_ = h.Agents.DeleteAgentInstance(c.Request.Context(), a.ID)
 		_ = h.Registry.UnregisterOrchestrator(c.Request.Context(), a.ID)
-		h.failConfiguration(c, err)
+		fail(c, err)
 		return
 	}
 	h.respondDescribed(c, http.StatusCreated, a.ID)

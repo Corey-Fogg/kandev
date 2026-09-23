@@ -28,6 +28,7 @@ func TestPromptNamesTheOrchestratorAndItsSettings(t *testing.T) {
 	prompt, err := s.prompt(ctx, persona, task, "", nil)
 	require.NoError(t, err)
 	require.Contains(t, prompt, "Your name in this workspace: Jeb\n")
+	require.NotContains(t, prompt, "Other orchestrators in this workspace")
 	require.Contains(t, prompt, "Settings: ask before creating tasks=on; automatic source issue comment=on; automatic move of source issue to done on completion=off\n")
 
 	_, err = s.Repo.SetOrchestratorDisplayName(ctx, "chief", "")
@@ -103,4 +104,29 @@ func TestBrokerListsTheCallersProposals(t *testing.T) {
 	capabilities := runtimeRequest(t, router, "GET", "/api/v1/orchestration/runtime/capabilities?limit=100", token, run, nil)
 	require.Equal(t, 200, capabilities.Code)
 	require.Contains(t, capabilities.Body.String(), `"name":"task_proposals","description":"List your task proposals awaiting or after the user's decision, newest first.","effect":"read"`)
+}
+
+func TestPromptNamesTheWorkspacesOtherOrchestrators(t *testing.T) {
+	s, _, task := newRuntime(t)
+	ctx := context.Background()
+	s.Manager = &fakeTaskManager{}
+	registerSecondOrchestrator(t, s)
+	_, err := s.Repo.SetOrchestratorDisplayName(ctx, "second", "Val")
+	require.NoError(t, err)
+	persona, err := s.Personas.GetAgentInstance(ctx, "chief")
+	require.NoError(t, err)
+	prompt, err := s.prompt(ctx, persona, task, "", nil)
+	require.NoError(t, err)
+	require.Contains(t, prompt, "Your name in this workspace: Chief of staff\n")
+	require.Contains(t, prompt, "Other orchestrators in this workspace: Val. Each coordinates only the tasks it delegated; leave theirs to them.\n")
+}
+
+// registerSecondOrchestrator adds the orchestrator "second" to the runtime's workspace.
+func registerSecondOrchestrator(t *testing.T, s *Service) {
+	t.Helper()
+	ctx := context.Background()
+	second := &settings.AgentProfile{ID: "second", AgentID: "claude", WorkspaceID: "ws", Role: settings.AgentRoleAssistant, Status: settings.AgentStatusIdle,
+		Name: "Second", Settings: `{"routing":{"execution_profile_id":"personal"}}`}
+	require.NoError(t, s.Personas.Profiles.CreateAgentProfile(ctx, second))
+	require.NoError(t, s.Repo.RegisterOrchestrator(ctx, second.ID, "ws", "chief-of-staff"))
 }

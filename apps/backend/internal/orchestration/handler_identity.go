@@ -9,33 +9,6 @@ import (
 	"github.com/kandev/kandev/internal/orchestration/models"
 )
 
-const orchestratorIDKey = "orchestrator_id"
-
-// rejectExisting answers 409 when the workspace already has an orchestrator
-// other than selfID. A workspace has one orchestrator; legacy extras keep
-// working but no new one is added.
-func (h *Handler) rejectExisting(c *gin.Context, selfID string) bool {
-	ids, err := h.Registry.ListOrchestratorIDs(c.Request.Context(), c.Param("wsId"))
-	if err != nil {
-		fail(c, err)
-		return true
-	}
-	for _, id := range ids {
-		if id != selfID {
-			c.JSON(http.StatusConflict, gin.H{errorResponseKey: models.ErrOrchestratorExists.Error(), orchestratorIDKey: id})
-			return true
-		}
-	}
-	return false
-}
-
-// failConfiguration answers a failed registration.
-func (h *Handler) failConfiguration(c *gin.Context, err error) {
-	if !errors.Is(err, models.ErrOrchestratorExists) || !h.rejectExisting(c, "") {
-		fail(c, err)
-	}
-}
-
 // respondDescribed answers with the orchestrator as it is stored now.
 func (h *Handler) respondDescribed(c *gin.Context, status int, id string) {
 	a, err := h.Agents.GetAgentInstance(c.Request.Context(), id)

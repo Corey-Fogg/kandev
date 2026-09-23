@@ -92,6 +92,18 @@ func TestCompletionMovesTheIssueOnlyWhenEnabled(t *testing.T) {
 	}
 }
 
+func TestWriteBackUsesTheDelegatingOrchestratorsSettings(t *testing.T) {
+	s, db, _ := newRuntime(t)
+	writer := writeBackRuntime(t, s, db, false)
+	registerSecondOrchestrator(t, s)
+	require.NoError(t, s.Repo.SaveOrchestratorSettings(context.Background(), "second",
+		models.OrchestratorSettings{AutoCommentSource: true, AutoMoveSourceDone: true}))
+	s.Tasks.(*testTasks).tasks["sourced"].Metadata["orchestration_chief_id"] = "second"
+	changeState(t, s, "sourced", v1.TaskStateCompleted)
+	require.Len(t, writer.calls, 1)
+	require.Equal(t, models.SourceStateDone, writer.calls[0].State, "the owner's move setting applies, not the workspace's other orchestrator's")
+}
+
 func TestDisabledWriteBackRecordsStateWithoutPosting(t *testing.T) {
 	s, db, _ := newRuntime(t)
 	writer := writeBackRuntime(t, s, db, false)
