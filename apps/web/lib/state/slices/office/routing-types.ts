@@ -78,7 +78,6 @@ export type WorkspaceRouting = {
 };
 
 export type AgentRoutingOverrides = {
-  execution_profile_id?: string;
   provider_order_source?: "inherit" | "override" | "";
   provider_order?: string[];
   tier_source?: "inherit" | "override" | "";

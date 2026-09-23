@@ -1,6 +1,5 @@
 import type { ComponentType } from "react";
 import {
-  IconSitemap,
   IconActivity,
   IconArchive,
   IconBell,
@@ -21,6 +20,7 @@ import {
   IconRobot,
   IconShieldLock,
   IconTerminal2,
+  IconSitemap,
   IconUsers,
   IconWand,
 } from "@tabler/icons-react";

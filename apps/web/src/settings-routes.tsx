@@ -1,7 +1,4 @@
-import { OrchestrationRolesPage } from "@/app/settings/orchestration/roles-page";
-import { OrchestratorsPage } from "@/app/settings/orchestration/orchestrators-page";
-import { OrchestratorEditor } from "@/app/settings/orchestration/orchestrator-editor";
-import { WorkspaceAgentsPage } from "@/app/settings/workspace/agents/workspace-agents-page";
+/* eslint-disable max-lines -- the settings route table and its dispatch remain one boundary */
 import { useEffect, useRef, type ReactNode } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
@@ -111,6 +108,7 @@ import { toAgentProfileOption } from "@/lib/state/slices/settings/types";
 import type { ListWorkspacesResponse, UserSettingsResponse } from "@/lib/types/http";
 import type { LicenseEntry } from "@/lib/types/system";
 import { renderIntegrationSettingsRoute } from "./integration-settings-route";
+import { renderOrchestrationSettingsRoute } from "./orchestration-settings-routes";
 import {
   WorkspaceRepositoriesRoute,
   WorkspaceWorkflowsRoute,
@@ -286,7 +284,8 @@ export function settingsRouteKey(pathname: string): string {
 }
 
 export function renderSettingsRoute(pathname: string) {
-  if (pathname === "/settings/orchestration") return <OrchestrationRolesPage />;
+  const orchestrationRoute = renderOrchestrationSettingsRoute(pathname);
+  if (orchestrationRoute) return orchestrationRoute;
   const dynamicRoute = renderDynamicSettingsRoute(pathname);
   if (dynamicRoute) return dynamicRoute;
   const staticRoute = SETTINGS_ROUTES[pathname]?.();
@@ -400,10 +399,9 @@ function renderExecutorSettingsRoute(pathname: string): ReactNode {
 // chain: the nested version pushed the enclosing matcher over both the
 // cyclomatic and cognitive complexity limits.
 // Keep in step with the alternation in the sub-page pattern below.
-type WorkspaceSubpageSection = "agents" | "repositories" | "workflows" | "automations" | "secrets";
+type WorkspaceSubpageSection = "repositories" | "workflows" | "automations" | "secrets";
 
 const WORKSPACE_SUBPAGE_PAGES: Record<WorkspaceSubpageSection, (id: string) => ReactNode> = {
-  agents: (id) => <WorkspaceAgentsPage workspaceId={id} />,
   repositories: (id) => <WorkspaceRepositoriesRoute workspaceId={id} />,
   workflows: (id) => <WorkspaceWorkflowsRoute workspaceId={id} />,
   automations: (id) => <AutomationsPage workspaceId={id} />,
@@ -438,20 +436,6 @@ function renderWorkspaceAutomationRoute(id: string, automationId: string): React
 }
 
 function renderWorkspaceSettingsRoute(pathname: string): ReactNode {
-  const orchestration = pathname.match(
-    /^\/settings\/workspaces\/([^/]+)\/orchestration(?:\/([^/]+))?$/,
-  );
-  if (orchestration)
-    return (
-      <WorkspaceSettingsShell workspaceId={orchestration[1]} activeTab="orchestration">
-        {orchestration[2] ? (
-          <OrchestratorEditor workspaceId={orchestration[1]} id={orchestration[2]} />
-        ) : (
-          <OrchestratorsPage workspaceId={orchestration[1]} />
-        )}
-      </WorkspaceSettingsShell>
-    );
-
   // Legacy /settings/workspace/<id>... paths forward to /settings/workspaces/<id>...
   if (pathname.startsWith("/settings/workspace/")) {
     return (
@@ -478,7 +462,7 @@ function renderWorkspaceSettingsRoute(pathname: string): ReactNode {
 
   const workspaceSubpage = matchDouble(
     pathname,
-    /^\/settings\/workspaces\/([^/]+)\/(agents|repositories|workflows|automations|secrets)$/,
+    /^\/settings\/workspaces\/([^/]+)\/(repositories|workflows|automations|secrets)$/,
   );
   if (workspaceSubpage) {
     const [id, section] = workspaceSubpage;

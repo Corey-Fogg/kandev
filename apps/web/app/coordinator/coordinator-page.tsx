@@ -50,7 +50,7 @@ function CoordinatorWorkspacePage({ workspaceId }: { workspaceId: string }) {
     );
   return <CoordinatorContent catalog={data} />;
 }
-export function CoordinatorContent({ catalog }: { catalog: CoordinatorWorkspace }) {
+function CoordinatorContent({ catalog }: { catalog: CoordinatorWorkspace }) {
   const { t } = useTranslation();
   const { requested, selected, choose } = useCoordinatorSelection(catalog);
   const { isMobile } = useResponsiveBreakpoint();
@@ -111,7 +111,11 @@ export function CoordinatorContent({ catalog }: { catalog: CoordinatorWorkspace 
           hidden={isMobile ? tab !== "chat" : !showChat}
           className="min-h-0 min-w-0 flex-1 flex flex-col [&[hidden]]:hidden"
         >
-          <CoordinatorChat catalog={catalog} selected={selected} />
+          <CoordinatorChat
+            catalog={catalog}
+            selected={selected}
+            visible={isMobile ? tab === "chat" : showChat}
+          />
         </div>
         <aside
           id="coordinator-panel-tasks"
@@ -126,4 +130,3 @@ export function CoordinatorContent({ catalog }: { catalog: CoordinatorWorkspace 
     </div>
   );
 }
-export { resolveCoordinatorSelection } from "./use-coordinator-selection";

@@ -148,3 +148,55 @@ describe("coordinator scope recovery", () => {
     view.dispose();
   });
 });
+
+describe("coordinator task list updates", () => {
+  it("keeps the current rows visible while a new filter is read", async () => {
+    const pending = deferred();
+    const load = vi
+      .fn()
+      .mockResolvedValueOnce(page([row("a"), row("b")]))
+      .mockReturnValueOnce(pending.promise);
+    const view = new CoordinatorTaskObservation("ws", {}, load);
+    view.setFilters({ query: "" });
+    await vi.waitFor(() => expect(view.getSnapshot().tasks).toHaveLength(2));
+    view.setFilters({ query: "" });
+    expect(load).toHaveBeenCalledTimes(1);
+    view.setFilters({ query: "a" });
+    expect(view.getSnapshot().tasks).toHaveLength(2);
+    expect(load.mock.calls[1][1]).toMatchObject({ query: "a", page: 1 });
+    pending.resolve(page([row("a")]));
+    await vi.waitFor(() => expect(view.getSnapshot().tasks).toHaveLength(1));
+    view.dispose();
+  });
+
+  it("commits a read that raced a lifecycle event, then reads once more", async () => {
+    vi.useFakeTimers();
+    const pending = deferred();
+    const load = vi
+      .fn()
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValueOnce(page([row("a", 2), row("b")]));
+    const view = new CoordinatorTaskObservation("ws", {}, load);
+    const request = view.refresh();
+    view.lifecycle({ task_id: "b", workspace_id: "ws" });
+    pending.resolve(page([row("a")]));
+    await request;
+    expect(view.getSnapshot().tasks.map((task) => task.id)).toEqual(["a"]);
+    await vi.advanceTimersByTimeAsync(250);
+    expect(view.getSnapshot().tasks.map((task) => task.id)).toEqual(["a", "b"]);
+    view.dispose();
+    vi.useRealTimers();
+  });
+
+  it("keeps complete coverage when a loaded task is deleted", async () => {
+    const view = new CoordinatorTaskObservation(
+      "ws",
+      {},
+      vi.fn().mockResolvedValue(page([row("a"), row("b")])),
+    );
+    await view.refresh();
+    view.lifecycle({ task_id: "a", workspace_id: "ws" }, true);
+    expect(view.getSnapshot()).toMatchObject({ complete: true, total: 1 });
+    view.dispose();
+  });
+});

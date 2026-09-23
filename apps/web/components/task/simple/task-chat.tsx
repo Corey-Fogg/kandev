@@ -1,12 +1,10 @@
 "use client";
 /* eslint-disable max-lines -- this component owns the chat timeline and composer composition. */
-import { CommentDraftContext } from "./comment-draft-context";
-import { ChatIdentityContext, PersonaIdentityContext } from "./persona-identity-context";
 
 import { useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { toast } from "@/lib/toast/sonner";
 import { IconCode, IconChevronDown, IconSend, IconPaperclip, IconUser } from "@tabler/icons-react";
-import { AgentAvatar } from "@/components/shared/agent-avatar";
+import { AgentAvatar } from "@/app/office/components/agent-avatar";
 import { Button } from "@kandev/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@kandev/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@kandev/ui/collapsible";
@@ -16,22 +14,25 @@ import { PromptResultRecovery } from "@/components/prompt-result-recovery";
 import { usePromptResultDelivery } from "@/hooks/use-prompt-result-delivery";
 import { useUtilityAgentGenerator } from "@/hooks/use-utility-agent-generator";
 import { useChatMotion } from "@/hooks/use-chat-motion";
-import { CommentTransportContext } from "./comment-transport";
+import { useAppStore } from "@/components/state-provider";
+import { selectCommandCount } from "@/lib/state/slices/session/selectors";
 import { formatRelativeTime } from "@/lib/utils";
 import { MarkdownComment } from "./markdown-comment";
 import { AgentTurnPanel } from "./components/agent-turn-panel";
 import { RunErrorEntry } from "./components/run-error-entry";
 import { UserCommentRunBadge } from "./components/user-comment-run-badge";
-import { useTaskChatAutoScroll } from "@/hooks/domains/task/use-task-chat-auto-scroll";
 import { buildCommentTurnContext, type CommentTurnContext } from "./turn-context";
 import { groupSessionsForTimeline, groupSortKey, type SessionGroup } from "./session-groups";
 import { synchronizeInputValue } from "./synchronize-input-value";
+import { useAgentIdentity } from "./chat-identity-context";
+import { CommentDraftContext } from "./comment-draft-context";
+import { CommentTransportContext } from "./comment-transport";
 import type {
   TaskComment,
   TaskDecision,
   TaskSession,
   TimelineEvent,
-} from "@/components/task/simple/types";
+} from "@/app/office/tasks/[id]/types";
 import {
   buildLaterAgentReplyMap,
   buildRunErrorsFromSessions,
@@ -45,6 +46,7 @@ import { useTranslation } from "react-i18next";
 import { DecisionTimelineEntry, TimelineEntry } from "./task-chat-timeline-entries";
 
 const MAX_INLINE_SESSIONS = 50;
+const AUTOSCROLL_THRESHOLD_PX = 80;
 // A catalog key, not copy: `t()` at module scope would freeze at the boot locale.
 const PROMPT_INSERTED_MESSAGE_KEY = "task:enhancedPromptInserted";
 
@@ -88,18 +90,6 @@ function formatDuration(ms: number): string {
   return `${minutes}m ${remaining}s`;
 }
 
-function useCommentIdentity(comment: TaskComment) {
-  const { t } = useTranslation();
-  const isAgent = comment.authorType === "agent";
-  const identities = useContext(ChatIdentityContext);
-  const resolvedAgentName = identities[comment.authorId] || comment.authorName || t("task:agent");
-  const persona = useContext(PersonaIdentityContext);
-  const identity = isAgent && persona?.id === comment.authorId ? persona : null;
-  const userName = comment.source === "automation" ? t("automations:automation") : t("task:you");
-  const displayName = isAgent ? (identity?.name ?? resolvedAgentName) : userName;
-  return { displayName, identity };
-}
-
 function CommentEntry({
   comment,
   taskId,
@@ -113,14 +103,18 @@ function CommentEntry({
 }) {
   const { t } = useTranslation();
   const isAgent = comment.authorType === "agent";
-  const { displayName, identity } = useCommentIdentity(comment);
+  // Backend session-bridged comments don't carry a name; the mapper leaves
+  // authorName empty for agents.
+  const agent = useAgentIdentity(comment.authorId, comment.authorName);
+  const userName = comment.source === "automation" ? t("automations:automation") : t("task:you");
+  const displayName = isAgent ? agent.name : userName;
   return (
     <div
       id={`comment-${comment.id}`}
       className="flex gap-3 py-3 border-b border-border/50 scroll-mt-16"
     >
       {isAgent ? (
-        <AgentAvatar name={displayName} icon={identity?.icon} size="md" />
+        <AgentAvatar name={displayName} icon={agent.icon} size="md" />
       ) : (
         <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center shrink-0">
           <IconUser className="h-4 w-4 text-muted-foreground" />
@@ -343,61 +337,12 @@ function CommentComposerFooter({
   );
 }
 
-function ComposerResizeHandle({
-  height,
-  onHeightChange,
-}: {
-  height: number;
-  onHeightChange: (height: number) => void;
-}) {
-  const { t } = useTranslation();
-  const resizeStartRef = useRef<{ y: number; height: number } | undefined>(undefined);
-  const handleResizeStart = useCallback(
-    (event: React.PointerEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      event.currentTarget.setPointerCapture(event.pointerId);
-      resizeStartRef.current = { y: event.clientY, height };
-    },
-    [height],
-  );
-  const handleResizeMove = useCallback(
-    (event: React.PointerEvent<HTMLDivElement>) => {
-      const start = resizeStartRef.current;
-      if (!start) return;
-      onHeightChange(Math.min(420, Math.max(96, start.height + start.y - event.clientY)));
-    },
-    [onHeightChange],
-  );
-  const handleResizeEnd = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    resizeStartRef.current = undefined;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  }, []);
-
-  return (
-    <div
-      role="separator"
-      aria-orientation="horizontal"
-      aria-label={t("task:resizeCommentComposer", "Resize comment composer")}
-      className="group flex h-4 cursor-row-resize touch-none items-center justify-center"
-      onPointerDown={handleResizeStart}
-      onPointerMove={handleResizeMove}
-      onPointerUp={handleResizeEnd}
-      onPointerCancel={handleResizeEnd}
-    >
-      <span className="h-1 w-16 rounded-full bg-border transition-colors group-hover:bg-primary group-active:bg-primary" />
-    </div>
-  );
-}
-
 function ChatInput({ taskId, taskTitle, taskDescription, onSubmitted }: ChatInputProps) {
-  const createComment = useContext(CommentTransportContext);
   const { t } = useTranslation();
+  const createComment = useContext(CommentTransportContext);
   const drafts = useContext(CommentDraftContext);
   const [input, setInput] = useState(() => drafts?.get(taskId) ?? "");
   const [submitting, setSubmitting] = useState(false);
-  const [composerHeight, setComposerHeight] = useState(128);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputValueRef = useRef(input);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -453,12 +398,8 @@ function ChatInput({ taskId, taskTitle, taskDescription, onSubmitted }: ChatInpu
   }, [enhancePrompt, promptDelivery, t]);
 
   return (
-    <div className="mt-4 pt-2 border-t border-border">
-      <ComposerResizeHandle height={composerHeight} onHeightChange={setComposerHeight} />
-      <div
-        className="flex flex-col rounded-md border bg-muted/30 focus-within:ring-1 focus-within:ring-ring"
-        style={{ height: composerHeight }}
-      >
+    <div className="mt-4 pt-4 border-t border-border">
+      <div className="rounded-md border bg-muted/30 focus-within:ring-1 focus-within:ring-ring">
         <textarea
           ref={textareaRef}
           value={input}
@@ -471,9 +412,8 @@ function ChatInput({ taskId, taskTitle, taskDescription, onSubmitted }: ChatInpu
           }}
           onPaste={handlePaste}
           placeholder={t("task:addAComment")}
-          rows={3}
-          aria-label={t("task:addAComment")}
-          className="min-h-0 flex-1 w-full bg-transparent px-3 py-2 text-sm outline-none resize-none"
+          rows={2}
+          className="w-full bg-transparent px-3 py-2 text-sm outline-none resize-none"
         />
         <CommentComposerFooter
           fileInputRef={fileInputRef}
@@ -491,6 +431,89 @@ function ChatInput({ taskId, taskTitle, taskDescription, onSubmitted }: ChatInpu
       </div>
     </div>
   );
+}
+
+function isAtBottom(scrollParent: HTMLElement | null): boolean {
+  if (!scrollParent) return true; // window scroll case — be conservative.
+  const remaining = scrollParent.scrollHeight - scrollParent.scrollTop - scrollParent.clientHeight;
+  return remaining <= AUTOSCROLL_THRESHOLD_PX;
+}
+
+function scrollToBottom(scrollParent: HTMLElement | null): void {
+  if (!scrollParent) return;
+  scrollParent.scrollTop = scrollParent.scrollHeight;
+}
+
+/**
+ * Auto-scroll the chat container to the bottom when new content arrives,
+ * but only if the user was already near the bottom (within ~80px) at the
+ * time of the change.
+ *
+ * Triggers on:
+ *   - opening or switching conversations (unless linking to a comment)
+ *   - comments arriving, including history loaded after mount
+ *   - a new active session entry first appearing (active count grows)
+ *   - new messages arriving in any session for this task
+ *
+ * Uses a scroll listener to track the user's "at-bottom" intent. Reads
+ * the latest value before scrolling so we never yank focus from a user
+ * who has scrolled up.
+ */
+export function useChatAutoScroll(
+  scrollParent: HTMLElement | null,
+  sessions: TaskSession[],
+  taskId: string,
+  commentCount: number,
+): void {
+  const activeSessionCount = sessions.filter(
+    (s) => s.state === "RUNNING" || s.state === "WAITING_FOR_INPUT",
+  ).length;
+
+  // Sum messages + command counts across all task sessions — single scalar
+  // that grows whenever new content streams in.
+  const totalContentSignal = useAppStore((s) => {
+    let sum = 0;
+    for (const session of sessions) {
+      sum += s.messages.bySession[session.id]?.length ?? 0;
+      sum += selectCommandCount(s, session.id);
+    }
+    return sum;
+  });
+
+  const wasAtBottomRef = useRef(true);
+
+  useEffect(() => {
+    if (!scrollParent) return;
+    // A newly opened conversation follows the latest messages. Its initial
+    // scrollTop is a browser default, not an intent to read older history.
+    wasAtBottomRef.current = !window.location.hash.startsWith("#comment-");
+    if (wasAtBottomRef.current) scrollToBottom(scrollParent);
+    const handler = () => {
+      if (scrollParent.clientHeight > 0) wasAtBottomRef.current = isAtBottom(scrollParent);
+    };
+    // A hidden tab can mount the conversation before its container has a size.
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(() => {
+            if (wasAtBottomRef.current && scrollParent.clientHeight > 0)
+              scrollToBottom(scrollParent);
+          });
+    observer?.observe(scrollParent);
+    scrollParent.addEventListener("scroll", handler, { passive: true });
+    return () => {
+      observer?.disconnect();
+      scrollParent.removeEventListener("scroll", handler);
+    };
+  }, [scrollParent, taskId]);
+
+  useEffect(() => {
+    if (wasAtBottomRef.current) {
+      scrollToBottom(scrollParent);
+      // After programmatic scroll, we are still "at bottom" by definition.
+      wasAtBottomRef.current = true;
+    }
+  }, [scrollParent, activeSessionCount, totalContentSignal, taskId, commentCount]);
 }
 
 /**
@@ -626,7 +649,7 @@ export function TaskChat({
     [comments, timeline, renderedGroups, decisions, turnCtx, runErrors, laterAgentReplyMap],
   );
 
-  useTaskChatAutoScroll(scrollParent ?? null, sessions, taskId, comments.length);
+  useChatAutoScroll(scrollParent ?? null, sessions, taskId, comments.length);
   useCommentHashScroll(comments);
 
   const showOlderToggle = olderGroups.length > 0 && !showOlder;

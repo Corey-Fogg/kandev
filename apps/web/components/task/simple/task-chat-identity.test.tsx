@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { StateProvider } from "@/components/state-provider";
-import { ChatIdentityContext, PersonaIdentityContext } from "./persona-identity-context";
+import { ChatIdentityContext } from "./chat-identity-context";
 import { ActiveSessionRefProvider } from "./components/active-session-ref-context";
 
 vi.mock("@/components/toast-provider", () => ({ useToast: () => ({ toast: vi.fn() }) }));
@@ -29,7 +29,7 @@ function wrap(children: ReactNode) {
   );
 }
 
-it("resolves feature-provided agent names and prefers the current persona identity", () => {
+it("renders agent entries as the conversation persona once it is known", () => {
   const comment = {
     id: "identity",
     taskId: "task-1",
@@ -41,17 +41,15 @@ it("resolves feature-provided agent names and prefers the current persona identi
   };
   const view = (name: string | null) =>
     wrap(
-      <ChatIdentityContext.Provider value={{ chief: "Office assistant" }}>
-        <PersonaIdentityContext.Provider value={name ? { id: "chief", name } : null}>
-          <TaskChat taskId="task-1" comments={[comment]} sessions={[]} readOnly />
-        </PersonaIdentityContext.Provider>
+      <ChatIdentityContext.Provider value={{ persona: name ? { id: "chief", name } : null }}>
+        <TaskChat taskId="task-1" comments={[comment]} sessions={[]} readOnly />
       </ChatIdentityContext.Provider>,
     );
   const { rerender } = render(view(null));
-  expect(screen.getByText("Office assistant")).not.toBeNull();
+  expect(screen.getByText("Agent")).not.toBeNull();
   rerender(view("Chief of staff"));
   expect(screen.getByText("Chief of staff")).not.toBeNull();
-  expect(screen.queryByText("Office assistant")).toBeNull();
+  expect(screen.queryByText("Agent")).toBeNull();
 });
 
 import { CommentDraftContext } from "./comment-draft-context";

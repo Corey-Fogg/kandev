@@ -10,7 +10,6 @@ test("mobile coordinator uses touch tabs, one pane, retained drafts and native t
 }) => {
   await backend.restart({
     KANDEV_FEATURES_ORCHESTRATION: "true",
-    KANDEV_FEATURES_PERSONAL_ASSISTANT: "false",
     KANDEV_FEATURES_OFFICE: "false",
   });
   const ws = seedData.workspaceId;

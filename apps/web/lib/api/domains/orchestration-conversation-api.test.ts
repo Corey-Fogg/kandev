@@ -1,6 +1,6 @@
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  getConversationComments,
+  createConversationSender,
   getConversationCommentPage,
   postConversationComment,
   retryConversation,
@@ -28,7 +28,7 @@ it("uses independent endpoints and preserves comment run state", async () => {
     ),
   );
   vi.stubGlobal("fetch", fetcher);
-  const rows = await getConversationComments("t");
+  const { comments: rows } = await getConversationCommentPage("t");
   expect(rows[0]).toMatchObject({
     content: "Finished",
     authorId: "chief",
@@ -71,8 +71,40 @@ it("shows an accepted user message as queued before a run exists", async () => {
 
   const page = await getConversationCommentPage("t");
 
-  expect(page.comments[0]).toMatchObject({
-    receiptStatus: "accepted",
-    runStatus: "queued",
+  expect(page.comments[0]).toMatchObject({ runStatus: "queued" });
+});
+
+describe("conversation sender", () => {
+  const sentIds = (fetcher: ReturnType<typeof vi.fn>) =>
+    fetcher.mock.calls.map((call) => JSON.parse(String(call[1]?.body)).client_message_id);
+
+  it("reuses one client_message_id when the same message is retried", async () => {
+    const fetcher = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("network down"))
+      .mockImplementation(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetcher);
+    const send = createConversationSender("t");
+    await expect(send("t", { body: "Hello", author_type: "user" })).rejects.toThrow();
+    await send("t", { body: "Hello", author_type: "user" });
+    await send("t", { body: "Next", author_type: "user" });
+    const [first, retry, next] = sentIds(fetcher);
+    expect(first).toBeTruthy();
+    expect(retry).toBe(first);
+    expect(next).not.toBe(first);
+  });
+
+  it("joins a duplicate submit and refuses a different message while one is in flight", async () => {
+    let release!: (response: Response) => void;
+    const fetcher = vi.fn(() => new Promise<Response>((resolve) => (release = resolve)));
+    vi.stubGlobal("fetch", fetcher);
+    const send = createConversationSender("t");
+    const first = send("t", { body: "Hello", author_type: "user" });
+    const duplicate = send("t", { body: "Hello", author_type: "user" });
+    await expect(send("t", { body: "Other", author_type: "user" })).rejects.toThrow();
+    await expect(send("other", { body: "Hello", author_type: "user" })).rejects.toThrow();
+    release(new Response("{}", { status: 200 }));
+    await Promise.all([first, duplicate]);
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 });

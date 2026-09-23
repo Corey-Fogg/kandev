@@ -10,7 +10,7 @@ import {
 } from "@/lib/types/http";
 import { TopbarWorkingIndicator } from "./topbar-working-indicator";
 import { ActiveSessionRefProvider, useActiveSessionRef } from "./active-session-ref-context";
-import type { TaskComment } from "../types";
+import type { TaskComment } from "@/app/office/tasks/[id]/types";
 
 afterEach(() => cleanup());
 

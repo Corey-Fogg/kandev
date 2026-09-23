@@ -39,11 +39,8 @@ import {
 } from "@/components/plugins/plugin-error-boundary";
 import { PluginPageFrame } from "@/components/plugins/plugin-page";
 import { safeDecodePathSegment } from "@/lib/routing/path";
-import { readTaskId } from "./spa-routing";
 import {
   mapWorkspaceItem,
-  mapWorkflowItem,
-  firstKnownWorkspaceId,
   promoteLegacyWorkspaceSelection,
   readActiveWorkspaceCookie,
 } from "@/lib/routing/route-bootstrap";
@@ -67,9 +64,12 @@ import { NeedsYouInboxRoute } from "./needs-you-inbox-route";
 import { AuthRouteRedirect, RouteLoading } from "./spa-route-chrome";
 import { NEEDS_YOU_INBOX_HREF } from "@/lib/navigation/needs-you-inbox-destination";
 import { generateUUID } from "@/lib/utils";
-import { AssistantPage } from "@/app/assistant/assistant-page";
-import { CoordinatorPage } from "@/app/coordinator/coordinator-page";
-import { OrchestrationConversationRoute } from "@/app/settings/orchestration/conversation-route";
+import {
+  isOrchestrationRoute,
+  OrchestrationRoute,
+  resolveOrchestrationRoute,
+  type OrchestrationSpaRoute,
+} from "./orchestration-routes";
 
 const OfficeRoutes = lazy(() =>
   import("./office-routes").then((mod) => ({ default: mod.OfficeRoutes })),
@@ -117,9 +117,7 @@ type SpaRoute =
   | { kind: "needsYouInbox" }
   | { kind: "settings"; pathname: string }
   | { kind: "office"; pathname: string }
-  | { kind: "orchestrationConversation"; taskId: string }
-  | { kind: "coordinator"; workspaceId: string }
-  | { kind: "assistant" }
+  | OrchestrationSpaRoute
   | { kind: "plugin"; path: string }
   | { kind: "login" }
   | { kind: "setup" }
@@ -284,25 +282,13 @@ function resolveTopLevelRoute(normalized: string, searchParams: URLSearchParams)
 }
 
 function resolveNestedRoute(normalized: string): SpaRoute | null {
-  if (normalized === "/assistant") return { kind: "assistant" };
-  const coordinator = normalized.match(/^\/workspaces\/([^/]+)\/coordinator$/);
-  if (coordinator) {
-    const workspaceId = safeDecodePathSegment(coordinator[1]);
-    if (workspaceId) return { kind: "coordinator", workspaceId };
-  }
   if (normalized === "/settings" || normalized.startsWith("/settings/")) {
     return { kind: "settings", pathname: normalized };
-  }
-  if (normalized.startsWith("/workspace/conversations/")) {
-    return {
-      kind: "orchestrationConversation",
-      taskId: normalized.slice("/workspace/conversations/".length),
-    };
   }
   if (normalized === "/office" || normalized.startsWith("/office/")) {
     return { kind: "office", pathname: normalized };
   }
-  return null;
+  return resolveOrchestrationRoute(normalized);
 }
 
 function resolveKanbanRoute(searchParams: URLSearchParams): SpaRoute {
@@ -313,12 +299,6 @@ function resolveKanbanRoute(searchParams: URLSearchParams): SpaRoute {
     taskId: searchParams.get("taskId") ?? undefined,
     sessionId: searchParams.get("sessionId") ?? undefined,
   };
-}
-
-function isAuthRoute(
-  route: SpaRoute,
-): route is Extract<SpaRoute, { kind: "login" | "setup" | "invite" }> {
-  return route.kind === "login" || route.kind === "setup" || route.kind === "invite";
 }
 
 export function SpaRoutes({ routeData }: { routeData?: BootRouteData }) {
@@ -334,14 +314,18 @@ export function SpaRoutes({ routeData }: { routeData?: BootRouteData }) {
   // Reaching /login, /setup, or /invite here means the pre-auth gate in
   // main.tsx already decided the app shell should render (authenticated, or
   // auth disabled) — those paths are stale, so bounce to the kanban home.
-  if (isAuthRoute(route)) return <AuthRouteRedirect />;
+  if (route.kind === "login" || route.kind === "setup" || route.kind === "invite") {
+    return <AuthRouteRedirect />;
+  }
   if (route.kind === "canvas" || route.kind === "canvasSettings") {
     return <CanvasRoute route={route} enabled={canvasesEnabled} />;
   }
   if (route.kind === "needsYouInbox") {
     return <NeedsYouInboxRoute enabled={needsYouInboxEnabled} />;
   }
-  if (route.kind === "plugin") return <PluginRoute path={route.path} />;
+  if (route.kind === "plugin") {
+    return <PluginRoute path={route.path} />;
+  }
   if (route.kind === "kanban") {
     return <KanbanRoute route={route} fallback={<RouteLoading routeNameKey="sidebar:home" />} />;
   }
@@ -371,8 +355,7 @@ export function SpaRoutes({ routeData }: { routeData?: BootRouteData }) {
       </Suspense>
     );
   }
-  const orchestration = renderOrchestrationRoute(route);
-  if (orchestration) return orchestration;
+  if (isOrchestrationRoute(route)) return <OrchestrationRoute route={route} />;
   if (route.kind === "office") {
     return (
       <Suspense fallback={<RouteLoading routeNameKey="sidebar:office" />}>
@@ -741,15 +724,38 @@ function listWorkspaceWorkflowSteps(workspaceId: string) {
   });
 }
 
+function firstKnownWorkspaceId(...ids: (string | null | undefined)[]): string | null {
+  for (const id of ids) {
+    const value = id?.trim();
+    if (value) return value;
+  }
+  return null;
+}
+
+function mapWorkflowItem(workflow: Workflow) {
+  return {
+    id: workflow.id,
+    workspaceId: workflow.workspace_id,
+    name: workflow.name,
+    description: workflow.description ?? null,
+    sortOrder: workflow.sort_order ?? 0,
+    ...(workflow.agent_profile_id ? { agent_profile_id: workflow.agent_profile_id } : {}),
+    ...(workflow.hidden !== undefined ? { hidden: workflow.hidden } : {}),
+    ...(workflow.style !== undefined ? { style: workflow.style } : {}),
+  };
+}
+
 function normalizePath(pathname: string): string {
   if (!pathname || pathname === "/") return "/";
   return pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
 }
 
-function renderOrchestrationRoute(route: SpaRoute) {
-  if (route.kind === "assistant") return <AssistantPage />;
-  if (route.kind === "coordinator") return <CoordinatorPage workspaceId={route.workspaceId} />;
-  if (route.kind === "orchestrationConversation")
-    return <OrchestrationConversationRoute taskId={route.taskId} />;
-  return null;
+function readTaskId(pathname: string): string | undefined {
+  for (const prefix of ["/t/", "/tasks/"]) {
+    if (!pathname.startsWith(prefix)) continue;
+    const suffix = pathname.slice(prefix.length);
+    if (!suffix || suffix.includes("/")) return undefined;
+    return decodeURIComponent(suffix);
+  }
+  return undefined;
 }

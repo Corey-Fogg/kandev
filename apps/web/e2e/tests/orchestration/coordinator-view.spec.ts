@@ -10,7 +10,6 @@ test("coordinator overview joins canonical tasks and persistent chat without sta
 }) => {
   await backend.restart({
     KANDEV_FEATURES_ORCHESTRATION: "true",
-    KANDEV_FEATURES_PERSONAL_ASSISTANT: "false",
     KANDEV_FEATURES_OFFICE: "false",
   });
   await page.setViewportSize({ width: 1440, height: 1000 });

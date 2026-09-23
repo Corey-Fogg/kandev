@@ -1,29 +1,44 @@
 import { IconSitemap } from "@tabler/icons-react";
 import { useTranslation } from "react-i18next";
+import { useAppStore } from "@/components/state-provider";
 import { coordinatorHref } from "@/lib/api/domains/orchestration-api";
+import { selectCoordinatedPendingInputCount } from "@/lib/orchestration/coordinated-pending-input";
 import { useRouter } from "@/lib/routing/client-router";
-import { useKanbanOnboardingComplete } from "@/hooks/use-kanban-onboarding-complete";
-import { useWorkspaceOrchestrators } from "@/hooks/domains/orchestration/use-orchestrator-conversation";
 import { AppSidebarNavItem } from "./app-sidebar-nav-item";
 
-type NavProps = { workspaceId: string; collapsed: boolean; onNavigate?: () => void };
-export function OrchestrationNav({ workspaceId, collapsed, onNavigate }: NavProps) {
+type NavProps = { collapsed?: boolean; onNavigate?: () => void };
+
+/** The active workspace's Coordinator entry, shown only while orchestration is enabled. */
+export function OrchestrationNav({ collapsed = false, onNavigate }: NavProps) {
+  const enabled = useAppStore((s) => s.features.orchestration);
+  const workspaceId = useAppStore((s) => s.workspaces.activeId);
+  if (!enabled || !workspaceId) return null;
+  return (
+    <CoordinatorLink workspaceId={workspaceId} collapsed={collapsed} onNavigate={onNavigate} />
+  );
+}
+
+function CoordinatorLink({
+  workspaceId,
+  collapsed,
+  onNavigate,
+}: NavProps & { workspaceId: string; collapsed: boolean }) {
   const { t } = useTranslation();
   const router = useRouter();
-  const onboarded = useKanbanOnboardingComplete();
-  const { data } = useWorkspaceOrchestrators(workspaceId);
-  if (!onboarded && !data?.orchestrators.length) return null;
+  const pendingInput = useAppStore(selectCoordinatedPendingInputCount);
+  const href = coordinatorHref(workspaceId);
   return (
     <div data-testid="workspace-orchestration-nav">
       <AppSidebarNavItem
         icon={IconSitemap}
         label={t("orchestration:coordinator")}
-        href={coordinatorHref(workspaceId)}
+        href={href}
         collapsed={collapsed}
+        badge={pendingInput}
         onClick={
           onNavigate
             ? () => {
-                router.push(coordinatorHref(workspaceId));
+                router.push(href);
                 onNavigate();
               }
             : undefined

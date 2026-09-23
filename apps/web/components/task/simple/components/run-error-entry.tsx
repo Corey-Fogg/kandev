@@ -2,8 +2,6 @@
 
 import { useContext, useState } from "react";
 import { toast } from "@/lib/toast/sonner";
-import { ChatIdentityContext, PersonaIdentityContext } from "../persona-identity-context";
-import { RecoveryTransportContext } from "../recovery-transport";
 import {
   IconAlertTriangle,
   IconChevronDown,
@@ -13,7 +11,7 @@ import {
 import { Button } from "@kandev/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@kandev/ui/collapsible";
 import { formatRelativeTime } from "@/lib/utils";
-import { AgentAvatar } from "@/components/shared/agent-avatar";
+import { AgentAvatar } from "@/app/office/components/agent-avatar";
 import { RemediationLink } from "@/components/task/remediation-link";
 import {
   EnsureSessionErrorBanner,
@@ -24,8 +22,10 @@ import type {
   BranchRecoveryDetails,
   SessionRecoveryAction,
 } from "@/lib/services/session-recovery-service";
-import type { RunError } from "@/components/task/simple/types";
+import type { RunError } from "@/app/office/tasks/[id]/types";
 import type { TaskRepository } from "@/lib/types/http";
+import { useAgentIdentity } from "../chat-identity-context";
+import { RecoveryTransportContext } from "../recovery-transport";
 import { ManagedRuntimeNpmRunError } from "./managed-runtime-npm-run-error";
 import { isLaunchErrorCategory, TaskLaunchErrorEntry } from "./task-launch-error-entry";
 import { useTranslation } from "react-i18next";
@@ -258,6 +258,52 @@ function LegacyRunErrorEntry({
   );
 }
 
+/** A failed conversation turn, retried through the surface's own recovery endpoint. */
+function ConversationRunErrorEntry({
+  taskId,
+  workspaceId,
+  agentName,
+  error,
+  recover,
+}: {
+  taskId: string;
+  workspaceId: string;
+  agentName: string;
+  error: RunError;
+  recover: NonNullable<React.ContextType<typeof RecoveryTransportContext>>;
+}) {
+  const [busyAction, setBusyAction] = useState<SessionRecoveryAction | null>(null);
+  const recoverConversation = async (action: SessionRecoveryAction): Promise<boolean> => {
+    if (action !== "resume" && action !== "fresh_start") return false;
+    setBusyAction(action);
+    try {
+      await recover(taskId, error.sessionId, action);
+      return true;
+    } catch (cause) {
+      toast.error(String(cause));
+      return false;
+    } finally {
+      setBusyAction(null);
+    }
+  };
+  return (
+    <LegacyRunErrorEntry
+      agentName={agentName}
+      error={error}
+      isActive={error.isActive !== false}
+      onRecover={recoverConversation}
+      onRetry={() => void recoverConversation("resume")}
+      onRestore={() => {}}
+      onNewBranch={() => {}}
+      workspaceId={workspaceId}
+      recoveryError={null}
+      recoveryNotice={null}
+      branchDetails={null}
+      busyAction={busyAction}
+    />
+  );
+}
+
 /**
  * Top-level chat entry rendered when an office session is in FAILED
  * state. Replaces the legacy red action-message banner: shows a short
@@ -273,12 +319,8 @@ export function RunErrorEntry({
   error,
 }: RunErrorEntryProps) {
   const { t } = useTranslation();
-  const persona = useContext(PersonaIdentityContext);
-  const identities = useContext(ChatIdentityContext);
+  const agentName = useAgentIdentity(error.agentProfileId).name;
   const recover = useContext(RecoveryTransportContext);
-  const agentName = persona?.name ?? identities[error.agentProfileId ?? ""] ?? t("task:agent");
-  const [customBusy, setCustomBusy] = useState<SessionRecoveryAction | null>(null);
-
   const {
     busyAction,
     recoveryError,
@@ -291,33 +333,13 @@ export function RunErrorEntry({
   } = useSessionRecoveryActions({ taskId, sessionId: error.sessionId });
 
   if (recover) {
-    const recoverConversation = async (action: SessionRecoveryAction): Promise<boolean> => {
-      if (action !== "resume" && action !== "fresh_start") return false;
-      setCustomBusy(action);
-      try {
-        await recover(taskId, error.sessionId, action);
-        return true;
-      } catch (cause) {
-        toast.error(String(cause));
-        return false;
-      } finally {
-        setCustomBusy(null);
-      }
-    };
     return (
-      <LegacyRunErrorEntry
+      <ConversationRunErrorEntry
+        taskId={taskId}
+        workspaceId={workspaceId}
         agentName={agentName}
         error={error}
-        isActive={error.isActive !== false}
-        onRecover={recoverConversation}
-        onRetry={() => void recoverConversation("resume")}
-        onRestore={() => {}}
-        onNewBranch={() => {}}
-        workspaceId={workspaceId}
-        recoveryError={null}
-        recoveryNotice={null}
-        branchDetails={null}
-        busyAction={customBusy}
+        recover={recover}
       />
     );
   }

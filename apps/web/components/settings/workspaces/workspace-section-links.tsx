@@ -1,7 +1,10 @@
 "use client";
 
-import { listOrchestrators } from "@/lib/api/domains/orchestration-api";
-import { ORCHESTRATION_CHANGED } from "@/hooks/domains/orchestration/use-orchestration-data";
+import {
+  affectsWorkspace,
+  ORCHESTRATION_CHANGED,
+} from "@/hooks/domains/orchestration/use-orchestration-data";
+import { readWorkspaceOrchestrators } from "@/lib/orchestration/orchestrator-list-cache";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { IconChevronRight } from "@tabler/icons-react";
@@ -67,10 +70,12 @@ export function useWorkspaceSectionCounts(workspaceId: string): {
   const enabled = useFeature("orchestration");
   const [revision, setRevision] = useState(0);
   useEffect(() => {
-    const refresh = () => setRevision((v) => v + 1);
+    const refresh = (event: Event) => {
+      if (affectsWorkspace(event, workspaceId)) setRevision((v) => v + 1);
+    };
     window.addEventListener(ORCHESTRATION_CHANGED, refresh);
     return () => window.removeEventListener(ORCHESTRATION_CHANGED, refresh);
-  }, []);
+  }, [workspaceId]);
   const [counts, setCounts] = useState<SectionCounts>({});
   const [settled, setSettled] = useState(false);
   const canvasesEnabled = useFeature("canvases");
@@ -86,7 +91,7 @@ export function useWorkspaceSectionCounts(workspaceId: string): {
     const probes = [
       ...(enabled
         ? [
-            listOrchestrators(workspaceId)
+            readWorkspaceOrchestrators(workspaceId)
               .then((r) => apply({ orchestration: r.orchestrators.length }))
               .catch(() => undefined),
           ]
@@ -141,7 +146,7 @@ type SectionStat = {
 // end up labelled or marked differently.
 function workspaceSectionStats(canvasesEnabled: boolean): SectionStat[] {
   return getWorkspaceSettingsTabs(canvasesEnabled)
-    .filter(({ tab }) => tab !== "overview" && tab !== "agents")
+    .filter(({ tab }) => tab !== "overview")
     .map(({ tab }) => ({ key: tab as keyof SectionCounts, tab }));
 }
 
@@ -161,8 +166,10 @@ export function WorkspaceSectionStats({
 }) {
   const { t } = useTranslation();
   const canvasesEnabled = useFeature("canvases");
-  const stats = workspaceSectionStats(canvasesEnabled);
-  const enabled = useFeature("orchestration");
+  const orchestrationEnabled = useFeature("orchestration");
+  const stats = workspaceSectionStats(canvasesEnabled).filter(
+    ({ key }) => key !== "orchestration" || orchestrationEnabled,
+  );
 
   return (
     <div
@@ -173,41 +180,39 @@ export function WorkspaceSectionStats({
       )}
       data-testid="workspace-section-stats"
     >
-      {stats
-        .filter(({ key }) => key !== "orchestration" || enabled)
-        .map(({ key, tab }) => {
-          const count = counts[key];
-          const { labelKey, icon: Icon } = workspaceSettingsTabSpec(tab);
-          return (
-            <Link
-              key={key}
-              href={workspaceSettingsHref(workspaceId, tab)}
-              className={cn(
-                "relative z-10 flex flex-col gap-1 rounded-lg border border-border/70 bg-background/50 p-2.5 transition-colors hover:border-foreground/30 hover:bg-muted/50",
-                tab === "canvases" && "hidden 2xl:flex",
-              )}
-            >
-              <div className="flex items-start justify-between gap-1">
-                <span
-                  className={cn(
-                    "text-lg font-bold leading-none tabular-nums",
-                    (count === 0 || count === undefined) && "text-muted-foreground/50",
-                  )}
-                >
-                  {count ?? "-"}
-                </span>
-                <IconChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
-              </div>
-              {/* gap-1, not gap-1.5: at the width these tiles sit at on a laptop
+      {stats.map(({ key, tab }) => {
+        const count = counts[key];
+        const { labelKey, icon: Icon } = workspaceSettingsTabSpec(tab);
+        return (
+          <Link
+            key={key}
+            href={workspaceSettingsHref(workspaceId, tab)}
+            className={cn(
+              "relative z-10 flex flex-col gap-1 rounded-lg border border-border/70 bg-background/50 p-2.5 transition-colors hover:border-foreground/30 hover:bg-muted/50",
+              tab === "canvases" && "hidden 2xl:flex",
+            )}
+          >
+            <div className="flex items-start justify-between gap-1">
+              <span
+                className={cn(
+                  "text-lg font-bold leading-none tabular-nums",
+                  (count === 0 || count === undefined) && "text-muted-foreground/50",
+                )}
+              >
+                {count ?? "-"}
+              </span>
+              <IconChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
+            </div>
+            {/* gap-1, not gap-1.5: at the width these tiles sit at on a laptop
                 the longest label ("Automations") overflowed its box by a single
                 pixel once the mark took its place beside it. */}
-              <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-                <Icon className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{t(labelKey)}</span>
-              </span>
-            </Link>
-          );
-        })}
+            <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+              <Icon className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{t(labelKey)}</span>
+            </span>
+          </Link>
+        );
+      })}
     </div>
   );
 }

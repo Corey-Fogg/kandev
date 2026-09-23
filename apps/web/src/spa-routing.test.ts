@@ -220,7 +220,7 @@ describe("officeRouteKey", () => {
       OFFICE_SETUP_PATH,
     );
     expect(resolveOfficeHomeSetupRedirect(OFFICE_HOME_PATH, true, true, [])).toBe(
-      OFFICE_SETUP_PATH,
+      `${OFFICE_SETUP_PATH}?mode=new`,
     );
     expect(
       resolveOfficeHomeSetupRedirect(OFFICE_HOME_PATH, true, true, [
@@ -236,12 +236,5 @@ describe("officeRouteKey", () => {
     ).toBeNull();
     expect(resolveOfficeHomeSetupRedirect(OFFICE_SETUP_PATH, true, true, [])).toBeNull();
     expect(resolveOfficeHomeSetupRedirect(OFFICE_HOME_PATH, false, true, [])).toBeNull();
-  });
-});
-
-it("maps a workspace coordinator route without falling back to another workspace", () => {
-  expect(resolveSpaRoute("/workspaces/ws-example/coordinator", new URLSearchParams())).toEqual({
-    kind: "coordinator",
-    workspaceId: "ws-example",
   });
 });

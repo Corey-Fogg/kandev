@@ -1,13 +1,9 @@
 "use client";
 
-import { useKanbanOnboardingComplete } from "@/hooks/use-kanban-onboarding-complete";
-import { orchestratorsHref } from "@/lib/api/domains/orchestration-api";
-import { officeSetupHref } from "@/lib/settings/office-setup";
 import { useTranslation } from "react-i18next";
 import { useRouter, usePathname } from "@/lib/routing/client-router";
 import {
   IconDots,
-  IconBuildings,
   IconSettings,
   IconSparkles,
   IconStethoscope,
@@ -27,7 +23,6 @@ import {
 import { ImproveKandevDialog } from "@/components/improve-kandev-dialog";
 import { ReleaseNotesDialog } from "@/components/release-notes/release-notes-dialog";
 import { useAppStore } from "@/components/state-provider";
-import { useFeature } from "@/hooks/domains/features/use-feature";
 import { useReleaseNotes } from "@/hooks/use-release-notes";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { CurrentUserChip } from "./current-user-chip";
@@ -369,9 +364,6 @@ export function AppSidebarFooter({
   const activeWorkspace = workspaces.items.find((workspace) => workspace.id === workspaceId);
   const settingsMode = useAppStore((s) => s.appSidebar.settingsMode);
   const toggleSettings = useSettingsGearToggle(settingsMode, activeWorkspace, onToggleSettingsMode);
-  const officeEnabled = useFeature("office");
-  const orchestrationEnabled = useFeature("orchestration");
-  const onboarded = useKanbanOnboardingComplete();
   const appStatusBarEnabled = useAppStore((s) => s.userSettings.appStatusBarEnabled);
   const insightDestinations = useStaticDestinations("sidebar", "insights").filter(
     (destination) => !layoutManaged || destination.source !== "plugin",
@@ -418,21 +410,6 @@ export function AppSidebarFooter({
           onClick={releaseNotes.openDialog}
           badge={releaseNotes.hasUnseen}
           testId="sidebar-release-notes-button"
-        />
-      )}
-      {(officeEnabled || orchestrationEnabled) && onboarded && (
-        <FooterIconButton
-          icon={IconBuildings}
-          label={t(orchestrationEnabled ? "orchestration:orchestration" : "office:workspaceAgents")}
-          collapsed={collapsed}
-          onClick={() => {
-            const href =
-              orchestrationEnabled && workspaceId
-                ? orchestratorsHref(workspaceId)
-                : officeSetupHref(true, workspaceId);
-            router.push(href);
-          }}
-          testId="sidebar-workspace-agents-button"
         />
       )}
       <ThemeToggle />

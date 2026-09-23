@@ -1,8 +1,4 @@
 "use client";
-import {
-  TaskOrchestratorLink,
-  TaskOrchestrationContext,
-} from "@/components/task/task-orchestrator-link";
 
 /**
  * KanbanTaskShell — kanban shell wrapper for /t/:taskId.
@@ -26,6 +22,7 @@ import { TaskBody, resolveTaskBodyMode } from "@/components/task/TaskBody";
 import { TaskHeader } from "@/components/task/TaskHeader";
 import { useTaskPendingInput } from "@/hooks/use-task-pending-input";
 import { TaskStateActions } from "@/components/task/task-state-actions";
+import { OrchestratedTaskFrame } from "@/components/task/task-orchestrator-link";
 import { useFeature } from "@/hooks/domains/features/use-feature";
 import { isFromOffice } from "@/lib/types/http";
 import type { Repository, RepositoryScript, Task } from "@/lib/types/http";
@@ -96,17 +93,18 @@ export function KanbanTaskShell({
     </div>
   );
 
+  if (mode === "advanced") {
+    return (
+      <OrchestratedTaskFrame task={task} advanced>
+        <TaskBody mode={mode} simpleSlot={simpleSlot} advancedSlot={advancedSlot} />
+      </OrchestratedTaskFrame>
+    );
+  }
+
   return (
-    <TaskOrchestrationContext.Provider value={task}>
-      <div className="flex flex-col h-full min-h-0">
-        <div className={mode === "advanced" ? "hidden md:block" : undefined}>
-          <TaskOrchestratorLink task={task} />
-        </div>
-        <div className="flex-1 min-h-0">
-          <TaskBody mode={mode} simpleSlot={simpleSlot} advancedSlot={advancedSlot} />
-        </div>
-      </div>
-    </TaskOrchestrationContext.Provider>
+    <OrchestratedTaskFrame task={task}>
+      <TaskBody mode={mode} simpleSlot={simpleSlot} advancedSlot={advancedSlot} />
+    </OrchestratedTaskFrame>
   );
 }
 

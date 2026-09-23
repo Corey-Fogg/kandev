@@ -10,6 +10,25 @@ import type { Task } from "@/lib/types/http";
 import type { CoordinatorWorkspace } from "@/hooks/domains/orchestration/use-coordinator-workspace";
 import type { CoordinatorTaskGroup } from "@/lib/orchestration/coordinator-task-groups";
 
+type CatalogNames = Record<"workflows" | "steps" | "repositories", Map<string, string>>;
+const catalogNames = new WeakMap<CoordinatorWorkspace, CatalogNames>();
+
+/** Name lookups are built once per catalog and shared by every row. */
+function namesFor(catalog: CoordinatorWorkspace): CatalogNames {
+  let names = catalogNames.get(catalog);
+  if (!names) {
+    const byId = (items: { id: string; name: string }[]) =>
+      new Map(items.map((item) => [item.id, item.name]));
+    names = {
+      workflows: byId(catalog.workflows),
+      steps: byId(catalog.steps),
+      repositories: byId(catalog.repositories),
+    };
+    catalogNames.set(catalog, names);
+  }
+  return names;
+}
+
 function TaskEvidence({ task }: { task: Task }) {
   const { t } = useTranslation();
   const summary = task.status_summary;
@@ -78,10 +97,11 @@ export function CoordinatorTaskRow({
   const { t } = useTranslation();
   const summary = task.status_summary;
   const pending = summary ? summary.pending_action : task.task_pending_action;
-  const workflow = catalog.workflows.find((item) => item.id === task.workflow_id)?.name;
-  const step = catalog.steps.find((item) => item.id === task.workflow_step_id)?.name;
+  const names = namesFor(catalog);
+  const workflow = names.workflows.get(task.workflow_id);
+  const step = names.steps.get(task.workflow_step_id);
   const repositories = (task.repositories ?? [])
-    .map((repo) => catalog.repositories.find((item) => item.id === repo.repository_id)?.name)
+    .map((repo) => names.repositories.get(repo.repository_id))
     .filter(Boolean);
   return (
     <article

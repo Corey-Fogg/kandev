@@ -23,15 +23,14 @@ import { WORKSPACES_SETTINGS_HREF } from "@/lib/settings-discovery/catalog/works
  */
 
 export type WorkspaceSettingsTab =
-  | "orchestration"
-  | "agents"
   | "overview"
   | "repositories"
   | "workflows"
   | "canvases"
   | "integrations"
   | "automations"
-  | "secrets";
+  | "secrets"
+  | "orchestration";
 
 export function workspaceSettingsHref(workspaceId: string, tab: WorkspaceSettingsTab): string {
   const base = `${WORKSPACES_SETTINGS_HREF}/${encodeURIComponent(workspaceId)}`;
@@ -53,7 +52,6 @@ export type WorkspaceTabSpec = {
 export const WORKSPACE_SETTINGS_TABS: ReadonlyArray<WorkspaceTabSpec> = [
   { tab: "overview", labelKey: "workspaces:overview", icon: IconLayoutGrid },
   { tab: "orchestration", labelKey: "office:orchestration", icon: IconRobot },
-  { tab: "agents", labelKey: "sidebar:office", icon: IconRobot },
   { tab: "repositories", labelKey: "sidebar:repositories", icon: IconGitBranch },
   { tab: "workflows", labelKey: "workflows:workflows", icon: IconArrowsShuffle },
   { tab: "canvases", labelKey: "canvases:canvases", icon: IconApps },
@@ -84,9 +82,7 @@ export function workspaceSettingsTabSpec(tab: WorkspaceSettingsTab): WorkspaceTa
 
 export function workspaceTabVisible(
   tab: WorkspaceSettingsTab,
-  features: { office?: boolean; orchestration?: boolean },
+  features: { orchestration?: boolean },
 ) {
-  if (tab === "orchestration") return !!features.orchestration;
-  if (tab === "agents") return !!features.office;
-  return true;
+  return tab !== "orchestration" || !!features.orchestration;
 }

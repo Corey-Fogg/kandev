@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 
 import { KanbanWithPreview } from "@/components/kanban-with-preview";
-import { ONBOARDING_CHANGED } from "@/hooks/use-kanban-onboarding-complete";
 import { OnboardingDialog } from "@/components/onboarding-dialog";
 import { useAppStore } from "@/components/state-provider";
 import { getLocalStorage, setLocalStorage } from "@/lib/local-storage";
@@ -64,7 +63,6 @@ export function PageClient({ workspaceId, initialTaskId, initialSessionId }: Pag
 
   const handleOnboardingComplete = () => {
     setLocalStorage(STORAGE_KEYS.ONBOARDING_COMPLETED, true);
-    window.dispatchEvent(new Event(ONBOARDING_CHANGED));
     setShowOnboarding(false);
     setBoardKey((prev) => prev + 1);
   };
@@ -77,7 +75,7 @@ export function PageClient({ workspaceId, initialTaskId, initialSessionId }: Pag
     if (!isResolvingStartupTask && redirectHref) router.replace(redirectHref);
   }, [isResolvingStartupTask, redirectHref, router]);
 
-  if (!showOnboarding && (isResolvingStartupTask || startupTaskId)) {
+  if (isResolvingStartupTask || startupTaskId) {
     return (
       <div className="flex h-full min-h-0 w-full items-center justify-center bg-background">
         <p role="status" aria-live="polite" className="text-sm text-muted-foreground">

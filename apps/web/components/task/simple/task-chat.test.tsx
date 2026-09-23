@@ -7,7 +7,7 @@ import type {
   TaskDecision,
   TaskSession,
   TimelineEvent,
-} from "@/components/task/simple/types";
+} from "@/app/office/tasks/[id]/types";
 import type { TaskStatusSummary } from "@/lib/types/task-status-summary";
 
 // Stub out everything that would otherwise drag the WS layer / portals into

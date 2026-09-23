@@ -7,7 +7,7 @@ import { useAppStore } from "@/components/state-provider";
 import { selectLiveSessionForTask } from "@/lib/state/slices/session/selectors";
 import { useActiveSessionRef } from "./active-session-ref-context";
 import { useTranslation } from "react-i18next";
-import type { TaskComment } from "../types";
+import type { TaskComment } from "@/app/office/tasks/[id]/types";
 
 type TopbarWorkingIndicatorProps = {
   taskId: string;

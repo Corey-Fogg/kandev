@@ -1,13 +1,13 @@
 "use client";
 
-import Link from "@/components/routing/app-link";
-
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/utils";
 import type { AutomationRun } from "@/lib/types/automation";
 import { isOpenRun, statusDotClass, statusLabelKey } from "./run-status";
 import { t } from "@/lib/i18n";
+import Link from "@/components/routing/app-link";
+import { conversationHref } from "@/lib/api/domains/orchestration-api";
 
 /**
  * What the run actually said, in priority order. An error outranks the summary
@@ -82,19 +82,21 @@ export function RunFeedItem({ run, automationName, onOpen }: RunFeedItemProps) {
     "flex w-full gap-3 rounded-md border border-transparent px-3 py-3 text-left transition-colors";
   const testId = `run-entry-${run.id}`;
 
-  // A run that never produced a task has no transcript to open — a skipped
-  // schedule is the whole story already — so it renders inert rather than
-  // offering a click that would go nowhere.
+  // An orchestrator delivery opens the conversation it was posted to.
   if (run.conversation_task_id)
     return (
       <Link
-        className={baseClass}
+        className={cn(baseClass, "cursor-pointer hover:border-border hover:bg-muted/40")}
         data-testid={testId}
-        href={`/workspace/conversations/${run.conversation_task_id}`}
+        href={conversationHref(run.conversation_task_id)}
       >
         <RunFeedItemBody run={run} automationName={automationName} />
       </Link>
     );
+
+  // A run that never produced a task has no transcript to open — a skipped
+  // schedule is the whole story already — so it renders inert rather than
+  // offering a click that would go nowhere.
   if (!run.task_id) {
     return (
       <div className={cn(baseClass, "opacity-80")} data-testid={testId}>

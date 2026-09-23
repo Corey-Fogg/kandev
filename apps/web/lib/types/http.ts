@@ -430,7 +430,6 @@ export function primaryTaskRepository(
 
 export type Task = ActiveSubagentCountFields & {
   id: TaskId;
-  identifier?: string;
   workspace_id: WorkspaceId;
   workflow_id: WorkflowId;
   workflow_step_id: string;
@@ -519,6 +518,7 @@ export type Task = ActiveSubagentCountFields & {
   runner_editable?: boolean;
   /** Machine-readable reason for `runner_editable`; always present alongside it. */
   runner_ineligible_reason?: string;
+  identifier?: string;
 };
 
 // Task origin values mirror models.TaskOrigin* constants in the Go backend.

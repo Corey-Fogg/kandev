@@ -1,4 +1,4 @@
-import type { TaskSession } from "@/components/task/simple/types";
+import type { TaskSession } from "@/app/office/tasks/[id]/types";
 
 /**
  * One entry in the unified chat timeline / per-agent tabs.

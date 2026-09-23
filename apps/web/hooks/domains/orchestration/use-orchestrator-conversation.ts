@@ -4,13 +4,20 @@ import { toast } from "@/lib/toast/sonner";
 import {
   openOrchestratorConversation,
   orchestratorConversationHref,
-  listOrchestrators,
 } from "@/lib/api/domains/orchestration-api";
+import { readWorkspaceOrchestrators } from "@/lib/orchestration/orchestrator-list-cache";
 import { useOrchestrationData } from "./use-orchestration-data";
 
+/** The workspace's orchestrators; an empty workspace id reads nothing. */
 export function useWorkspaceOrchestrators(workspaceId: string) {
-  const load = useCallback(() => listOrchestrators(workspaceId), [workspaceId]);
-  return useOrchestrationData(load);
+  const load = useCallback(
+    () =>
+      workspaceId
+        ? readWorkspaceOrchestrators(workspaceId)
+        : Promise.resolve({ orchestrators: [] }),
+    [workspaceId],
+  );
+  return useOrchestrationData(load, undefined, workspaceId);
 }
 
 export function useOrchestratorConversation(

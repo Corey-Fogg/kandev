@@ -2,7 +2,7 @@ import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { Label } from "@kandev/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kandev/ui/select";
-import { AgentAvatar } from "@/components/shared/agent-avatar";
+import { AgentAvatar } from "@/app/office/components/agent-avatar";
 export function PersonaIconField({
   name,
   icon,
