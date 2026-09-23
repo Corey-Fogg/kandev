@@ -112,28 +112,21 @@ test("coordinator overview joins canonical tasks and persistent chat without sta
   const first = await (
     await page.request.get(`${base}/workspaces/${ws}/orchestrators/${chief}`)
   ).json();
-  const roleResponse = await page.request.post(`${base}/roles`, {
-    data: { name: "Checklist coordinator", instructions: "Help with example checklists." },
-  });
-  expect(roleResponse.ok()).toBeTruthy();
-  const role = await roleResponse.json();
+  // A workspace has one orchestrator: a second one is refused and the view names the only one.
   const secondResponse = await page.request.post(`${base}/workspaces/${ws}/orchestrators`, {
-    data: { ...first, role_id: role.id },
+    data: first,
   });
-  expect(secondResponse.ok()).toBeTruthy();
-  const second = await secondResponse.json();
+  expect(secondResponse.status()).toBe(409);
+  expect(await secondResponse.json()).toMatchObject({
+    error: "orchestrator_exists",
+    orchestrator_id: chief,
+  });
   await apiClient.updateTaskMetadata(queued.id, { orchestration_chief_id: chief });
   await page.reload();
   await expect(chat.locator("textarea")).toBeVisible();
+  await expect(page.getByTestId("coordinator-selector")).toHaveCount(0);
+  await expect(page.getByTestId("coordinator-name")).toHaveText(first.name);
   await chat.locator("textarea").fill("Compare the sample guides.");
-  await page.getByTestId("coordinator-selector").click();
-  await page.getByRole("option", { name: "Checklist coordinator", exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`orchestratorId=${second.id}`));
-  await expect(chat.locator("textarea")).toHaveValue("");
-  await chat.locator("textarea").fill("Check the sample checklist.");
-  await page.getByTestId("coordinator-selector").click();
-  await page.getByRole("option", { name: first.name, exact: true }).click();
-  await expect(chat.locator("textarea")).toHaveValue("Compare the sample guides.");
   await page.getByRole("combobox", { name: "Task scope", exact: true }).click();
   await page.getByRole("option", { name: "Selected coordinator’s tasks", exact: true }).click();
   await expect(page.getByTestId(`coordinator-task-${queued.id}`)).toBeVisible();
