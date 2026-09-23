@@ -919,6 +919,30 @@
         "scripts/lint-harness-files.test.py",
         ".github/scripts/lint-action-pinning_test.py"
       ]
+    },
+    {
+      "id": "workspace-orchestration",
+      "audiences": ["user", "operator"],
+      "stability": "experimental",
+      "docs": ["orchestration-personas", "feature-status", "orchestration-api"],
+      "sources": [
+        "apps/backend/internal/orchestration/handler.go",
+        "apps/backend/internal/orchestration/runtime/handler.go",
+        "apps/backend/internal/orchestration/runtime/events.go",
+        "apps/backend/internal/orchestration/models/workspace_tools.go",
+        "apps/backend/internal/backendapp/orchestration.go",
+        "apps/web/app/settings/orchestration/orchestrator-editor.tsx",
+        "apps/web/app/coordinator/coordinator-page.tsx"
+      ],
+      "tests": [
+        "apps/backend/internal/orchestration/handler_test.go",
+        "apps/backend/internal/orchestration/runtime/service_test.go",
+        "apps/backend/internal/orchestration/runtime/workspace_broker_test.go",
+        "apps/backend/internal/backendapp/orchestration_test.go",
+        "apps/web/e2e/tests/orchestration/workspace-orchestrators.spec.ts",
+        "apps/web/e2e/tests/orchestration/coordinator-view.spec.ts",
+        "apps/web/e2e/tests/orchestration/mobile-coordinator-view.spec.ts"
+      ]
     }
   ],
   "exclusions": {

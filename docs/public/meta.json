@@ -56,6 +56,9 @@
     "---Office---",
     "office-provider-routing",
     "office-config-sync",
+    "---Orchestration---",
+    "orchestration-personas",
+    "orchestration-api",
     "---Protocol Reference---",
     "websocket-api"
   ]

@@ -68,6 +68,12 @@ does not need to reopen merely because its agent answers a question.
 - **AC-TASKS-COMPLETION-001.13:** The editor shall show saved and unsaved state,
   use coordinated Save changes and discard, and disable editing for read-only
   synchronized workflows. The phone control shall be reachable by touch.
+- **AC-TASKS-COMPLETION-001.14:** An orchestration-managed parent task shall not
+  transition to `COMPLETED` while it has any direct, non-archived,
+  non-ephemeral child task outside `COMPLETED`, `FAILED`, or `CANCELLED`. The
+  task-state write shall fail with an actionable error identifying an
+  unfinished child. Ordinary user-created parents retain their existing
+  completion behavior.
 
 ### REQ-TASKS-COMPLETION-002: Follow-ups in completed conversations
 

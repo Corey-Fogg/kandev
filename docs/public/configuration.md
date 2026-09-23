@@ -533,6 +533,7 @@ Copying this entire file is unnecessary and can freeze old defaults in a deploym
 
 | Key | Environment lock | Production default | Effect |
 |---|---|---|---|
+| `features.orchestration` | `KANDEV_FEATURES_ORCHESTRATION` | off | Experimental workspace coordinators: roles, workspace assignments, persistent conversations and delegated Kanban work. |
 | `features.auth` | `KANDEV_FEATURES_AUTH` | off | Experimental authentication, users, per-user workspaces, and team access. |
 | `features.multiTenancy` | `KANDEV_FEATURES_MULTI_TENANCY` | off | Experimental organizations above authenticated users. Requires `features.auth`; startup is refused otherwise. |
 | `features.dynamicAgentRouting` | `KANDEV_FEATURES_DYNAMIC_AGENT_ROUTING` | off | Experimental dynamic profiles with ordered provider-error fallback. |
