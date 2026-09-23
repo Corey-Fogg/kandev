@@ -40,10 +40,11 @@ test("Orchestrator opens at the latest messages and respects reading older messa
   ]) {
     await page.setViewportSize(viewport);
     await page.goto(`/workspaces/${ws}/coordinator?orchestratorId=${chief}`);
-    await expect(chat.getByText("Example request 24: review the sample checklist.")).toBeAttached();
+    // The phone layout loads the chat only once its tab is shown.
     if (viewport.width < 768) {
       await page.getByRole("tab", { name: "Chat", exact: true }).click();
     }
+    await expect(chat.getByText("Example request 24: review the sample checklist.")).toBeAttached();
     // Prove the history actually overflows before checking the initial scroll position.
     await expect
       .poll(() => chat.evaluate((el) => el.scrollHeight - el.clientHeight))
@@ -63,10 +64,10 @@ test("Orchestrator opens at the latest messages and respects reading older messa
 
     await page.goto(`/?workspaceId=${ws}`);
     await page.goto(`/workspaces/${ws}/coordinator?orchestratorId=${chief}`);
-    await expect(chat.locator(`#comment-${later.comment_id}`)).toBeAttached();
     if (viewport.width < 768) {
       await page.getByRole("tab", { name: "Chat", exact: true }).click();
     }
+    await expect(chat.locator(`#comment-${later.comment_id}`)).toBeAttached();
     await expect.poll(bottomGap).toBeLessThanOrEqual(2);
   }
 });
