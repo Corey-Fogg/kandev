@@ -10,7 +10,11 @@ import {
 import { ConversationContent } from "@/app/settings/orchestration/conversation-route";
 import { useCoordinatorConversation } from "@/hooks/domains/orchestration/use-coordinator-conversation";
 import type { CoordinatorWorkspace } from "@/hooks/domains/orchestration/use-coordinator-workspace";
-import { orchestratorHref, selectedExecutor } from "@/lib/api/domains/orchestration-api";
+import {
+  orchestratorHref,
+  selectedExecutor,
+  type Orchestrator,
+} from "@/lib/api/domains/orchestration-api";
 
 const drafts = new Map<string, string>();
 let draftOwner: string | undefined;
@@ -29,11 +33,19 @@ function memoryDrafts(owner: string | undefined, workspace: string): CommentDraf
     },
   };
 }
-function ReadyConversation({ workspaceId, selected }: { workspaceId: string; selected: string }) {
+function ReadyConversation({
+  workspaceId,
+  persona,
+  visible,
+}: {
+  workspaceId: string;
+  persona: Orchestrator;
+  visible: boolean;
+}) {
   const { t } = useTranslation();
   const user = useAppStore((s) => s.auth.user?.id);
   const draftStore = useMemo(() => memoryDrafts(user, workspaceId), [user, workspaceId]);
-  const { data, error, refresh } = useCoordinatorConversation(workspaceId, selected);
+  const { data, error, refresh } = useCoordinatorConversation(workspaceId, persona.id);
   if (error)
     return (
       <div className="p-4 space-y-3" role="alert">
@@ -51,16 +63,25 @@ function ReadyConversation({ workspaceId, selected }: { workspaceId: string; sel
     );
   return (
     <CommentDraftContext.Provider value={draftStore}>
-      <ConversationContent key={data.task_id} taskId={data.task_id} embedded />
+      <ConversationContent
+        key={data.task_id}
+        taskId={data.task_id}
+        embedded
+        visible={visible}
+        persona={persona}
+      />
     </CommentDraftContext.Provider>
   );
 }
 export function CoordinatorChat({
   catalog,
   selected,
+  visible = true,
 }: {
   catalog: CoordinatorWorkspace;
   selected: string;
+  /** The chat panel stays mounted while hidden; it stops polling until shown again. */
+  visible?: boolean;
 }) {
   const { t } = useTranslation();
   const assignment = catalog.assignments.find((item) => item.id === selected);
@@ -91,7 +112,8 @@ export function CoordinatorChat({
     <ReadyConversation
       key={`${catalog.workspace.id}:${assignment.id}`}
       workspaceId={catalog.workspace.id}
-      selected={assignment.id}
+      persona={assignment}
+      visible={visible}
     />
   );
 }

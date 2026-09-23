@@ -1,15 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Button } from "@kandev/ui/button";
 import { PageShell } from "@/components/page-shell";
-import { useAppStore, useAppStoreApi } from "@/components/state-provider";
-import { listTaskSessions } from "@/lib/api/domains/session-api";
-import {
-  getConversation,
-  getConversationComments,
-} from "@/lib/api/domains/orchestration-conversation-api";
-import { useSessionLiveSyncSubscriptions } from "@/hooks/domains/session/use-session-live-sync";
+import { useAppStore } from "@/components/state-provider";
+import { useConversationChat } from "@/hooks/domains/orchestration/use-conversation-chat";
+import type { Orchestrator } from "@/lib/api/domains/orchestration-api";
 import type { TaskSession as APISession } from "@/lib/types/http";
-import type { TaskSession } from "@/components/task/simple/types";
+import type { TaskSession } from "@/app/office/tasks/[id]/types";
 import { OrchestratorConversationPane } from "./conversation-pane";
 
 export function mapConversationSession(session: APISession): TaskSession {
@@ -28,82 +24,73 @@ export function mapConversationSession(session: APISession): TaskSession {
     commandCount: session.command_count,
   };
 }
-async function loadConversation(id: string) {
-  const [task, comments, sessions] = await Promise.all([
-    getConversation(id),
-    getConversationComments(id),
-    listTaskSessions(id),
-  ]);
-  return { task, comments, sessions: sessions.sessions ?? [] };
-}
+
 export function ConversationContent({
   taskId,
   embedded = false,
+  visible = true,
+  persona,
 }: {
   taskId: string;
   embedded?: boolean;
+  /** Polling stops while the hosting panel is hidden. */
+  visible?: boolean;
+  /** The conversation owner, when the host already holds the workspace catalog. */
+  persona?: Orchestrator;
 }) {
-  const store = useAppStoreApi();
-  const [data, setData] = useState<Awaited<ReturnType<typeof loadConversation>>>();
-  const [error, setError] = useState<string>();
-  const [revision, setRevision] = useState(0);
-  const refresh = useCallback(() => setRevision((value) => value + 1), []);
-  const setSessions = useAppStore((s) => s.setTaskSessionsForTask);
-  const connectionStatus = useAppStore((s) => s.connection.status);
-  useEffect(() => {
-    let active = true;
-    let pending = false;
-    const load = async () => {
-      if (pending || document.hidden) return;
-      pending = true;
-      try {
-        const activityEpochsAtRequestStart = {
-          ...store.getState().taskSessions.activityEpochBySession,
-        };
-        const result = await loadConversation(taskId);
-        if (active) {
-          setData(result);
-          setError(undefined);
-          setSessions(taskId, result.sessions, activityEpochsAtRequestStart);
-        }
-      } catch (e) {
-        if (active) setError(String(e));
-      } finally {
-        pending = false;
-      }
-    };
-    void load();
-    const timer = window.setInterval(() => void load(), 3000);
-    document.addEventListener("visibilitychange", load);
-    return () => {
-      active = false;
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", load);
-    };
-  }, [taskId, revision, setSessions, store]);
-  useSessionLiveSyncSubscriptions({
-    connectionStatus,
-    taskId,
-    sessionIds: data?.sessions.map((s) => s.id) ?? [],
-  });
-  if (!data) return error ? <p role="alert">{error}</p> : null;
-  const owner = data.task.orchestrator_id;
+  const { t } = useTranslation();
+  const chat = useConversationChat(taskId, visible);
+  if (!chat.metadata || !chat.loaded) {
+    if (!chat.error)
+      return (
+        <p role="status" className="p-4">
+          {t("common:loading")}
+        </p>
+      );
+    return (
+      <div role="alert" className="p-4 space-y-3">
+        <p>{t("orchestration:conversationUnavailable")}</p>
+        <Button
+          variant="outline"
+          className="cursor-pointer max-md:min-h-11"
+          onClick={() => void chat.refresh()}
+        >
+          {t("task:retry")}
+        </Button>
+      </div>
+    );
+  }
+  const { task, sessions } = chat.metadata;
   return (
     <>
-      {error && <p role="alert">{error}</p>}
+      {chat.error ? (
+        <p role="alert" className="px-4 pt-2 text-sm">
+          {t("orchestration:conversationUnavailable")}
+        </p>
+      ) : null}
+      {chat.nextCursor && (
+        <Button
+          variant="ghost"
+          className="cursor-pointer max-md:min-h-11 shrink-0"
+          disabled={chat.loadingMore}
+          onClick={() => void chat.loadMore()}
+        >
+          {t("orchestration:earlierMessages")}
+        </Button>
+      )}
       <OrchestratorConversationPane
         embedded={embedded}
-        task={{ id: data.task.id, title: data.task.title, workspaceId: data.task.workspace_id }}
-        orchestratorId={typeof owner === "string" ? owner : ""}
-        comments={data.comments}
-        sessions={data.sessions.map(mapConversationSession)}
-        timeline={[]}
-        activity={[]}
-        onCommentsChanged={refresh}
+        task={{ id: task.id, title: task.title, workspaceId: task.workspace_id }}
+        orchestratorId={task.orchestrator_id ?? ""}
+        persona={persona}
+        comments={chat.comments}
+        sessions={sessions.map(mapConversationSession)}
+        onCommentsChanged={() => void chat.refresh()}
       />
     </>
   );
 }
+
 export function OrchestrationConversationRoute({ taskId }: { taskId: string }) {
   const { t } = useTranslation();
   const enabled = useAppStore((s) => s.features.orchestration);

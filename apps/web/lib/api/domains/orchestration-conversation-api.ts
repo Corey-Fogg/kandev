@@ -1,7 +1,7 @@
 import { fetchJson } from "../client";
 import { generateUUID } from "@/lib/utils";
 import type { CommentTransport } from "@/components/task/simple/comment-transport";
-import type { TaskComment } from "@/components/task/simple/types";
+import type { TaskComment } from "@/app/office/tasks/[id]/types";
 export type ConversationTask = {
   id: string;
   title: string;
@@ -19,10 +19,7 @@ type CommentDTO = {
   body: string;
   created_at: string;
   source?: string;
-  client_message_id?: string;
   receipt_status?: string;
-  intent_revision?: number;
-  sequence?: number;
 };
 const path = (id: string) => `/api/v1/orchestration/tasks/${encodeURIComponent(id)}`;
 export const getConversation = (id: string) => fetchJson<ConversationTask>(path(id));
@@ -49,15 +46,7 @@ function mapComment(row: CommentDTO): TaskComment {
     content: row.body,
     createdAt: row.created_at,
     source: row.source,
-    clientMessageId: row.client_message_id,
-    receiptStatus: row.receipt_status,
-    intentRevision: row.intent_revision,
-    sequence: row.sequence,
   };
-}
-export async function getConversationComments(id: string): Promise<TaskComment[]> {
-  const result = await fetchJson<{ comments: CommentDTO[] }>(`${path(id)}/comments`);
-  return (result.comments ?? []).map(mapComment);
 }
 export async function getConversationCommentPage(id: string, before = "", signal?: AbortSignal) {
   const query = new URLSearchParams({ before, limit: "50" });

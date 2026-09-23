@@ -1,61 +1,88 @@
-import { PersonaIdentityContext } from "@/components/task/simple/persona-identity-context";
-import { useWorkspaceOrchestrators } from "@/hooks/domains/orchestration/use-orchestrator-conversation";
-import { ImplicitTaskLinksContext } from "@/components/task/simple/task-link-context";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import Link from "@/components/routing/app-link";
 import { TaskChat } from "@/components/task/simple/task-chat";
-import {
-  CommentTransportContext,
-  type CommentTransport,
-} from "@/components/task/simple/comment-transport";
+import { ChatIdentityContext } from "@/components/task/simple/chat-identity-context";
+import { ImplicitTaskLinksContext } from "@/components/task/simple/task-link-context";
+import { CommentTransportContext } from "@/components/task/simple/comment-transport";
 import { RecoveryTransportContext } from "@/components/task/simple/recovery-transport";
-import {
-  postConversationComment,
-  retryConversation,
-} from "@/lib/api/domains/orchestration-conversation-api";
 import { ActiveSessionRefProvider } from "@/components/task/simple/components/active-session-ref-context";
 import { TopbarWorkingIndicator } from "@/components/task/simple/components/topbar-working-indicator";
+import { useWorkspaceOrchestrators } from "@/hooks/domains/orchestration/use-orchestrator-conversation";
+import {
+  createConversationSender,
+  retryConversation,
+} from "@/lib/api/domains/orchestration-conversation-api";
 import {
   orchestratorsHref,
   orchestratorHref,
   coordinatorHref,
+  type Orchestrator,
 } from "@/lib/api/domains/orchestration-api";
-import type {
-  Task,
-  TaskComment,
-  TaskActivityEntry,
-  TaskSession,
-  TimelineEvent,
-} from "@/components/task/simple/types";
+import type { Task, TaskComment, TaskSession } from "@/app/office/tasks/[id]/types";
+
+function usePersona(workspaceId: string, orchestratorId: string, provided?: Orchestrator) {
+  const { data } = useWorkspaceOrchestrators(provided ? "" : workspaceId);
+  return provided ?? data?.orchestrators.find((item) => item.id === orchestratorId);
+}
+
+function ConversationLinks({
+  workspaceId,
+  orchestratorId,
+}: {
+  workspaceId: string;
+  orchestratorId: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <nav className="flex flex-wrap gap-4 text-sm">
+      <Link
+        className="underline max-md:min-h-11 inline-flex items-center"
+        href={coordinatorHref(workspaceId, orchestratorId)}
+      >
+        {t("orchestration:coordinator")}
+      </Link>
+      <Link className="underline" href={orchestratorsHref(workspaceId)}>
+        {t("orchestration:orchestration")}
+      </Link>
+      <Link className="underline" href={orchestratorHref(workspaceId, orchestratorId)}>
+        {t("orchestration:configureOrchestrator")}
+      </Link>
+      <Link className="underline" href={`/?workspaceId=${workspaceId}`}>
+        {t("orchestration:workspaceBoard")}
+      </Link>
+    </nav>
+  );
+}
+
 export function OrchestratorConversationPane({
   task,
   comments,
   sessions,
-  timeline,
   onCommentsChanged,
   orchestratorId,
+  persona: providedPersona,
   embedded = false,
-  transport = postConversationComment,
-  readOnly = false,
 }: {
   task: Pick<Task, "id" | "title" | "workspaceId">;
   comments: TaskComment[];
-  activity: TaskActivityEntry[];
   sessions: TaskSession[];
-  timeline: TimelineEvent[];
   onCommentsChanged: () => void;
   orchestratorId: string;
+  persona?: Orchestrator;
   embedded?: boolean;
-  transport?: CommentTransport;
-  readOnly?: boolean;
 }) {
-  const { t } = useTranslation();
-  const { data } = useWorkspaceOrchestrators(task.workspaceId);
-  const persona = data?.orchestrators.find((item) => item.id === orchestratorId);
+  const persona = usePersona(task.workspaceId, orchestratorId, providedPersona);
+  const identity = useMemo(
+    () => ({
+      persona: persona ? { id: persona.id, name: persona.name, icon: persona.icon } : null,
+    }),
+    [persona],
+  );
+  const transport = useMemo(() => createConversationSender(task.id), [task.id]);
   const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
   return (
-    <PersonaIdentityContext.Provider value={persona ?? null}>
+    <ChatIdentityContext.Provider value={identity}>
       <ImplicitTaskLinksContext.Provider value={false}>
         <ActiveSessionRefProvider>
           <section
@@ -64,26 +91,7 @@ export function OrchestratorConversationPane({
             data-testid="orchestrator-conversation"
           >
             {!embedded && (
-              <nav className="flex flex-wrap gap-4 text-sm">
-                <Link
-                  className="underline max-md:min-h-11 inline-flex items-center"
-                  href={coordinatorHref(task.workspaceId, orchestratorId)}
-                >
-                  {t("orchestration:coordinator")}
-                </Link>
-                <Link className="underline" href={orchestratorsHref(task.workspaceId)}>
-                  {t("orchestration:orchestration")}
-                </Link>
-                <Link
-                  className="underline"
-                  href={orchestratorHref(task.workspaceId, orchestratorId)}
-                >
-                  {t("orchestration:configureOrchestrator")}
-                </Link>
-                <Link className="underline" href={`/?workspaceId=${task.workspaceId}`}>
-                  {t("orchestration:workspaceBoard")}
-                </Link>
-              </nav>
+              <ConversationLinks workspaceId={task.workspaceId} orchestratorId={orchestratorId} />
             )}
             <h1 className="text-xl font-semibold my-4">{task.title}</h1>
             <TopbarWorkingIndicator taskId={task.id} comments={comments} />
@@ -93,9 +101,8 @@ export function OrchestratorConversationPane({
                   taskId={task.id}
                   comments={comments}
                   sessions={sessions}
-                  timeline={timeline}
+                  timeline={[]}
                   scrollParent={scrollParent}
-                  readOnly={readOnly}
                   onCommentsChanged={onCommentsChanged}
                 />
               </CommentTransportContext.Provider>
@@ -103,6 +110,6 @@ export function OrchestratorConversationPane({
           </section>
         </ActiveSessionRefProvider>
       </ImplicitTaskLinksContext.Provider>
-    </PersonaIdentityContext.Provider>
+    </ChatIdentityContext.Provider>
   );
 }

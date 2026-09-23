@@ -4,7 +4,8 @@ import type { ReactNode } from "react";
 import { StateProvider } from "@/components/state-provider";
 import type { CoordinatorWorkspace } from "@/hooks/domains/orchestration/use-coordinator-workspace";
 import { CoordinatorChat } from "./coordinator-chat";
-import { CoordinatorPage, resolveCoordinatorSelection } from "./coordinator-page";
+import { CoordinatorPage } from "./coordinator-page";
+import { resolveCoordinatorSelection } from "./use-coordinator-selection";
 
 vi.mock("@/components/page-shell", () => ({
   PageShell: ({ children }: { children: ReactNode }) => <div>{children}</div>,
