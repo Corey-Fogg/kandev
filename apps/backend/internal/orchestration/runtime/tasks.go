@@ -88,7 +88,7 @@ func (h *Handler) createTask(c *gin.Context) {
 		fail(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"id": id, "title": title, titleTruncatedKey: truncated})
+	c.JSON(http.StatusCreated, gin.H{"id": id, titleKey: title, titleTruncatedKey: truncated})
 }
 
 func (h *Handler) manageTask(c *gin.Context) {
@@ -115,7 +115,7 @@ func (h *Handler) manageTask(c *gin.Context) {
 		return
 	}
 	if truncated {
-		c.JSON(http.StatusOK, gin.H{"ok": true, "title": *req.Title, titleTruncatedKey: true})
+		c.JSON(http.StatusOK, gin.H{"ok": true, titleKey: *req.Title, titleTruncatedKey: true})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})

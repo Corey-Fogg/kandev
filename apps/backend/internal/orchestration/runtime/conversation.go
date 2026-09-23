@@ -30,7 +30,7 @@ func (h *Handler) conversation(c *gin.Context) {
 		fail(c, err)
 		return
 	}
-	c.JSON(200, gin.H{"id": task.ID, "title": task.Title, "workspace_id": task.WorkspaceID, "orchestrator_id": owner})
+	c.JSON(200, gin.H{"id": task.ID, titleKey: task.Title, "workspace_id": task.WorkspaceID, "orchestrator_id": owner})
 }
 
 // comments pages a conversation's messages, newest last. A coordinator reads

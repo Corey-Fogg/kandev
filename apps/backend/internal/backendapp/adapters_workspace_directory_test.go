@@ -20,7 +20,7 @@ func TestWorkspaceCatalogIsCompactUnlessFullDetailIsRequested(t *testing.T) {
 	require.NoError(t, err)
 	catalog := compact.(map[string]any)
 	require.NotContains(t, catalog, "workflow_templates")
-	require.Contains(t, catalog["workflow_steps"], map[string]any{"id": step.ID, "workflow_id": wf.ID, "name": "Backlog", "position": step.Position, "is_start_step": true, "allow_manual_move": step.AllowManualMove, "agent_profile_id": ""})
+	require.Contains(t, catalog["workflow_steps"], catalogStep{ID: step.ID, WorkflowID: wf.ID, Name: "Backlog", Position: step.Position, IsStartStep: true, AllowManualMove: step.AllowManualMove})
 
 	full, err := a.WorkspaceCatalog(ctx, "ws-1", true)
 	require.NoError(t, err)

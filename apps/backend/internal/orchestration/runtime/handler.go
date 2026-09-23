@@ -22,6 +22,7 @@ const (
 	statusFailed        = "failed"
 	nextCursorKey       = "next_cursor"
 	authorTypeUser      = "user"
+	titleKey            = "title"
 )
 
 type Handler struct {

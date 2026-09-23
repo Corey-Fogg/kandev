@@ -57,13 +57,31 @@ func sortedSteps(steps []*workflowmodels.WorkflowStep) []*workflowmodels.Workflo
 	return ordered
 }
 
-func compactWorkflows(workflows []*models.Workflow) []map[string]any {
-	rows := []map[string]any{}
+// catalogWorkflow and catalogStep are the compact catalog rows.
+type catalogWorkflow struct {
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Description    string `json:"description,omitempty"`
+	AgentProfileID string `json:"agent_profile_id,omitempty"`
+}
+
+type catalogStep struct {
+	ID              string `json:"id"`
+	WorkflowID      string `json:"workflow_id"`
+	Name            string `json:"name"`
+	Position        int    `json:"position"`
+	IsStartStep     bool   `json:"is_start_step"`
+	AllowManualMove bool   `json:"allow_manual_move"`
+	AgentProfileID  string `json:"agent_profile_id,omitempty"`
+}
+
+func compactWorkflows(workflows []*models.Workflow) []catalogWorkflow {
+	rows := []catalogWorkflow{}
 	for _, workflow := range workflows {
 		if workflow == nil || workflow.Hidden {
 			continue
 		}
-		rows = append(rows, map[string]any{"id": workflow.ID, "name": workflow.Name, "description": workspaceExportText(workflow.Description, 300), "agent_profile_id": workflow.AgentProfileID})
+		rows = append(rows, catalogWorkflow{ID: workflow.ID, Name: workflow.Name, Description: workspaceExportText(workflow.Description, 300), AgentProfileID: workflow.AgentProfileID})
 	}
 	return rows
 }
@@ -78,10 +96,10 @@ func compactRepositories(repositories []*models.Repository) []shared.DirectoryRe
 	return rows
 }
 
-func compactSteps(steps []*workflowmodels.WorkflowStep) []map[string]any {
-	rows := []map[string]any{}
+func compactSteps(steps []*workflowmodels.WorkflowStep) []catalogStep {
+	rows := []catalogStep{}
 	for _, step := range sortedSteps(steps) {
-		rows = append(rows, map[string]any{"id": step.ID, "workflow_id": step.WorkflowID, "name": step.Name, "position": step.Position, "is_start_step": step.IsStartStep, "allow_manual_move": step.AllowManualMove, "agent_profile_id": step.AgentProfileID})
+		rows = append(rows, catalogStep{ID: step.ID, WorkflowID: step.WorkflowID, Name: step.Name, Position: step.Position, IsStartStep: step.IsStartStep, AllowManualMove: step.AllowManualMove, AgentProfileID: step.AgentProfileID})
 	}
 	return rows
 }
