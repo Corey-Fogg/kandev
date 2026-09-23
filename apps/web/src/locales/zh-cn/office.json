@@ -1023,5 +1023,6 @@
   "failedToLoadRouteAttempts": "加载路由尝试记录失败",
   "failedToLoadRoutingConfig": "加载路由配置失败",
   "failedToLoadRoutingPreview": "加载路由预览失败",
-  "failedToLoadTaskQuorum": "加载任务法定人数失败"
+  "failedToLoadTaskQuorum": "加载任务法定人数失败",
+  "orchestrationKeywords": "编排器 统筹助理 协调员 职责 角色 委派"
 }

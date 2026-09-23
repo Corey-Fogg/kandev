@@ -1,9 +1,10 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useContext } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import { remarkPlugins, markdownComponents } from "@/components/shared/markdown-components";
+import { ImplicitTaskLinksContext } from "./task-link-context";
 import { remarkTaskLinks } from "./task-identifier-link";
 
 type MarkdownCommentProps = {
@@ -21,10 +22,11 @@ const sanitizeSchema = {
 };
 
 export const MarkdownComment = memo(function MarkdownComment({ content }: MarkdownCommentProps) {
+  const implicitTaskLinks = useContext(ImplicitTaskLinksContext);
   return (
     <div className="prose prose-sm max-w-none text-sm markdown-body">
       <ReactMarkdown
-        remarkPlugins={localRemarkPlugins}
+        remarkPlugins={implicitTaskLinks ? localRemarkPlugins : remarkPlugins}
         rehypePlugins={[[rehypeSanitize, sanitizeSchema]]}
         components={markdownComponents}
       >

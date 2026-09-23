@@ -84,6 +84,7 @@ export function useSettingsMenuBranches(mode: SettingsMenuMode): SettingsMenuBra
   );
   const { hideDisabled: hideDisabledAgentProfiles } = useHideDisabledAgentProfilesInNav();
 
+  const orchestration = useAppStore((s) => s.features?.orchestration === true);
   return useMemo(() => {
     if (!isTree) return NO_BRANCHES;
     const orderedAgents = orderAgentsForDisplay(agentDiscovery, agents);
@@ -100,7 +101,7 @@ export function useSettingsMenuBranches(mode: SettingsMenuMode): SettingsMenuBra
           activeWorkspaceId,
           visibleIntegrationsFor,
           integrationContributions,
-          { pluginIntegrationEnabled, canvasesEnabled },
+          { pluginIntegrationEnabled, canvasesEnabled, orchestration },
         ),
       ),
       ...branchEntry(
@@ -123,6 +124,7 @@ export function useSettingsMenuBranches(mode: SettingsMenuMode): SettingsMenuBra
     pluginIntegrationEnabled,
     hideDisabledIntegrations,
     hideDisabledAgentProfiles,
+    orchestration,
   ]);
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useContext, useState } from "react";
+import { toast } from "@/lib/toast/sonner";
 import {
   IconAlertTriangle,
   IconChevronDown,
@@ -9,8 +10,6 @@ import {
 } from "@tabler/icons-react";
 import { Button } from "@kandev/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@kandev/ui/collapsible";
-import { useAppStore } from "@/components/state-provider";
-import { selectOfficeAgentProfiles } from "@/lib/state/slices/office/selectors";
 import { formatRelativeTime } from "@/lib/utils";
 import { AgentAvatar } from "@/app/office/components/agent-avatar";
 import { RemediationLink } from "@/components/task/remediation-link";
@@ -25,6 +24,8 @@ import type {
 } from "@/lib/services/session-recovery-service";
 import type { RunError } from "@/app/office/tasks/[id]/types";
 import type { TaskRepository } from "@/lib/types/http";
+import { useAgentIdentity } from "../chat-identity-context";
+import { RecoveryTransportContext } from "../recovery-transport";
 import { ManagedRuntimeNpmRunError } from "./managed-runtime-npm-run-error";
 import { isLaunchErrorCategory, TaskLaunchErrorEntry } from "./task-launch-error-entry";
 import { useTranslation } from "react-i18next";
@@ -257,6 +258,54 @@ function LegacyRunErrorEntry({
   );
 }
 
+/** A failed conversation turn, retried through the surface's own recovery endpoint. */
+function ConversationRunErrorEntry({
+  taskId,
+  workspaceId,
+  agentName,
+  error,
+  recover,
+}: {
+  taskId: string;
+  workspaceId: string;
+  agentName: string;
+  error: RunError;
+  recover: NonNullable<React.ContextType<typeof RecoveryTransportContext>>;
+}) {
+  const { t } = useTranslation();
+  const [busyAction, setBusyAction] = useState<SessionRecoveryAction | null>(null);
+  const recoverConversation = async (action: SessionRecoveryAction): Promise<boolean> => {
+    if (action !== "resume" && action !== "fresh_start") return false;
+    setBusyAction(action);
+    try {
+      const outcome = await recover(taskId, { sessionId: error.sessionId }, action);
+      if (outcome === "already_queued") toast.info(t("orchestration:retryAlreadyQueued"));
+      return true;
+    } catch (cause) {
+      toast.error(String(cause));
+      return false;
+    } finally {
+      setBusyAction(null);
+    }
+  };
+  return (
+    <LegacyRunErrorEntry
+      agentName={agentName}
+      error={error}
+      isActive={error.isActive !== false}
+      onRecover={recoverConversation}
+      onRetry={() => void recoverConversation("resume")}
+      onRestore={() => {}}
+      onNewBranch={() => {}}
+      workspaceId={workspaceId}
+      recoveryError={null}
+      recoveryNotice={null}
+      branchDetails={null}
+      busyAction={busyAction}
+    />
+  );
+}
+
 /**
  * Top-level chat entry rendered when an office session is in FAILED
  * state. Replaces the legacy red action-message banner: shows a short
@@ -272,11 +321,8 @@ export function RunErrorEntry({
   error,
 }: RunErrorEntryProps) {
   const { t } = useTranslation();
-  const agentName = useAppStore(
-    (s) =>
-      selectOfficeAgentProfiles(s).find((a) => a.id === error.agentProfileId)?.name ??
-      t("task:agent"),
-  );
+  const agentName = useAgentIdentity(error.agentProfileId).name;
+  const recover = useContext(RecoveryTransportContext);
   const {
     busyAction,
     recoveryError,
@@ -287,6 +333,18 @@ export function RunErrorEntry({
     handleRetry,
     handleNewBranch,
   } = useSessionRecoveryActions({ taskId, sessionId: error.sessionId });
+
+  if (recover) {
+    return (
+      <ConversationRunErrorEntry
+        taskId={taskId}
+        workspaceId={workspaceId}
+        agentName={agentName}
+        error={error}
+        recover={recover}
+      />
+    );
+  }
 
   if (isLaunchErrorCategory(error.failureCode) && error.errorStamp) {
     return (

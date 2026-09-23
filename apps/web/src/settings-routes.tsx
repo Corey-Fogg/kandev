@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the settings route table and its dispatch remain one boundary */
 import { useEffect, useRef, type ReactNode } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
@@ -107,6 +108,7 @@ import { toAgentProfileOption } from "@/lib/state/slices/settings/types";
 import type { ListWorkspacesResponse, UserSettingsResponse } from "@/lib/types/http";
 import type { LicenseEntry } from "@/lib/types/system";
 import { renderIntegrationSettingsRoute } from "./integration-settings-route";
+import { renderOrchestrationSettingsRoute } from "./orchestration-settings-routes";
 import {
   WorkspaceRepositoriesRoute,
   WorkspaceWorkflowsRoute,
@@ -282,6 +284,8 @@ export function settingsRouteKey(pathname: string): string {
 }
 
 export function renderSettingsRoute(pathname: string) {
+  const orchestrationRoute = renderOrchestrationSettingsRoute(pathname);
+  if (orchestrationRoute) return orchestrationRoute;
   const dynamicRoute = renderDynamicSettingsRoute(pathname);
   if (dynamicRoute) return dynamicRoute;
   const staticRoute = SETTINGS_ROUTES[pathname]?.();

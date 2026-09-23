@@ -1023,5 +1023,6 @@
   "failedToLoadRouteAttempts": "載入路由嘗試記錄失敗",
   "failedToLoadRoutingConfig": "載入路由設定失敗",
   "failedToLoadRoutingPreview": "載入路由預覽失敗",
-  "failedToLoadTaskQuorum": "載入任務法定人數失敗"
+  "failedToLoadTaskQuorum": "載入任務法定人數失敗",
+  "orchestrationKeywords": "編排器 統籌助理 協調員 職責 角色 委派"
 }

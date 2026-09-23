@@ -480,6 +480,8 @@ export async function listTasksByWorkspace(
     workflowId?: string | null;
     repositoryId?: string | null;
     sort?: string;
+    view?: "kanban";
+    excludeConfig?: boolean;
   } = {},
   options?: ApiRequestOptions,
 ) {
@@ -493,5 +495,7 @@ export async function listTasksByWorkspace(
   if (params.workflowId) url.searchParams.set("workflow_id", params.workflowId);
   if (params.repositoryId) url.searchParams.set("repository_id", params.repositoryId);
   if (params.sort) url.searchParams.set("sort", params.sort);
+  if (params.view) url.searchParams.set("view", params.view);
+  if (params.excludeConfig) url.searchParams.set("exclude_config", "true");
   return fetchJson<ListTasksResponse>(url.toString(), options);
 }

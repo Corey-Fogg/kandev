@@ -297,5 +297,13 @@
   "pluginWebhookState_failed": "失败",
   "pluginWebhookState_cancelled": "已取消",
   "pluginWebhookState_skipped": "已跳过",
-  "pluginWebhookState_ignored": "已忽略"
+  "pluginWebhookState_ignored": "已忽略",
+  "runTarget": "运行目标",
+  "agentRunTarget": "代理任务",
+  "orchestratorUnavailable": "编排器不可用",
+  "orchestratorTargetHint": "每次运行都会发送到此编排器的对话。编排器使用自己的执行配置。",
+  "manageOrchestrators": "管理编排器",
+  "orchestratorDeliveryHint": "此次运行已发送到编排器对话。",
+  "runDispatched": "已发送至编排器",
+  "openOrchestratorChat": "打开编排器对话"
 }

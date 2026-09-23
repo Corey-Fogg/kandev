@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable max-lines -- this component owns the chat timeline and composer composition. */
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { toast } from "@/lib/toast/sonner";
 import { IconCode, IconChevronDown, IconSend, IconPaperclip, IconUser } from "@tabler/icons-react";
 import { AgentAvatar } from "@/app/office/components/agent-avatar";
@@ -15,17 +15,19 @@ import { usePromptResultDelivery } from "@/hooks/use-prompt-result-delivery";
 import { useUtilityAgentGenerator } from "@/hooks/use-utility-agent-generator";
 import { useChatMotion } from "@/hooks/use-chat-motion";
 import { useAppStore } from "@/components/state-provider";
-import { selectOfficeAgentProfiles } from "@/lib/state/slices/office/selectors";
 import { selectCommandCount } from "@/lib/state/slices/session/selectors";
-import { createComment } from "@/lib/api/domains/office-api";
 import { formatRelativeTime } from "@/lib/utils";
 import { MarkdownComment } from "./markdown-comment";
 import { AgentTurnPanel } from "./components/agent-turn-panel";
 import { RunErrorEntry } from "./components/run-error-entry";
 import { UserCommentRunBadge } from "./components/user-comment-run-badge";
+import { CommentRetryButton } from "./components/comment-retry-button";
 import { buildCommentTurnContext, type CommentTurnContext } from "./turn-context";
 import { groupSessionsForTimeline, groupSortKey, type SessionGroup } from "./session-groups";
 import { synchronizeInputValue } from "./synchronize-input-value";
+import { useAgentIdentity } from "./chat-identity-context";
+import { CommentDraftContext } from "./comment-draft-context";
+import { CommentTransportContext } from "./comment-transport";
 import type {
   TaskComment,
   TaskDecision,
@@ -65,6 +67,8 @@ type TaskChatProps = {
   taskDescription?: string;
   statusSummary?: TaskStatusSummary | null;
   repositories?: TaskRepository[];
+  /** Open at the latest message and follow new comments (conversation panes). */
+  openAtLatest?: boolean;
 };
 
 function partitionGroups(groups: SessionGroup[]): {
@@ -89,6 +93,19 @@ function formatDuration(ms: number): string {
   return `${minutes}m ${remaining}s`;
 }
 
+/** The run badge of a user message, with a retry for a failed turn. */
+function UserCommentRunState({ comment, taskId }: { comment: TaskComment; taskId: string }) {
+  if (!comment.runStatus || comment.runStatus === "finished") return null;
+  return (
+    <div className="mt-1.5 flex items-center gap-2">
+      <UserCommentRunBadge status={comment.runStatus} errorMessage={comment.runError} />
+      {comment.runStatus === "failed" && comment.runId && (
+        <CommentRetryButton taskId={taskId} runId={comment.runId} />
+      )}
+    </div>
+  );
+}
+
 function CommentEntry({
   comment,
   taskId,
@@ -102,24 +119,18 @@ function CommentEntry({
 }) {
   const { t } = useTranslation();
   const isAgent = comment.authorType === "agent";
-  // Resolve the agent name from the office agents store so renames
-  // flow through automatically. Backend session-bridged comments don't
-  // carry a name; the mapper leaves authorName empty for agents.
-  const resolvedAgentName = useAppStore((s) =>
-    isAgent
-      ? (selectOfficeAgentProfiles(s).find((a) => a.id === comment.authorId)?.name ??
-        comment.authorName ??
-        t("task:agent"))
-      : "",
-  );
-  const displayName = isAgent ? resolvedAgentName : t("task:you");
+  // Backend session-bridged comments don't carry a name; the mapper leaves
+  // authorName empty for agents.
+  const agent = useAgentIdentity(comment.authorId, comment.authorName);
+  const userName = comment.source === "automation" ? t("automations:automation") : t("task:you");
+  const displayName = isAgent ? agent.name : userName;
   return (
     <div
       id={`comment-${comment.id}`}
       className="flex gap-3 py-3 border-b border-border/50 scroll-mt-16"
     >
       {isAgent ? (
-        <AgentAvatar name={displayName} size="md" />
+        <AgentAvatar name={displayName} icon={agent.icon} size="md" />
       ) : (
         <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center shrink-0">
           <IconUser className="h-4 w-4 text-muted-foreground" />
@@ -145,14 +156,9 @@ function CommentEntry({
         <div className="mt-1">
           <MarkdownComment content={comment.content} />
         </div>
-        {!isAgent &&
-          comment.runStatus &&
-          comment.runStatus !== "finished" &&
-          !hasLaterAgentReply && (
-            <div className="mt-1.5">
-              <UserCommentRunBadge status={comment.runStatus} errorMessage={comment.runError} />
-            </div>
-          )}
+        {!isAgent && !hasLaterAgentReply && (
+          <UserCommentRunState comment={comment} taskId={taskId} />
+        )}
         {comment.toolCalls && comment.toolCalls.length > 0 && (
           <Collapsible>
             <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground mt-1 cursor-pointer hover:text-foreground transition-colors">
@@ -344,14 +350,20 @@ function CommentComposerFooter({
 
 function ChatInput({ taskId, taskTitle, taskDescription, onSubmitted }: ChatInputProps) {
   const { t } = useTranslation();
-  const [input, setInput] = useState("");
+  const createComment = useContext(CommentTransportContext);
+  const drafts = useContext(CommentDraftContext);
+  const [input, setInput] = useState(() => drafts?.get(taskId) ?? "");
   const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputValueRef = useRef(input);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const setInputAndSync = useCallback((next: React.SetStateAction<string>) => {
-    synchronizeInputValue(inputValueRef, setInput, next);
-  }, []);
+  const setInputAndSync = useCallback(
+    (next: React.SetStateAction<string>) => {
+      synchronizeInputValue(inputValueRef, setInput, next);
+      drafts?.set(taskId, inputValueRef.current);
+    },
+    [drafts, taskId],
+  );
   const isUtilityConfigured = useIsUtilityConfigured();
   const { enhancePrompt, isEnhancingPrompt } = useUtilityAgentGenerator({
     sessionId: null,
@@ -381,7 +393,7 @@ function ChatInput({ taskId, taskTitle, taskDescription, onSubmitted }: ChatInpu
     } finally {
       setSubmitting(false);
     }
-  }, [submitting, taskId, onSubmitted, setInputAndSync, t]);
+  }, [submitting, taskId, onSubmitted, setInputAndSync, t, createComment]);
 
   const handleEnhance = useCallback(() => {
     const current = inputValueRef.current;
@@ -449,6 +461,9 @@ function scrollToBottom(scrollParent: HTMLElement | null): void {
  * time of the change.
  *
  * Triggers on:
+ *   - with `openAtLatest`: opening or switching conversations (unless
+ *     linking to a comment) and comments arriving, including history loaded
+ *     after mount
  *   - a new active session entry first appearing (active count grows)
  *   - new messages arriving in any session for this task
  *
@@ -456,10 +471,12 @@ function scrollToBottom(scrollParent: HTMLElement | null): void {
  * the latest value before scrolling so we never yank focus from a user
  * who has scrolled up.
  */
-function useChatAutoScroll(
+export function useChatAutoScroll(
   scrollParent: HTMLElement | null,
   sessions: TaskSession[],
   taskId: string,
+  commentCount: number,
+  openAtLatest = false,
 ): void {
   const activeSessionCount = sessions.filter(
     (s) => s.state === "RUNNING" || s.state === "WAITING_FOR_INPUT",
@@ -481,12 +498,35 @@ function useChatAutoScroll(
   useEffect(() => {
     if (!scrollParent) return;
     const handler = () => {
-      wasAtBottomRef.current = isAtBottom(scrollParent);
+      if (!openAtLatest || scrollParent.clientHeight > 0)
+        wasAtBottomRef.current = isAtBottom(scrollParent);
     };
-    handler();
+    if (!openAtLatest) {
+      handler();
+      scrollParent.addEventListener("scroll", handler, { passive: true });
+      return () => scrollParent.removeEventListener("scroll", handler);
+    }
+    // A newly opened conversation follows the latest messages. Its initial
+    // scrollTop is a browser default, not an intent to read older history.
+    wasAtBottomRef.current = !window.location.hash.startsWith("#comment-");
+    if (wasAtBottomRef.current) scrollToBottom(scrollParent);
+    // A hidden tab can mount the conversation before its container has a size.
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(() => {
+            if (wasAtBottomRef.current && scrollParent.clientHeight > 0)
+              scrollToBottom(scrollParent);
+          });
+    observer?.observe(scrollParent);
     scrollParent.addEventListener("scroll", handler, { passive: true });
-    return () => scrollParent.removeEventListener("scroll", handler);
-  }, [scrollParent]);
+    return () => {
+      observer?.disconnect();
+      scrollParent.removeEventListener("scroll", handler);
+    };
+  }, [scrollParent, taskId, openAtLatest]);
+
+  const commentSignal = openAtLatest ? commentCount : 0;
 
   useEffect(() => {
     if (wasAtBottomRef.current) {
@@ -494,7 +534,7 @@ function useChatAutoScroll(
       // After programmatic scroll, we are still "at bottom" by definition.
       wasAtBottomRef.current = true;
     }
-  }, [scrollParent, activeSessionCount, totalContentSignal, taskId]);
+  }, [scrollParent, activeSessionCount, totalContentSignal, taskId, commentSignal]);
 }
 
 /**
@@ -592,6 +632,7 @@ export function TaskChat({
   taskTitle,
   taskDescription,
   repositories,
+  openAtLatest = false,
 }: TaskChatProps) {
   const { t } = useTranslation();
   const [showOlder, setShowOlder] = useState(false);
@@ -630,7 +671,7 @@ export function TaskChat({
     [comments, timeline, renderedGroups, decisions, turnCtx, runErrors, laterAgentReplyMap],
   );
 
-  useChatAutoScroll(scrollParent ?? null, sessions, taskId);
+  useChatAutoScroll(scrollParent ?? null, sessions, taskId, comments.length, openAtLatest);
   useCommentHashScroll(comments);
 
   const showOlderToggle = olderGroups.length > 0 && !showOlder;

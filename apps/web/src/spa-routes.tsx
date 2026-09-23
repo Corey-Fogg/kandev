@@ -64,6 +64,12 @@ import { NeedsYouInboxRoute } from "./needs-you-inbox-route";
 import { AuthRouteRedirect, RouteLoading } from "./spa-route-chrome";
 import { NEEDS_YOU_INBOX_HREF } from "@/lib/navigation/needs-you-inbox-destination";
 import { generateUUID } from "@/lib/utils";
+import {
+  isOrchestrationRoute,
+  OrchestrationRoute,
+  resolveOrchestrationRoute,
+  type OrchestrationSpaRoute,
+} from "./orchestration-routes";
 
 const OfficeRoutes = lazy(() =>
   import("./office-routes").then((mod) => ({ default: mod.OfficeRoutes })),
@@ -111,6 +117,7 @@ type SpaRoute =
   | { kind: "needsYouInbox" }
   | { kind: "settings"; pathname: string }
   | { kind: "office"; pathname: string }
+  | OrchestrationSpaRoute
   | { kind: "plugin"; path: string }
   | { kind: "login" }
   | { kind: "setup" }
@@ -281,7 +288,7 @@ function resolveNestedRoute(normalized: string): SpaRoute | null {
   if (normalized === "/office" || normalized.startsWith("/office/")) {
     return { kind: "office", pathname: normalized };
   }
-  return null;
+  return resolveOrchestrationRoute(normalized);
 }
 
 function resolveKanbanRoute(searchParams: URLSearchParams): SpaRoute {
@@ -348,6 +355,7 @@ export function SpaRoutes({ routeData }: { routeData?: BootRouteData }) {
       </Suspense>
     );
   }
+  if (isOrchestrationRoute(route)) return <OrchestrationRoute route={route} />;
   if (route.kind === "office") {
     return (
       <Suspense fallback={<RouteLoading routeNameKey="sidebar:office" />}>

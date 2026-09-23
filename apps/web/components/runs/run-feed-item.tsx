@@ -6,6 +6,8 @@ import { formatRelativeTime } from "@/lib/utils";
 import type { AutomationRun } from "@/lib/types/automation";
 import { isOpenRun, statusDotClass, statusLabelKey } from "./run-status";
 import { t } from "@/lib/i18n";
+import Link from "@/components/routing/app-link";
+import { conversationHref } from "@/lib/api/domains/orchestration-api";
 
 /**
  * What the run actually said, in priority order. An error outranks the summary
@@ -79,6 +81,18 @@ export function RunFeedItem({ run, automationName, onOpen }: RunFeedItemProps) {
   const baseClass =
     "flex w-full gap-3 rounded-md border border-transparent px-3 py-3 text-left transition-colors";
   const testId = `run-entry-${run.id}`;
+
+  // An orchestrator delivery opens the conversation it was posted to.
+  if (run.conversation_task_id)
+    return (
+      <Link
+        className={cn(baseClass, "cursor-pointer hover:border-border hover:bg-muted/40")}
+        data-testid={testId}
+        href={conversationHref(run.conversation_task_id)}
+      >
+        <RunFeedItemBody run={run} automationName={automationName} />
+      </Link>
+    );
 
   // A run that never produced a task has no transcript to open — a skipped
   // schedule is the whole story already — so it renders inert rather than

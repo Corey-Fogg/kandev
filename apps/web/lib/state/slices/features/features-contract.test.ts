@@ -16,6 +16,9 @@ function backendFeatureKeys(source: string): string[] {
 }
 
 describe("feature flag repository contract", () => {
+  it("keeps the single Orchestrator disabled by default", () => {
+    expect(defaultFeatureFlags.orchestration).toBe(false);
+  });
   it("keeps dynamic agent routing disabled by default", () => {
     expect(defaultFeatureFlags.dynamicAgentRouting).toBe(false);
   });

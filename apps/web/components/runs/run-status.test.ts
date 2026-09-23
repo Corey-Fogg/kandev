@@ -9,8 +9,10 @@ import {
   STATUS_FILTER_OPTIONS,
   statusDotClass,
   statusLabelKey,
+  visibleStatusFilters,
 } from "./run-status";
 import { ANY_AUTOMATION, isDefaultFilters } from "./run-filters";
+import automationsEn from "@/src/locales/en/automations.json";
 
 const EVERY_STATUS: RunStatus[] = [
   "triggered",
@@ -29,6 +31,15 @@ describe("run status presentation", () => {
     for (const status of EVERY_STATUS) {
       expect(statusLabelKey(status), status).toBeTruthy();
       expect(statusDotClass(status), status).toBeTruthy();
+    }
+  });
+
+  it("labels every status with a key the English catalog defines", () => {
+    // A missing key renders the raw key name (for example "runDispatched")
+    // on the run row instead of a label.
+    const catalog = automationsEn as Record<string, string>;
+    for (const key of Object.values(RUN_STATUS_LABEL_KEY)) {
+      expect(catalog[key.replace(/^automations:/, "")], key).toBeTruthy();
     }
   });
 
@@ -71,6 +82,14 @@ describe("status filter options", () => {
     expect(STATUS_FILTER_OPTIONS[0].value).toBe(ALL_STATUSES);
     const values = STATUS_FILTER_OPTIONS.map((o) => o.value);
     expect(new Set(values).size).toBe(values.length);
+  });
+
+  it("offers Dispatched only while orchestration is on", () => {
+    const values = (on: boolean) =>
+      visibleStatusFilters(STATUS_FILTER_OPTIONS, on).map((o) => o.value);
+    expect(values(false)).not.toContain("dispatched");
+    expect(values(true)).toContain("dispatched");
+    expect(values(false)).toContain("skipped");
   });
 
   it("labels each option the same way the feed labels the run", () => {

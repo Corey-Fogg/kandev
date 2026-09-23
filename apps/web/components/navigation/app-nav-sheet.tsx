@@ -18,6 +18,7 @@ import { usePathname } from "@/lib/routing/client-router";
 import { useHasSavedSidebarLayout } from "@/hooks/domains/sidebar/use-sidebar-layout-navigation";
 import { AppNavSections, useAppNavDialogs } from "./app-nav-sections";
 import { MobileAutomationsSection } from "./mobile-automations-section";
+import { OrchestrationNav } from "@/components/app-sidebar/orchestration-nav";
 import { AppNavTrigger } from "./app-nav-trigger";
 import { AppNavSurface } from "./app-nav-surface";
 
@@ -181,6 +182,7 @@ function MobileNavigationExtras({
   const { t } = useTranslation();
   return (
     <>
+      <OrchestrationNav onNavigate={close} />
       {localNav && (
         <section className="flex flex-col gap-3" aria-label={t("common:pageNavigation")}>
           <h3 className="text-sm font-medium">{t("common:pageNavigation")}</h3>

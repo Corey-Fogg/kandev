@@ -24,6 +24,8 @@ import { useRailWidth } from "./use-rail-width";
 import { useManualTrigger } from "./use-manual-trigger";
 import { useResponsiveBreakpoint } from "@/hooks/use-responsive-breakpoint";
 import { statusLabelKey } from "./run-status";
+import Link from "@/components/routing/app-link";
+import { conversationHref } from "@/lib/api/domains/orchestration-api";
 
 const MUTED_NOTE = "py-16 text-center text-sm text-muted-foreground";
 
@@ -50,7 +52,7 @@ function useWorkspaceGuard(automation: Automation | null, onLeave: () => void): 
  * empty pane that reads as a broken link.
  */
 function selectRun(runs: AutomationRun[], requestedId: string | undefined): AutomationRun | null {
-  const openable = runs.filter((run) => Boolean(run.session_id));
+  const openable = runs.filter((run) => Boolean(run.session_id || run.conversation_task_id));
   if (openable.length === 0) return null;
   const requested = requestedId ? openable.find((run) => run.id === requestedId) : undefined;
   if (requested) return requested;
@@ -226,6 +228,15 @@ function ActivityView({
       </p>
     );
   }
+  if (selected.conversation_task_id)
+    return (
+      <div className="p-6 space-y-3" data-testid="automation-orchestrator-delivery">
+        <p>{selected.error_message || t("automations:orchestratorDeliveryHint")}</p>
+        <Link className="underline" href={conversationHref(selected.conversation_task_id)}>
+          {t("automations:openOrchestratorChat")}
+        </Link>
+      </div>
+    );
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="automation-activity">
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/60 px-4 py-2">

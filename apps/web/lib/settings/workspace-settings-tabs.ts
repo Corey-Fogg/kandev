@@ -5,6 +5,7 @@ import {
   IconBolt,
   IconGitBranch,
   IconKey,
+  IconRobot,
   IconLayoutGrid,
   IconPlugConnected,
 } from "@tabler/icons-react";
@@ -28,7 +29,8 @@ export type WorkspaceSettingsTab =
   | "canvases"
   | "integrations"
   | "automations"
-  | "secrets";
+  | "secrets"
+  | "orchestration";
 
 export function workspaceSettingsHref(workspaceId: string, tab: WorkspaceSettingsTab): string {
   const base = `${WORKSPACES_SETTINGS_HREF}/${encodeURIComponent(workspaceId)}`;
@@ -49,6 +51,7 @@ export type WorkspaceTabSpec = {
  */
 export const WORKSPACE_SETTINGS_TABS: ReadonlyArray<WorkspaceTabSpec> = [
   { tab: "overview", labelKey: "workspaces:overview", icon: IconLayoutGrid },
+  { tab: "orchestration", labelKey: "office:orchestration", icon: IconRobot },
   { tab: "repositories", labelKey: "sidebar:repositories", icon: IconGitBranch },
   { tab: "workflows", labelKey: "workflows:workflows", icon: IconArrowsShuffle },
   { tab: "canvases", labelKey: "canvases:canvases", icon: IconApps },
@@ -75,4 +78,11 @@ export function workspaceSettingsTabSpec(tab: WorkspaceSettingsTab): WorkspaceTa
   // Every member of the union has a row, so the fallback is unreachable; it
   // exists so a future tab cannot crash a page before its row is added.
   return WORKSPACE_SETTINGS_TABS.find((entry) => entry.tab === tab) ?? WORKSPACE_SETTINGS_TABS[0];
+}
+
+export function workspaceTabVisible(
+  tab: WorkspaceSettingsTab,
+  features: { orchestration?: boolean },
+) {
+  return tab !== "orchestration" || !!features.orchestration;
 }

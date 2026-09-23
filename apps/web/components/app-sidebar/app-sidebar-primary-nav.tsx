@@ -15,6 +15,7 @@ import { useQuickChatActivity } from "@/components/quick-chat/use-quick-chat-act
 import { homeDestinationHref } from "@/lib/navigation/core-destinations";
 import { NEEDS_YOU_INBOX_HREF } from "@/lib/navigation/needs-you-inbox-destination";
 import { AppSidebarNavItem } from "./app-sidebar-nav-item";
+import { OrchestrationNav } from "./orchestration-nav";
 import { AppSidebarNewTaskItem } from "./app-sidebar-new-task-item";
 
 type AppSidebarPrimaryNavProps = {
@@ -106,6 +107,7 @@ export function AppSidebarPrimaryNav({
     <div className="flex flex-col gap-0.5">
       {showHome && <AppSidebarHomeItem collapsed={collapsed} />}
       <AppSidebarFixedNav collapsed={collapsed} />
+      <OrchestrationNav collapsed={collapsed} />
       {showNewTask && <AppSidebarNewTaskItem collapsed={collapsed} />}
     </div>
   );

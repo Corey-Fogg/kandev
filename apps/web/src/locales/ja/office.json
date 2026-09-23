@@ -1023,5 +1023,6 @@
   "failedToLoadRouteAttempts": "ルート試行の読み込み失敗",
   "failedToLoadRoutingConfig": "ルーティング設定の読み込み失敗",
   "failedToLoadRoutingPreview": "ルーティングプレビューの読み込み失敗",
-  "failedToLoadTaskQuorum": "タスククオーラムの読み込み失敗"
+  "failedToLoadTaskQuorum": "タスククオーラムの読み込み失敗",
+  "orchestrationKeywords": "オーケストレーター チーフ・オブ・スタッフ コーディネーター ロール ペルソナ 委任 orchestrators chief of staff coordinator roles personas delegation"
 }

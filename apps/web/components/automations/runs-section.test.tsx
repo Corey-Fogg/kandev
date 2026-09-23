@@ -15,6 +15,11 @@ const CANCELLED = "Cancelled";
 const RUN_OUTCOME = "run-outcome";
 const RUN_OUTCOME_REASON = "run-outcome-reason";
 
+const orchestration = vi.hoisted(() => ({ enabled: false }));
+vi.mock("@/hooks/domains/features/use-feature", () => ({
+  useFeature: () => orchestration.enabled,
+}));
+
 const mockPush = vi.fn();
 vi.mock("@/lib/routing/client-router", () => ({
   useRouter: () => ({ push: mockPush }),
@@ -365,5 +370,22 @@ describe("RunsSection derived statuses", () => {
     fireEvent.click(screen.getByTestId("run-filter-cancelled"));
     expect(screen.getByTestId("run-row-run-canc")).toBeTruthy();
     expect(screen.queryByTestId("run-row-run-arch")).toBeNull();
+  });
+});
+
+describe("RunsSection orchestration filter", () => {
+  afterEach(() => {
+    orchestration.enabled = false;
+    cleanup();
+  });
+
+  it("offers the Dispatched filter only while orchestration is on", () => {
+    const runs = [mkRun({ id: "run-dispatched", status: "dispatched", task_id: "" })];
+    setup(runs);
+    expect(screen.queryByTestId("run-filter-dispatched")).toBeNull();
+    cleanup();
+    orchestration.enabled = true;
+    setup(runs);
+    expect(screen.getByTestId("run-filter-dispatched")).toBeTruthy();
   });
 });

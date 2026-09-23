@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  affectsWorkspace,
+  ORCHESTRATION_CHANGED,
+} from "@/hooks/domains/orchestration/use-orchestration-data";
+import { readWorkspaceOrchestrators } from "@/lib/orchestration/orchestrator-list-cache";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { IconChevronRight } from "@tabler/icons-react";
@@ -25,6 +30,7 @@ import {
 import { cn } from "@kandev/ui/lib/utils";
 
 export type SectionCounts = {
+  orchestration?: number;
   repositories?: number;
   workflows?: number;
   integrations?: number;
@@ -61,6 +67,15 @@ export function useWorkspaceSectionCounts(workspaceId: string): {
   counts: SectionCounts;
   settled: boolean;
 } {
+  const enabled = useFeature("orchestration");
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const refresh = (event: Event) => {
+      if (affectsWorkspace(event, workspaceId)) setRevision((v) => v + 1);
+    };
+    window.addEventListener(ORCHESTRATION_CHANGED, refresh);
+    return () => window.removeEventListener(ORCHESTRATION_CHANGED, refresh);
+  }, [workspaceId]);
   const [counts, setCounts] = useState<SectionCounts>({});
   const [settled, setSettled] = useState(false);
   const canvasesEnabled = useFeature("canvases");
@@ -74,6 +89,13 @@ export function useWorkspaceSectionCounts(workspaceId: string): {
     };
     // The backend serializes empty lists as null — count defensively.
     const probes = [
+      ...(enabled
+        ? [
+            readWorkspaceOrchestrators(workspaceId)
+              .then((r) => apply({ orchestration: r.orchestrators.length }))
+              .catch(() => undefined),
+          ]
+        : []),
       listRepositories(workspaceId)
         .then((res) => apply({ repositories: (res.repositories ?? []).length }))
         .catch(() => undefined),
@@ -110,7 +132,7 @@ export function useWorkspaceSectionCounts(workspaceId: string): {
     return () => {
       cancelled = true;
     };
-  }, [canvasesEnabled, workspaceId]);
+  }, [canvasesEnabled, workspaceId, enabled, revision]);
 
   return { counts, settled };
 }
@@ -144,7 +166,10 @@ export function WorkspaceSectionStats({
 }) {
   const { t } = useTranslation();
   const canvasesEnabled = useFeature("canvases");
-  const stats = workspaceSectionStats(canvasesEnabled);
+  const orchestrationEnabled = useFeature("orchestration");
+  const stats = workspaceSectionStats(canvasesEnabled).filter(
+    ({ key }) => key !== "orchestration" || orchestrationEnabled,
+  );
 
   return (
     <div

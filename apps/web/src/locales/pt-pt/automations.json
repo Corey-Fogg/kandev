@@ -297,5 +297,13 @@
   "pluginWebhookState_failed": "Falhou",
   "pluginWebhookState_cancelled": "Cancelada",
   "pluginWebhookState_skipped": "Omitida",
-  "pluginWebhookState_ignored": "Ignorada"
+  "pluginWebhookState_ignored": "Ignorada",
+  "runTarget": "Destino da execução",
+  "agentRunTarget": "Tarefa de agente",
+  "orchestratorUnavailable": "Orquestrador indisponível",
+  "orchestratorTargetHint": "Cada execução é enviada para a conversa deste orquestrador. O orquestrador usa o seu próprio perfil de execução.",
+  "manageOrchestrators": "Gerir orquestradores",
+  "orchestratorDeliveryHint": "Esta execução foi entregue numa conversa de orquestrador.",
+  "runDispatched": "Entregue ao orquestrador",
+  "openOrchestratorChat": "Abrir conversa do orquestrador"
 }

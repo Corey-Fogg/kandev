@@ -24,6 +24,10 @@ import { buildRunOutcomeReasonSuffix } from "@/lib/automation-run-reason";
 import { linkToTask } from "@/lib/links";
 import type { AutomationRun, RunStatus } from "@/lib/types/automation";
 import { formatRelativeTime } from "@/lib/utils";
+import Link from "@/components/routing/app-link";
+import { conversationHref } from "@/lib/api/domains/orchestration-api";
+import { useFeature } from "@/hooks/domains/features/use-feature";
+import { visibleStatusFilters } from "@/components/runs/run-status";
 
 type RunsSectionProps = {
   automationId: string | null;
@@ -34,6 +38,7 @@ const STATUS_BADGE: Record<
   RunStatus,
   { variant: "default" | "destructive" | "secondary" | "outline"; labelKey: string }
 > = {
+  dispatched: { variant: "default", labelKey: "automations:runDispatched" },
   triggered: { variant: "secondary", labelKey: "automations:runStatusTriggered" },
   task_created: { variant: "secondary", labelKey: "automations:runStatusRunning" },
   succeeded: { variant: "default", labelKey: "automations:runStatusSucceeded" },
@@ -79,7 +84,14 @@ function RunRow({ run, deleting, onDelete, onNavigate }: RunRowProps) {
       // lives here instead of being inferred from rendered copy.
       data-task-id={run.task_id || undefined}
     >
-      <TableCell className="text-sm">{run.trigger_type}</TableCell>
+      <TableCell className="text-sm">
+        {run.trigger_type}
+        {run.conversation_task_id && (
+          <Link className="block underline" href={conversationHref(run.conversation_task_id)}>
+            {t("automations:openOrchestratorChat")}
+          </Link>
+        )}
+      </TableCell>
       <TableCell>
         <Badge variant={badge.variant}>{t(badge.labelKey)}</Badge>
       </TableCell>
@@ -125,6 +137,7 @@ function RunRow({ run, deleting, onDelete, onNavigate }: RunRowProps) {
  */
 const STATUS_FILTERS: { value: RunStatus | "all"; labelKey: string }[] = [
   { value: "all", labelKey: "automations:runAll" },
+  { value: "dispatched", labelKey: "automations:runDispatched" },
   { value: "task_created", labelKey: "automations:runStatusRunning" },
   { value: "succeeded", labelKey: "automations:runStatusSucceeded" },
   { value: "failed", labelKey: "automations:runStatusFailed" },
@@ -209,9 +222,10 @@ function StatusFilter({
   onChange: (value: RunStatus | "all") => void;
 }) {
   const { t } = useTranslation();
+  const orchestration = useFeature("orchestration");
   return (
     <div className="flex items-center gap-1 flex-wrap" data-testid="run-status-filter">
-      {STATUS_FILTERS.map((filter) => {
+      {visibleStatusFilters(STATUS_FILTERS, orchestration).map((filter) => {
         const count =
           filter.value === "all"
             ? runs.length

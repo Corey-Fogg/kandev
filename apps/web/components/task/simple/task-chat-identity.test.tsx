@@ -1,0 +1,78 @@
+import { afterEach, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { StateProvider } from "@/components/state-provider";
+import { ChatIdentityContext } from "./chat-identity-context";
+import { ActiveSessionRefProvider } from "./components/active-session-ref-context";
+
+vi.mock("@/components/toast-provider", () => ({ useToast: () => ({ toast: vi.fn() }) }));
+vi.mock("@/hooks/use-is-utility-configured", () => ({ useIsUtilityConfigured: () => true }));
+vi.mock("@/hooks/use-utility-agent-generator", () => ({
+  useUtilityAgentGenerator: () => ({ enhancePrompt: vi.fn(), isEnhancingPrompt: false }),
+}));
+vi.mock("./markdown-comment", () => ({
+  MarkdownComment: ({ content }: { content: string }) => <p>{content}</p>,
+}));
+vi.mock("@kandev/ui/tooltip", () => ({
+  Tooltip: ({ children }: { children: ReactNode }) => <>{children}</>,
+  TooltipTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
+  TooltipContent: ({ children }: { children: ReactNode }) => <>{children}</>,
+}));
+import { TaskChat } from "./task-chat";
+
+afterEach(cleanup);
+function wrap(children: ReactNode) {
+  return (
+    <StateProvider>
+      <ActiveSessionRefProvider>{children}</ActiveSessionRefProvider>
+    </StateProvider>
+  );
+}
+
+it("renders agent entries as the conversation persona once it is known", () => {
+  const comment = {
+    id: "identity",
+    taskId: "task-1",
+    content: "A generic project update.",
+    createdAt: "2026-05-01T10:00:00Z",
+    authorType: "agent" as const,
+    authorId: "chief",
+    authorName: "",
+  };
+  const view = (name: string | null) =>
+    wrap(
+      <ChatIdentityContext.Provider value={{ persona: name ? { id: "chief", name } : null }}>
+        <TaskChat taskId="task-1" comments={[comment]} sessions={[]} readOnly />
+      </ChatIdentityContext.Provider>,
+    );
+  const { rerender } = render(view(null));
+  expect(screen.getByText("Agent")).not.toBeNull();
+  rerender(view("Chief of staff"));
+  expect(screen.getByText("Chief of staff")).not.toBeNull();
+  expect(screen.queryByText("Agent")).toBeNull();
+});
+
+import { CommentDraftContext } from "./comment-draft-context";
+it("preserves memory-only drafts per conversation without transferring them", () => {
+  const drafts = new Map<string, string>();
+  const store = {
+    get: (id: string) => drafts.get(id) ?? "",
+    set: (id: string, value: string) => {
+      drafts.set(id, value);
+    },
+  };
+  const view = (id: string) =>
+    wrap(
+      <CommentDraftContext.Provider value={store}>
+        <TaskChat key={id} taskId={id} comments={[]} />
+      </CommentDraftContext.Provider>,
+    );
+  const { rerender } = render(view("first"));
+  fireEvent.change(screen.getByRole("textbox"), { target: { value: "Summarize example tasks." } });
+  rerender(view("second"));
+  expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("");
+  rerender(view("first"));
+  expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
+    "Summarize example tasks.",
+  );
+});

@@ -11,8 +11,16 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/components/state-provider", () => ({
-  useAppStore: (selector: (state: { workspaces: { activeId: string | undefined } }) => unknown) =>
-    selector({ workspaces: { activeId: mocks.activeWorkspaceId.current } }),
+  useAppStore: (
+    selector: (state: {
+      workspaces: { activeId: string | undefined };
+      features: { orchestration: boolean };
+    }) => unknown,
+  ) =>
+    selector({
+      workspaces: { activeId: mocks.activeWorkspaceId.current },
+      features: { orchestration: false },
+    }),
 }));
 
 vi.mock("@/lib/api/domains/automation-api", () => ({

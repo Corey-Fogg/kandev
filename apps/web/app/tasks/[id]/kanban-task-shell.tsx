@@ -22,6 +22,7 @@ import { TaskBody, resolveTaskBodyMode } from "@/components/task/TaskBody";
 import { TaskHeader } from "@/components/task/TaskHeader";
 import { useTaskPendingInput } from "@/hooks/use-task-pending-input";
 import { TaskStateActions } from "@/components/task/task-state-actions";
+import { OrchestratedTaskFrame } from "@/components/task/task-orchestrator-link";
 import { useFeature } from "@/hooks/domains/features/use-feature";
 import { isFromOffice } from "@/lib/types/http";
 import type { Repository, RepositoryScript, Task } from "@/lib/types/http";
@@ -93,10 +94,18 @@ export function KanbanTaskShell({
   );
 
   if (mode === "advanced") {
-    return <TaskBody mode={mode} simpleSlot={simpleSlot} advancedSlot={advancedSlot} />;
+    return (
+      <OrchestratedTaskFrame task={task} advanced>
+        <TaskBody mode={mode} simpleSlot={simpleSlot} advancedSlot={advancedSlot} />
+      </OrchestratedTaskFrame>
+    );
   }
 
-  return <TaskBody mode={mode} simpleSlot={simpleSlot} advancedSlot={advancedSlot} />;
+  return (
+    <OrchestratedTaskFrame task={task}>
+      <TaskBody mode={mode} simpleSlot={simpleSlot} advancedSlot={advancedSlot} />
+    </OrchestratedTaskFrame>
+  );
 }
 
 // Open-task header row for the kanban simple view: a task-level status icon plus
