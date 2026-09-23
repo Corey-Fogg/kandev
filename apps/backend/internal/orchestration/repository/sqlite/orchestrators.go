@@ -68,6 +68,7 @@ func (r *Repository) DeleteOrchestratorRole(ctx context.Context, id string) erro
 	return err
 }
 func (r *Repository) RegisterOrchestrator(ctx context.Context, agentID, workspaceID, roleID string) error {
+	defer r.invalidateRegistered()
 	result, err := r.db.ExecContext(ctx, r.db.Rebind(`INSERT INTO workspace_orchestrators (agent_id,workspace_id,role_id) SELECT id,workspace_id,? FROM agent_profiles WHERE id=? AND workspace_id=? AND deleted_at IS NULL AND role='assistant' ON CONFLICT(agent_id) DO UPDATE SET role_id=excluded.role_id`), roleID, agentID, workspaceID)
 	if err != nil {
 		return err
@@ -92,6 +93,7 @@ func (r *Repository) OrchestratorRoleID(ctx context.Context, agentID string) (st
 	return id, err
 }
 func (r *Repository) UnregisterOrchestrator(ctx context.Context, id string) error {
+	defer r.invalidateRegistered()
 	_, err := r.db.ExecContext(ctx, r.db.Rebind(`DELETE FROM workspace_orchestrators WHERE agent_id=?`), id)
 	return err
 }

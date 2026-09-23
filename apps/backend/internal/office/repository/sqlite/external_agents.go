@@ -23,13 +23,13 @@ func (r *Repository) IsExternalAgentTask(ctx context.Context, taskID string) (bo
 	if r.externalAgents == nil {
 		return false, nil
 	}
+	ids, err := r.externalAgents.RegisteredProfileIDs(ctx)
+	if err != nil || len(ids) == 0 {
+		return false, err
+	}
 	fields, err := r.GetTaskExecutionFields(ctx, taskID)
 	if err != nil || fields.AssigneeAgentProfileID == "" {
 		return false, nil
-	}
-	ids, err := r.externalAgents.RegisteredProfileIDs(ctx)
-	if err != nil {
-		return false, err
 	}
 	return slices.Contains(ids, fields.AssigneeAgentProfileID), nil
 }

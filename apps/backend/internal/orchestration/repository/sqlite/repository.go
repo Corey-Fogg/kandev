@@ -4,7 +4,12 @@ package sqlite
 
 import "github.com/jmoiron/sqlx"
 
-type Repository struct{ db, ro *sqlx.DB }
+type Repository struct {
+	db, ro *sqlx.DB
+	// registered caches RegisteredProfileIDs, which Office and the run
+	// dispatcher read on hot paths.
+	registered registeredCache
+}
 
 func New(db, ro *sqlx.DB) *Repository {
 	if ro == nil {

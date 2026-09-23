@@ -41,6 +41,23 @@ func TestRegistryWithoutOfficePreservesExistingRows(t *testing.T) {
 	if err := repo.RegisterOrchestrator(ctx, "chief", "workspace", "custom"); err != nil {
 		t.Fatal(err)
 	}
+	// The cached registration list follows this repository's own writes.
+	assertRegistered := func(want ...string) {
+		t.Helper()
+		got, err := repo.RegisteredProfileIDs(ctx)
+		if err != nil || len(got) != len(want) || (len(want) == 1 && got[0] != want[0]) {
+			t.Fatalf("registered profiles = %v, %v; want %v", got, err, want)
+		}
+	}
+	assertRegistered("chief")
+	if err := repo.UnregisterOrchestrator(ctx, "chief"); err != nil {
+		t.Fatal(err)
+	}
+	assertRegistered()
+	if err := repo.RegisterOrchestrator(ctx, "chief", "workspace", "custom"); err != nil {
+		t.Fatal(err)
+	}
+	assertRegistered("chief")
 	if err := repo.Migrate(); err != nil {
 		t.Fatal(err)
 	}
