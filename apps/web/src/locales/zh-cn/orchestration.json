@@ -87,5 +87,21 @@
   "workspaceUnavailable": "无法加载此工作区。请检查访问权限后重试。",
   "retryMessage": "重试",
   "retryQueued": "已加入重试队列",
-  "retryAlreadyQueued": "重试已在队列中"
+  "retryAlreadyQueued": "重试已在队列中",
+  "displayName": "显示名称",
+  "displayNameHint": "此编排器在聊天、导航和设置中使用的名称。留空则使用角色名称（{{role}}）。",
+  "displayNameTooLong": "请使用不超过 60 个字符。",
+  "identitySection": "身份",
+  "behaviorSection": "行为",
+  "askBeforeCreate": "创建任务前先询问",
+  "askBeforeCreateHint": "开启后，编排器会在聊天中提议每个新任务，并等待你批准、编辑或驳回。关闭后，它会自行创建并启动任务。",
+  "autoCommentSource": "自动在来源问题上评论",
+  "autoCommentSourceHint": "当从 Jira 或 Linear 问题创建的委派任务进入审核或完成时，Kandev 会在该问题上发布一条简短评论，每次变更只发布一次。",
+  "autoMoveSourceDone": "自动将来源问题移至已完成",
+  "autoMoveSourceDoneHint": "当从 Jira 或 Linear 问题创建的委派任务完成时，Kandev 还会将该问题移至已完成状态。如果你的团队自行关闭问题，请保持关闭。",
+  "singleOrchestratorHint": "每个工作区只有一个编排器。打开它即可重命名、更改角色或调整行为。",
+  "orchestratorExists": "此工作区已有编排器，因此已改为打开该编排器。",
+  "legacyMultipleOrchestrators": "此工作区有多个来自早期版本的编排器。它们仍可正常工作，但现在每个工作区只有一个编排器。请删除不再需要的编排器。",
+  "conversationWith": "与 {{name}} 的对话",
+  "orchestratorPausedLabel": "{{name}}（已暂停）"
 }

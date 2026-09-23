@@ -87,5 +87,21 @@
   "workspaceUnavailable": "This workspace could not be loaded. Check your access and try again.",
   "retryMessage": "Retry",
   "retryQueued": "Retry queued",
-  "retryAlreadyQueued": "A retry is already queued"
+  "retryAlreadyQueued": "A retry is already queued",
+  "displayName": "Display name",
+  "displayNameHint": "The name this orchestrator uses in chat, navigation and settings. Leave it empty to use the role name ({{role}}).",
+  "displayNameTooLong": "Use 60 characters or fewer.",
+  "identitySection": "Identity",
+  "behaviorSection": "Behavior",
+  "askBeforeCreate": "Ask before creating tasks",
+  "askBeforeCreateHint": "When on, the orchestrator proposes each new task in chat and waits for you to approve, edit or dismiss it. When off, it creates and starts tasks on its own.",
+  "autoCommentSource": "Comment on the source issue automatically",
+  "autoCommentSourceHint": "When a delegated task created from a Jira or Linear issue reaches review or completes, Kandev posts a short comment on that issue once per change.",
+  "autoMoveSourceDone": "Move the source issue to done automatically",
+  "autoMoveSourceDoneHint": "When a delegated task created from a Jira or Linear issue completes, Kandev also moves the issue to its done status. Leave this off if your team closes issues itself.",
+  "singleOrchestratorHint": "A workspace has one orchestrator. Open it to rename it, change its role or adjust its behavior.",
+  "orchestratorExists": "This workspace already has an orchestrator, so it was opened instead.",
+  "legacyMultipleOrchestrators": "This workspace has more than one orchestrator from an earlier version. They keep working, but a workspace now has one. Delete the ones you no longer need.",
+  "conversationWith": "Conversation with {{name}}",
+  "orchestratorPausedLabel": "{{name}} (paused)"
 }

@@ -87,5 +87,21 @@
   "workspaceUnavailable": "Não foi possível carregar este espaço de trabalho. Verifique o acesso e tente novamente.",
   "retryMessage": "Tentar novamente",
   "retryQueued": "Nova tentativa em fila",
-  "retryAlreadyQueued": "Já existe uma nova tentativa em fila"
+  "retryAlreadyQueued": "Já existe uma nova tentativa em fila",
+  "displayName": "Nome a apresentar",
+  "displayNameHint": "O nome que este orquestrador usa no chat, na navegação e nas definições. Deixe vazio para usar o nome da função ({{role}}).",
+  "displayNameTooLong": "Use 60 caracteres ou menos.",
+  "identitySection": "Identidade",
+  "behaviorSection": "Comportamento",
+  "askBeforeCreate": "Perguntar antes de criar tarefas",
+  "askBeforeCreateHint": "Quando ativo, o orquestrador propõe cada nova tarefa no chat e aguarda que a aprove, edite ou rejeite. Quando inativo, cria e inicia tarefas por conta própria.",
+  "autoCommentSource": "Comentar automaticamente no problema de origem",
+  "autoCommentSourceHint": "Quando uma tarefa delegada criada a partir de um problema do Jira ou Linear chega a revisão ou é concluída, o Kandev publica um comentário curto nesse problema, uma vez por alteração.",
+  "autoMoveSourceDone": "Mover automaticamente o problema de origem para concluído",
+  "autoMoveSourceDoneHint": "Quando uma tarefa delegada criada a partir de um problema do Jira ou Linear é concluída, o Kandev também move o problema para o estado concluído. Deixe inativo se a sua equipa fecha os problemas manualmente.",
+  "singleOrchestratorHint": "Um espaço de trabalho tem um orquestrador. Abra-o para lhe mudar o nome, alterar a função ou ajustar o comportamento.",
+  "orchestratorExists": "Este espaço de trabalho já tem um orquestrador, por isso foi aberto em alternativa.",
+  "legacyMultipleOrchestrators": "Este espaço de trabalho tem mais do que um orquestrador de uma versão anterior. Continuam a funcionar, mas agora cada espaço de trabalho tem um. Elimine os que já não precisa.",
+  "conversationWith": "Conversa com {{name}}",
+  "orchestratorPausedLabel": "{{name}} (em pausa)"
 }

@@ -55,6 +55,15 @@ function ConversationLinks({
   );
 }
 
+function ConversationHeading({ title, persona }: { title: string; persona?: Orchestrator }) {
+  const { t } = useTranslation();
+  return (
+    <h1 className="text-xl font-semibold my-4">
+      {persona ? t("orchestration:conversationWith", { name: persona.name }) : title}
+    </h1>
+  );
+}
+
 export function OrchestratorConversationPane({
   task,
   comments,
@@ -93,7 +102,7 @@ export function OrchestratorConversationPane({
             {!embedded && (
               <ConversationLinks workspaceId={task.workspaceId} orchestratorId={orchestratorId} />
             )}
-            <h1 className="text-xl font-semibold my-4">{task.title}</h1>
+            <ConversationHeading title={task.title} persona={persona} />
             <TopbarWorkingIndicator taskId={task.id} comments={comments} />
             <RecoveryTransportContext.Provider value={retryConversation}>
               <CommentTransportContext.Provider value={transport}>

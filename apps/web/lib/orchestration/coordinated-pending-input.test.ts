@@ -27,4 +27,15 @@ describe("coordinated pending input count", () => {
   it("ignores tasks no coordinator manages", () => {
     expect(selectCoordinatedPendingInputCount(state([task("a", undefined, "permission")]))).toBe(0);
   });
+
+  it("counts only one orchestrator's tasks when an id is given", () => {
+    const rows = [
+      task("a", "chief", "clarification"),
+      task("b", "other", "permission"),
+      task("c", "chief", "permission"),
+    ];
+    expect(selectCoordinatedPendingInputCount(state(rows), "chief")).toBe(2);
+    expect(selectCoordinatedPendingInputCount(state(rows), "other")).toBe(1);
+    expect(selectCoordinatedPendingInputCount(state(rows), "missing")).toBe(0);
+  });
 });
