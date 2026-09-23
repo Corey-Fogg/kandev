@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// @covers AC-ORCHESTRATION-ASSISTANT-010.1, AC-ORCHESTRATION-ASSISTANT-010.3
+// @covers AC-ORCHESTRATION-COORDINATOR-005.2
 func TestOrchestratorFeatureGateNativeRunMatrix(t *testing.T) {
 	a, _, repo, taskID := coordinatorConversationFixture(t)
 	ctx := context.Background()

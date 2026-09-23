@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func assistantRouter(s *Service, users ...string) *gin.Engine {
+func conversationRouter(s *Service, users ...string) *gin.Engine {
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		user := c.GetHeader("X-Test-User")
@@ -32,12 +32,12 @@ func assistantRouter(s *Service, users ...string) *gin.Engine {
 	return router
 }
 
-func TestAssistantIntakeRepairsAcceptedMessageAtRestart(t *testing.T) {
+func TestConversationIntakeRepairsAcceptedMessageAtRestart(t *testing.T) {
 	s, db, task := newRuntime(t)
 	queue := s.Queue
 	s.Queue = nil
 	path := "/api/v1/orchestration/tasks/" + task + "/comments"
-	require.Equal(t, 201, runtimeRequest(t, assistantRouter(s), "POST", path, "", "", map[string]string{"body": "Inspect only", "client_message_id": "offline"}).Code)
+	require.Equal(t, 201, runtimeRequest(t, conversationRouter(s), "POST", path, "", "", map[string]string{"body": "Inspect only", "client_message_id": "offline"}).Code)
 	s.Queue = queue
 	require.NoError(t, s.RecoverInterrupted(context.Background()))
 	var count int
@@ -48,10 +48,10 @@ func TestAssistantIntakeRepairsAcceptedMessageAtRestart(t *testing.T) {
 	require.Equal(t, 1, count)
 }
 
-func TestAssistantIntentNewMessageRevokesOldRunWrites(t *testing.T) {
+func TestConversationIntentNewMessageRevokesOldRunWrites(t *testing.T) {
 	s, _, task := newRuntime(t)
 	ctx := context.Background()
-	human := assistantRouter(s)
+	human := conversationRouter(s)
 	path := "/api/v1/orchestration/tasks/" + task + "/comments"
 	require.Equal(t, 201, runtimeRequest(t, human, "POST", path, "", "", map[string]string{"body": "Work on the report"}).Code)
 	run, err := s.Runs.ClaimNextEligibleRun(ctx)
@@ -71,9 +71,9 @@ func TestAssistantIntentNewMessageRevokesOldRunWrites(t *testing.T) {
 	require.Empty(t, rows)
 }
 
-func TestAssistantIntakeDuplicateIsOneCommentAndRun(t *testing.T) {
+func TestConversationIntakeDuplicateIsOneCommentAndRun(t *testing.T) {
 	s, db, task := newRuntime(t)
-	router := assistantRouter(s)
+	router := conversationRouter(s)
 	path := "/api/v1/orchestration/tasks/" + task + "/comments"
 	body := map[string]string{"body": "Inspect the workspace only.", "client_message_id": "client-1"}
 	first := runtimeRequest(t, router, http.MethodPost, path, "", "", body)
@@ -97,21 +97,21 @@ func TestAssistantIntakeDuplicateIsOneCommentAndRun(t *testing.T) {
 	require.Len(t, rows, 1)
 }
 
-func TestAssistantIntakeStartupBeforeQueueIsReadyKeepsOutbox(t *testing.T) {
+func TestConversationIntakeStartupBeforeQueueIsReadyKeepsOutbox(t *testing.T) {
 	s, _, task := newRuntime(t)
 	s.Queue = nil
 	path := "/api/v1/orchestration/tasks/" + task + "/comments"
-	require.Equal(t, 201, runtimeRequest(t, assistantRouter(s), "POST", path, "", "", map[string]string{"body": "Inspect only"}).Code)
+	require.Equal(t, 201, runtimeRequest(t, conversationRouter(s), "POST", path, "", "", map[string]string{"body": "Inspect only"}).Code)
 	require.NoError(t, s.RecoverInterrupted(context.Background()))
 	rows, err := s.Repo.PendingIntake(context.Background())
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 }
 
-func TestAssistantIntakePersistsWhenQueueUnavailable(t *testing.T) {
+func TestConversationIntakePersistsWhenQueueUnavailable(t *testing.T) {
 	s, _, task := newRuntime(t)
 	s.Queue = nil
-	router := assistantRouter(s)
+	router := conversationRouter(s)
 	path := "/api/v1/orchestration/tasks/" + task + "/comments"
 	result := runtimeRequest(t, router, http.MethodPost, path, "", "", map[string]string{
 		"body": "Read the report.", "client_message_id": "offline",
@@ -125,7 +125,7 @@ func TestAssistantIntakePersistsWhenQueueUnavailable(t *testing.T) {
 	require.Len(t, rows, 1)
 }
 
-func TestAssistantIntentExactSourceSurvivesNewerComments(t *testing.T) {
+func TestConversationIntentExactSourceSurvivesNewerComments(t *testing.T) {
 	s, _, task := newRuntime(t)
 	ctx := context.Background()
 	original := &models.TaskComment{
@@ -162,7 +162,7 @@ func TestRetainedOwnerAndBindingDoNotRestrictConversation(t *testing.T) {
 	_, err = db.Exec(`INSERT INTO orchestration_assistant_bindings VALUES('binding','owner','chief','ws',?,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`, task)
 	require.NoError(t, err)
 	s.Tasks.(*testTasks).tasks[task] = &taskmodels.Task{ID: task, WorkspaceID: "ws"}
-	member := assistantRouter(s, "member")
+	member := conversationRouter(s, "member")
 	path := "/api/v1/orchestration/tasks/" + task
 	require.Equal(t, 200, runtimeRequest(t, member, "GET", path, "", "", nil).Code)
 	response := runtimeRequest(t, member, "POST", path+"/comments", "", "", map[string]string{"body": "Summarize the sample tasks", "client_message_id": "member"})

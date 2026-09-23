@@ -11,11 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAssistantIntakeAtomicRollback(t *testing.T) {
+func TestConversationIntakeAtomicRollback(t *testing.T) {
 	s, db, task := newRuntime(t)
 	_, err := db.Exec(`CREATE TRIGGER fail_intake BEFORE INSERT ON orchestration_intake BEGIN SELECT RAISE(ABORT,'outbox unavailable'); END`)
 	require.NoError(t, err)
-	result := runtimeRequest(t, assistantRouter(s), "POST", "/api/v1/orchestration/tasks/"+task+"/comments", "", "", map[string]string{"body": "Inspect", "client_message_id": "rollback"})
+	result := runtimeRequest(t, conversationRouter(s), "POST", "/api/v1/orchestration/tasks/"+task+"/comments", "", "", map[string]string{"body": "Inspect", "client_message_id": "rollback"})
 	require.Equal(t, 400, result.Code)
 	rows, err := s.Repo.ListComments(context.Background(), task, 10)
 	require.NoError(t, err)
@@ -25,9 +25,9 @@ func TestAssistantIntakeAtomicRollback(t *testing.T) {
 	require.Zero(t, revision)
 }
 
-func TestAssistantIntakeConcurrentSendAndMigrationReplay(t *testing.T) {
+func TestConversationIntakeConcurrentSendAndMigrationReplay(t *testing.T) {
 	s, db, task := newRuntime(t)
-	router := assistantRouter(s)
+	router := conversationRouter(s)
 	start, results := make(chan struct{}), make(chan int, 2)
 	for i := 0; i < 2; i++ {
 		go func() {
@@ -48,14 +48,14 @@ func TestAssistantIntakeConcurrentSendAndMigrationReplay(t *testing.T) {
 	require.EqualValues(t, 1, rows[0].IntentRevision)
 }
 
-func TestAssistantIntakeHistoryCursorHasNoGaps(t *testing.T) {
+func TestConversationIntakeHistoryCursorHasNoGaps(t *testing.T) {
 	s, _, task := newRuntime(t)
 	ctx := context.Background()
 	created := time.Now().UTC()
 	for i := 0; i < 5; i++ {
 		require.NoError(t, s.Repo.PutComment(ctx, &models.TaskComment{ID: fmt.Sprintf("comment-%d", i), TaskID: task, Body: "message", Source: "user", AuthorType: "user", AuthorID: "owner", CreatedAt: created}))
 	}
-	router := assistantRouter(s)
+	router := conversationRouter(s)
 	path := "/api/v1/orchestration/tasks/" + task + "/comments?limit=2"
 	var page struct {
 		Comments   []models.TaskComment `json:"comments"`

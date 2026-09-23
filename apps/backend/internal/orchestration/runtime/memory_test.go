@@ -93,7 +93,7 @@ func TestMemoryReadsIgnoreRetainedLegacyColumns(t *testing.T) {
 	require.Equal(t, "Kept", rows[0].Content)
 }
 
-func TestFreshInstallCreatesNoAssistantStorage(t *testing.T) {
+func TestFreshInstallCreatesNoRetiredAssistantTables(t *testing.T) {
 	_, db, _ := newRuntime(t)
 	var tables int
 	require.NoError(t, db.Get(&tables, `SELECT count(*) FROM sqlite_master WHERE type='table' AND name='orchestration_assistant_bindings'`))
