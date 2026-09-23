@@ -12,4 +12,4 @@ func (r *Repository) ListKanbanTasksByWorkspace(ctx context.Context, workspaceID
 
 const kanbanWorkflowFilter = ` AND workflow_id IN (
  SELECT w.id FROM workflows w JOIN workspaces ws ON ws.id = w.workspace_id
- WHERE w.hidden = false AND (ws.office_workflow_id IS NULL OR w.id != ws.office_workflow_id))`
+ WHERE w.hidden = 0 AND (ws.office_workflow_id IS NULL OR w.id != ws.office_workflow_id))`
