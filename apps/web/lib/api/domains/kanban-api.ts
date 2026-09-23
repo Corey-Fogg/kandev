@@ -472,8 +472,6 @@ export async function getSubtaskCount(taskId: string, options?: ApiRequestOption
 export async function listTasksByWorkspace(
   workspaceId: string,
   params: {
-    view?: "kanban";
-    excludeConfig?: boolean;
     page?: number;
     pageSize?: number;
     query?: string;
@@ -482,13 +480,13 @@ export async function listTasksByWorkspace(
     workflowId?: string | null;
     repositoryId?: string | null;
     sort?: string;
+    view?: "kanban";
+    excludeConfig?: boolean;
   } = {},
   options?: ApiRequestOptions,
 ) {
   const baseUrl = options?.baseUrl ?? getBackendConfig().apiBaseUrl;
   const url = new URL(`${baseUrl}/api/v1/workspaces/${workspaceId}/tasks`);
-  if (params.view) url.searchParams.set("view", params.view);
-  if (params.excludeConfig) url.searchParams.set("exclude_config", "true");
   if (params.page) url.searchParams.set("page", String(params.page));
   if (params.pageSize) url.searchParams.set("page_size", String(params.pageSize));
   if (params.query) url.searchParams.set("query", params.query);
@@ -497,5 +495,7 @@ export async function listTasksByWorkspace(
   if (params.workflowId) url.searchParams.set("workflow_id", params.workflowId);
   if (params.repositoryId) url.searchParams.set("repository_id", params.repositoryId);
   if (params.sort) url.searchParams.set("sort", params.sort);
+  if (params.view) url.searchParams.set("view", params.view);
+  if (params.excludeConfig) url.searchParams.set("exclude_config", "true");
   return fetchJson<ListTasksResponse>(url.toString(), options);
 }

@@ -2,19 +2,24 @@ import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { useAppStore } from "@/components/state-provider";
 import { useWebSocketClient } from "@/lib/ws/connection";
 import { useForegroundRefresh } from "@/hooks/use-foreground-refresh";
+import { useDebounce } from "@/hooks/use-debounce";
 import {
   CoordinatorTaskObservation,
   type CoordinatorFilters,
 } from "@/lib/orchestration/coordinator-task-observation";
 
+export const SEARCH_DEBOUNCE_MS = 300;
+
 export function useCoordinatorTasks(workspaceId: string, filters: CoordinatorFilters = {}) {
   const connection = useAppStore((s) => s.connection.status);
   const user = useAppStore((s) => s.auth.user?.id);
   const client = useWebSocketClient();
-  const { query, workflowId, repositoryId } = filters;
+  const query = useDebounce(filters.query, SEARCH_DEBOUNCE_MS);
+  const { workflowId, repositoryId } = filters;
   const observation = useMemo(
-    () => new CoordinatorTaskObservation(workspaceId, { query, workflowId, repositoryId }),
-    [workspaceId, query, workflowId, repositoryId, user],
+    () => new CoordinatorTaskObservation(workspaceId, {}),
+    // A new viewer must never see the previous viewer's rows.
+    [workspaceId, user],
   );
   const snapshot = useSyncExternalStore(
     observation.subscribe,
@@ -23,9 +28,11 @@ export function useCoordinatorTasks(workspaceId: string, filters: CoordinatorFil
   );
   useEffect(() => {
     observation.activate();
-    void observation.refresh();
     return observation.dispose;
   }, [observation]);
+  useEffect(() => {
+    observation.setFilters({ query, workflowId, repositoryId });
+  }, [observation, query, workflowId, repositoryId]);
   useEffect(() => {
     if (connection === "connected") observation.scheduleRefresh();
   }, [connection, observation]);

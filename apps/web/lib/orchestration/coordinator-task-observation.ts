@@ -37,6 +37,7 @@ export class CoordinatorTaskObservation {
   private generation = 0;
   private lifecycleRevision = 0;
   private disposed = false;
+  private started = false;
   private request?: AbortController;
   private timer?: ReturnType<typeof setTimeout>;
   constructor(
@@ -58,8 +59,23 @@ export class CoordinatorTaskObservation {
   activate = () => {
     this.disposed = false;
   };
+  /** Re-reads under new filters while keeping the current rows visible until the read lands. */
+  setFilters = (filters: CoordinatorFilters) => {
+    if (
+      this.started &&
+      filters.query === this.filters.query &&
+      filters.workflowId === this.filters.workflowId &&
+      filters.repositoryId === this.filters.repositoryId
+    )
+      return;
+    this.started = true;
+    this.filters = filters;
+    this.pages = 1;
+    void this.refresh();
+  };
   dispose = () => {
     this.disposed = true;
+    this.started = false;
     ++this.generation;
     this.request?.abort();
     clearTimeout(this.timer);
@@ -98,6 +114,11 @@ export class CoordinatorTaskObservation {
     }
     return [...unique.values()];
   }
+  /**
+   * Reads the loaded window. A lifecycle event that lands mid-read still lets
+   * the read commit, then schedules one follow-up, so a steady event stream
+   * cannot starve the list.
+   */
   refresh = async () => {
     if (this.disposed) return;
     this.request?.abort();
@@ -109,10 +130,7 @@ export class CoordinatorTaskObservation {
     try {
       const response = await this.readWindow(request.signal);
       if (this.disposed || generation !== this.generation) return;
-      if (revision !== this.lifecycleRevision) {
-        this.scheduleRefresh();
-        return;
-      }
+      if (revision !== this.lifecycleRevision) this.scheduleRefresh();
       const tasks = this.mergeRows(response.tasks);
       this.update({
         tasks,
@@ -173,10 +191,9 @@ export class CoordinatorTaskObservation {
     if (deleted) {
       this.deleted.add(payload.task_id);
       this.summaries.delete(payload.task_id);
-      this.update({
-        tasks: this.snapshot.tasks.filter((task) => task.id !== payload.task_id),
-        complete: false,
-      });
+      const tasks = this.snapshot.tasks.filter((task) => task.id !== payload.task_id);
+      if (tasks.length !== this.snapshot.tasks.length)
+        this.update({ tasks, total: Math.max(0, this.snapshot.total - 1) });
     }
     this.scheduleRefresh();
   };
