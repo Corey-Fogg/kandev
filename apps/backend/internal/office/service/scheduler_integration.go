@@ -1327,12 +1327,3 @@ func (si *SchedulerIntegration) enrichTaskContext(
 		}
 	}
 }
-
-// ProcessRun executes an Office-owned run already claimed by the core dispatcher.
-func (si *SchedulerIntegration) ProcessRun(ctx context.Context, run *models.Run) (bool, error) {
-	si.processRun(ctx, run)
-	return true, nil
-}
-
-// PrepareDispatch lifts Office routing backoff before the core claim loop.
-func (si *SchedulerIntegration) PrepareDispatch(ctx context.Context) { si.liftParkedRoutingRuns(ctx) }

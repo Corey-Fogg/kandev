@@ -14,6 +14,7 @@ import (
 	"github.com/kandev/kandev/internal/orchestration/models"
 	"github.com/kandev/kandev/internal/orchestration/personas"
 	store "github.com/kandev/kandev/internal/orchestration/repository/sqlite"
+	rundispatcher "github.com/kandev/kandev/internal/runs/dispatcher"
 	runmodels "github.com/kandev/kandev/internal/runs/models"
 	runstore "github.com/kandev/kandev/internal/runs/repository/sqlite"
 	runservice "github.com/kandev/kandev/internal/runs/service"
@@ -102,8 +103,13 @@ func (s *Service) QueueTurn(ctx context.Context, id, taskID, reason, key string,
 // Process claims no rows itself: the core queue dispatcher owns the single claim loop.
 func (s *Service) Process(ctx context.Context, run *runmodels.Run) (bool, error) {
 	role, err := s.Repo.OrchestratorRoleID(ctx, run.AgentProfileID)
-	if err != nil || role == "" {
-		return false, err
+	if err != nil {
+		// Neither fail an ordinary Office run nor hand a coordinator run to
+		// Office on a failed lookup: the dispatcher retries it later.
+		return false, fmt.Errorf("orchestrator lookup: %w: %w", rundispatcher.ErrOwnerUnknown, err)
+	}
+	if role == "" {
+		return false, nil
 	}
 	if !s.Enabled {
 		// The feature flag is the kill-switch: a registered orchestrator's run

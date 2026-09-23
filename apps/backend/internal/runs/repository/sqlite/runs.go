@@ -733,6 +733,16 @@ func (r *Repository) ScheduleRetryIfClaimed(ctx context.Context, runID string, r
 	return n > 0, nil
 }
 
+// ReleaseClaim returns a claimed run to the queue unchanged, for a dispatcher
+// that could not decide which runtime owns it.
+func (r *Repository) ReleaseClaim(ctx context.Context, id string) error {
+	_, err := r.db.ExecContext(ctx, r.db.Rebind(`
+		UPDATE runs SET status = 'queued', claimed_at = NULL
+		WHERE id = ? AND status = 'claimed'
+	`), id)
+	return err
+}
+
 // CleanExpired deletes finished/failed runs older than the given time.
 func (r *Repository) CleanExpired(ctx context.Context, olderThan time.Time) (int64, error) {
 	res, err := r.db.ExecContext(ctx, r.db.Rebind(`

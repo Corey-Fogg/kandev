@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -97,6 +98,33 @@ func validateOrchestratedCompletion(ctx context.Context, repos *Repositories, st
 		}
 	}
 	return nil
+}
+
+// staleClaimedRunAge matches the Office scheduler's stale-claim threshold.
+const staleClaimedRunAge = 30 * time.Minute
+
+// recoverStaleRuns requeues claimed runs that went unanswered. With the
+// feature on, coordinator runs follow the orchestration runtime's own recovery,
+// and a failed owner lookup skips this tick rather than requeue a coordinator
+// turn. With it off, coordinator runs are requeued like any other run and the
+// runtime's kill switch settles them.
+func recoverStaleRuns(ctx context.Context, repos *Repositories, orchestrationOn bool, log *logger.Logger) {
+	var protected []string
+	if orchestrationOn {
+		ids, err := repos.Orchestration.RegisteredProfileIDs(ctx)
+		if err != nil {
+			log.Warn("run recovery ownership lookup failed", zap.Error(err))
+			return
+		}
+		protected = ids
+	}
+	count, err := repos.Runs.RecoverStaleExcept(ctx, time.Now().UTC().Add(-staleClaimedRunAge), protected)
+	if err != nil && ctx.Err() == nil {
+		log.Warn("run recovery failed", zap.Error(err))
+	}
+	if count > 0 {
+		log.Info("recovered stale claimed runs", zap.Int64("count", count))
+	}
 }
 
 // startOrchestrationRuntime attaches the conversation runtime to the event bus

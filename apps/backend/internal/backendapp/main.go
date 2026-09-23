@@ -1879,28 +1879,23 @@ func startSchedulingRuntime(
 		dispatcher.Handlers = append(dispatcher.Handlers, services.Orchestration.Process)
 	}
 	dispatcher.Handlers = append(dispatcher.Handlers, orchScheduler.ProcessRun)
+	orchestrationOn := services.Orchestration != nil && services.Orchestration.Enabled
 	dispatcher.Before = func(ctx context.Context) {
 		orchScheduler.PrepareDispatch(ctx)
-		if services.Orchestration != nil {
+		if orchestrationOn {
 			if err := services.Orchestration.DispatchIntake(ctx); err != nil && ctx.Err() == nil {
 				log.Warn("orchestration intake recovery failed", zap.Error(err))
 			}
 		}
 	}
 	dispatcher.After = func(ctx context.Context) {
-		protected, err := repos.Orchestration.RegisteredProfileIDs(ctx)
-		if err != nil {
-			log.Warn("run recovery ownership lookup failed", zap.Error(err))
-			return
-		}
-		if _, err := repos.Runs.RecoverStaleExcept(ctx, time.Now().UTC().Add(-30*time.Minute), protected); err != nil && ctx.Err() == nil {
-			log.Warn("run recovery failed", zap.Error(err))
-		}
-		if services.Orchestration != nil {
+		recoverStaleRuns(ctx, repos, orchestrationOn, log)
+		if orchestrationOn {
 			if err := services.Orchestration.FailUnboundRuns(ctx, time.Now().UTC()); err != nil && ctx.Err() == nil {
 				log.Warn("orchestration unbound run recovery failed", zap.Error(err))
 			}
 		}
+		orchScheduler.FinishDispatch(ctx)
 	}
 
 	runScheduler := runsscheduler.New(

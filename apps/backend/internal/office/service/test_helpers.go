@@ -9,6 +9,7 @@ import (
 
 	"github.com/kandev/kandev/internal/office/models"
 	"github.com/kandev/kandev/internal/office/repository/sqlite"
+	rundispatcher "github.com/kandev/kandev/internal/runs/dispatcher"
 )
 
 // ListRunEventsForTest exposes the repo's ListRunEvents query so the
@@ -162,10 +163,20 @@ func (s *Service) GetAgentRuntimeForTest(ctx context.Context, agentID string) (*
 }
 
 // RunSchedulerTick runs a single scheduler tick for testing.
-// This exercises the full processRun pipeline including task launch.
+// This exercises the full processRun pipeline including task launch, through
+// the core run dispatcher and the Office hooks production installs on it.
 func RunSchedulerTick(svc *Service, ctx context.Context) {
 	si := &SchedulerIntegration{svc: svc, logger: svc.logger}
-	si.tick(ctx)
+	d := &rundispatcher.Dispatcher{
+		Queue:    svc.repo,
+		Handlers: []rundispatcher.Handler{si.ProcessRun},
+		Before:   si.PrepareDispatch,
+		After: func(ctx context.Context) {
+			si.recoverStaleClaimedRuns(ctx)
+			si.FinishDispatch(ctx)
+		},
+	}
+	d.Tick(ctx)
 }
 
 // ProcessRunForTest exposes processRun directly for external test packages
