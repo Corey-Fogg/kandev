@@ -1,4 +1,4 @@
-# Workspace orchestration owns its coordination runtime
+# ADR-2026-09-07-workspace-orchestration: Workspace orchestration owns its coordination runtime
 
 **Status:** accepted
 **Date:** 2026-09-07
@@ -18,4 +18,6 @@ Conversation presentation uses the standard app shell and shared chat components
 
 ## Consequences
 
-Office remains compatible and separately gated. Orchestration exposes its own runtime API and MCP conversation surface; its backend dependency graph contains no Office packages. Core run models, storage, dispatch and runtime authentication are shared infrastructure. Office cannot address registered Orchestration personas or conversations. An explicit import endpoint preserves existing assistant identity and conversation history. New orchestration configuration never creates a delivery workflow. Existing workflow execution, account authentication, permissions and external repair access remain Kandev's existing systems.
+Office remains compatible and separately gated. Orchestration exposes its own runtime API and broker MCP surface; its backend dependency graph contains no Office packages. Core run models, storage, dispatch and runtime authentication are shared infrastructure. Office cannot address registered Orchestration personas or conversations. An explicit import endpoint registers an existing agent persona as an assignment, preserving its identity and conversation history. New orchestration configuration never creates a delivery workflow. Existing workflow execution, account authentication, permissions and external repair access remain Kandev's existing systems.
+
+The single runtime path every coordinator uses is recorded in [ADR-2026-09-18-orchestrator-product-boundary](2026-09-18-orchestrator-product-boundary.md).
