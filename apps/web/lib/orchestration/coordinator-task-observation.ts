@@ -9,7 +9,16 @@ export type CoordinatorFilters = {
   query?: string;
   workflowId?: string | null;
   repositoryId?: string | null;
+  includeArchived?: boolean;
+  onlyArchived?: boolean;
 };
+const FILTER_KEYS = [
+  "query",
+  "workflowId",
+  "repositoryId",
+  "includeArchived",
+  "onlyArchived",
+] as const;
 type Snapshot = {
   tasks: Task[];
   total: number;
@@ -61,13 +70,7 @@ export class CoordinatorTaskObservation {
   };
   /** Re-reads under new filters while keeping the current rows visible until the read lands. */
   setFilters = (filters: CoordinatorFilters) => {
-    if (
-      this.started &&
-      filters.query === this.filters.query &&
-      filters.workflowId === this.filters.workflowId &&
-      filters.repositoryId === this.filters.repositoryId
-    )
-      return;
+    if (this.started && FILTER_KEYS.every((key) => filters[key] === this.filters[key])) return;
     this.started = true;
     this.filters = filters;
     this.pages = 1;

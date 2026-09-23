@@ -5,9 +5,23 @@ export type OrchestratorConfiguration = {
   profile_id: string;
   executor_preference: string;
   context: string;
+  /** The instance name; empty inherits the role name. */
+  display_name: string;
+  ask_before_create: boolean;
+  auto_comment_source: boolean;
+  auto_move_source_done: boolean;
 };
+/** Fields PATCH may change, including while the orchestrator is working. */
+export type OrchestratorPatch = Partial<
+  Pick<
+    OrchestratorConfiguration,
+    "display_name" | "ask_before_create" | "auto_comment_source" | "auto_move_source_done"
+  >
+>;
 export type Orchestrator = OrchestratorConfiguration & {
+  /** The effective name: the display name when set, otherwise the role name. */
   name: string;
+  role_name: string;
   icon?: string;
   instructions: string;
   id: string;
@@ -33,6 +47,35 @@ export const saveOrchestrator = (
   fetchJson<Orchestrator>(
     `${instances(ws)}${id ? `/${encodeURIComponent(id)}` : ""}`,
     json(id ? "PUT" : "POST", body),
+  );
+export const patchOrchestrator = (ws: string, id: string, body: OrchestratorPatch) =>
+  fetchJson<Orchestrator>(`${instances(ws)}/${encodeURIComponent(id)}`, json("PATCH", body));
+/** Outcome metrics for one orchestrator; nullable values are unknown in the window. */
+export type CoordinatorMetrics = {
+  days: number;
+  since: string;
+  delegated: number;
+  completed: number;
+  failed: number;
+  truncated: boolean;
+  success_rate: number | null;
+  merged_prs: number | null;
+  cycle_time_samples: number;
+  cycle_time_median_hours: number | null;
+  cycle_time_p90_hours: number | null;
+  cost_usd: number;
+  cost_per_merged_pr_usd: number | null;
+  unpriced_event_count: number;
+};
+export const getOrchestratorMetrics = (
+  ws: string,
+  id: string,
+  days: 7 | 30,
+  init?: { signal?: AbortSignal },
+) =>
+  fetchJson<CoordinatorMetrics>(
+    `${instances(ws)}/${encodeURIComponent(id)}/metrics?days=${days}`,
+    init ? { init } : undefined,
   );
 export const deleteOrchestrator = (ws: string, id: string) =>
   fetchJson(`${instances(ws)}/${encodeURIComponent(id)}`, json("DELETE"));

@@ -63,17 +63,20 @@ test("orchestrators connect workspace navigation, profiles, roles and clean conv
     await testPage.request.get(`${base}/workspaces/${ws}/orchestrators/${firstId}`)
   ).json();
   expect(first.profile_id).toBeTruthy();
-  const secondRole = await (
-    await testPage.request.post(`${base}/roles`, {
-      data: { name: "Second coordinator", instructions: "Coordinate other tasks" },
-    })
-  ).json();
+  // A workspace has exactly one orchestrator; a second create is refused with the existing id.
   const created = await testPage.request.post(`${base}/workspaces/${ws}/orchestrators`, {
-    data: { ...first, role_id: secondRole.id },
+    data: first,
   });
-  expect(created.ok()).toBeTruthy();
+  expect(created.status()).toBe(409);
+  expect(await created.json()).toMatchObject({
+    error: "orchestrator_exists",
+    orchestrator_id: firstId,
+  });
   await testPage.goto(settings);
-  await expect(testPage.getByTestId("orchestrator-card")).toHaveCount(2);
+  await expect(testPage.getByTestId("orchestrator-card")).toHaveCount(1);
+  await expect(testPage.getByRole("link", { name: "Add orchestrator", exact: true })).toHaveCount(
+    0,
+  );
   await testPage
     .getByTestId("orchestrator-card")
     .filter({ hasText: "Personal coordinator" })
@@ -120,13 +123,15 @@ test("orchestrators connect workspace navigation, profiles, roles and clean conv
   const conversationUrl = testPage.url();
   await testPage.getByTestId("app-nav-trigger").click();
   const drawer = testPage.getByTestId("app-nav-sheet");
-  await drawer.getByTestId("workspace-coordinator-link").click();
+  await drawer.getByTestId(`workspace-coordinator-link-${firstId}`).click();
   await expect(drawer).not.toBeVisible();
-  await expect(testPage).toHaveURL(new RegExp(`/workspaces/${ws}/coordinator`));
+  await expect(testPage).toHaveURL(
+    new RegExp(`/workspaces/${ws}/coordinator\\?orchestratorId=${firstId}`),
+  );
   await testPage.setViewportSize({ width: 1440, height: 1000 });
-  await expect(testPage.getByTestId("workspace-coordinator-link")).toHaveAttribute(
+  await expect(testPage.getByTestId(`workspace-coordinator-link-${firstId}`)).toHaveAttribute(
     "href",
-    `/workspaces/${ws}/coordinator`,
+    `/workspaces/${ws}/coordinator?orchestratorId=${firstId}`,
   );
   await testPage.goto(conversationUrl);
   await testPage.setViewportSize({ width: 393, height: 852 });

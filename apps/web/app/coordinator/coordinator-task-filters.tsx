@@ -2,26 +2,32 @@ import { useTranslation } from "react-i18next";
 import { useResponsiveBreakpoint } from "@/hooks/use-responsive-breakpoint";
 import { Input } from "@kandev/ui/input";
 import type { CoordinatorWorkspace } from "@/hooks/domains/orchestration/use-coordinator-workspace";
-import type { CoordinatorFilters } from "@/lib/orchestration/coordinator-task-observation";
+import { COORDINATOR_GROUPS } from "@/lib/orchestration/coordinator-task-groups";
+import {
+  activeClauses,
+  type CoordinatorFilterState,
+} from "@/lib/orchestration/coordinator-task-filters";
+import type { Task } from "@/lib/types/http";
 import { CoordinatorSelect } from "./coordinator-select";
+import { CoordinatorFilterClauses } from "./coordinator-filter-clauses";
 
 export function TaskFilters({
   catalog,
+  tasks,
   filters,
   setFilters,
-  scope,
-  setScope,
   selected,
 }: {
   catalog: CoordinatorWorkspace;
-  filters: CoordinatorFilters;
-  setFilters: (next: CoordinatorFilters) => void;
-  scope: string;
-  setScope: (value: string) => void;
+  tasks: Task[];
+  filters: CoordinatorFilterState;
+  setFilters: (next: CoordinatorFilterState) => void;
   selected: string;
 }) {
   const { t } = useTranslation();
   const { isMobile } = useResponsiveBreakpoint();
+  const patch = (next: Partial<CoordinatorFilterState>) => setFilters({ ...filters, ...next });
+  const active = activeClauses(filters.clauses).length;
   return (
     <div className="grid grid-cols-2 gap-3 p-4">
       <div className="col-span-2">
@@ -30,49 +36,52 @@ export function TaskFilters({
         </label>
         <Input
           id="coordinator-search"
-          value={filters.query ?? ""}
-          onChange={(e) => setFilters({ ...filters, query: e.target.value })}
+          value={filters.query}
+          onChange={(e) => patch({ query: e.target.value })}
           className="mt-1 max-md:min-h-11"
         />
       </div>
       <details open={!isMobile} className="col-span-2">
-        <summary className="md:hidden cursor-pointer min-h-11 flex items-center text-sm">
+        <summary className="md:hidden cursor-pointer min-h-11 flex items-center gap-2 text-sm">
           {t("task:filters")}
+          {active > 0 && (
+            <span className="text-xs text-muted-foreground">
+              {t("orchestration:filtersActive", { count: active })}
+            </span>
+          )}
         </summary>
         <div className="grid grid-cols-2 gap-3">
-          <CoordinatorSelect
-            label={t("orchestration:workflowFilter")}
-            value={filters.workflowId || "all"}
-            onChange={(id) => setFilters({ ...filters, workflowId: id === "all" ? null : id })}
-            options={[
-              { id: "all", name: t("orchestration:allWorkflows") },
-              ...catalog.workflows.filter(
-                (flow) => flow.id !== catalog.workspace.office_workflow_id,
-              ),
-            ]}
-          />
-          <CoordinatorSelect
-            label={t("orchestration:repositoryFilter")}
-            value={filters.repositoryId || "all"}
-            onChange={(id) => setFilters({ ...filters, repositoryId: id === "all" ? null : id })}
-            options={[
-              { id: "all", name: t("orchestration:allRepositories") },
-              ...catalog.repositories,
-            ]}
-          />
           <div className="col-span-2">
-            <CoordinatorSelect
-              label={t("orchestration:taskScope")}
-              value={scope}
-              onChange={setScope}
-              options={[
-                { id: "all", name: t("orchestration:allTasks") },
-                ...(selected
-                  ? [{ id: "coordinated", name: t("orchestration:selectedTasks") }]
-                  : []),
-              ]}
+            <CoordinatorFilterClauses
+              catalog={catalog}
+              tasks={tasks}
+              clauses={filters.clauses}
+              onChange={(clauses) => patch({ clauses })}
+              mobile={isMobile}
             />
           </div>
+          <CoordinatorSelect
+            label={t("orchestration:taskScope")}
+            value={filters.scope}
+            onChange={(scope) => patch({ scope: scope === "coordinated" ? "coordinated" : "all" })}
+            options={[
+              { id: "all", name: t("orchestration:allTasks") },
+              ...(selected || filters.scope === "coordinated"
+                ? [{ id: "coordinated", name: t("orchestration:selectedTasks") }]
+                : []),
+            ]}
+          />
+          <CoordinatorSelect
+            label={t("orchestration:groupFilter")}
+            value={filters.group}
+            onChange={(group) =>
+              patch({ group: COORDINATOR_GROUPS.find((item) => item === group) ?? "all" })
+            }
+            options={[
+              { id: "all", name: t("orchestration:allGroups") },
+              ...COORDINATOR_GROUPS.map((id) => ({ id, name: t(`orchestration:group_${id}`) })),
+            ]}
+          />
         </div>
       </details>
     </div>
