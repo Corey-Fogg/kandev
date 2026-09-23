@@ -28,6 +28,7 @@ import { synchronizeInputValue } from "./synchronize-input-value";
 import { useAgentIdentity } from "./chat-identity-context";
 import { CommentDraftContext } from "./comment-draft-context";
 import { CommentTransportContext } from "./comment-transport";
+import { CommentRendererContext } from "./comment-renderer-context";
 import type {
   TaskComment,
   TaskDecision,
@@ -575,10 +576,18 @@ function ChatEntries({
   repositories?: TaskRepository[];
   entries: ChatEntry[];
 }) {
+  const renderComment = useContext(CommentRendererContext);
   return (
     <>
       {entries.map((entry) => {
         if (entry.kind === "comment") {
+          const custom = renderComment?.(entry.data);
+          if (custom != null)
+            return (
+              <div key={`c-${entry.data.id}`} id={`comment-${entry.data.id}`}>
+                {custom}
+              </div>
+            );
           return (
             <CommentEntry
               key={`c-${entry.data.id}`}

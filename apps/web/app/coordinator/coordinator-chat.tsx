@@ -10,6 +10,7 @@ import {
 import { ConversationContent } from "@/app/settings/orchestration/conversation-route";
 import { useCoordinatorConversation } from "@/hooks/domains/orchestration/use-coordinator-conversation";
 import type { CoordinatorWorkspace } from "@/hooks/domains/orchestration/use-coordinator-workspace";
+import { ProposalCatalogContext } from "@/lib/orchestration/proposal-catalog";
 import {
   orchestratorHref,
   selectedExecutor,
@@ -109,11 +110,13 @@ export function CoordinatorChat({
       </div>
     );
   return (
-    <ReadyConversation
-      key={`${catalog.workspace.id}:${assignment.id}`}
-      workspaceId={catalog.workspace.id}
-      persona={assignment}
-      visible={visible}
-    />
+    <ProposalCatalogContext.Provider value={catalog}>
+      <ReadyConversation
+        key={`${catalog.workspace.id}:${assignment.id}`}
+        workspaceId={catalog.workspace.id}
+        persona={assignment}
+        visible={visible}
+      />
+    </ProposalCatalogContext.Provider>
   );
 }

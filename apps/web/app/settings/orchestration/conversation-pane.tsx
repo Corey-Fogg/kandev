@@ -6,6 +6,7 @@ import { ChatIdentityContext } from "@/components/task/simple/chat-identity-cont
 import { ImplicitTaskLinksContext } from "@/components/task/simple/task-link-context";
 import { CommentTransportContext } from "@/components/task/simple/comment-transport";
 import { RecoveryTransportContext } from "@/components/task/simple/recovery-transport";
+import { CommentRendererContext } from "@/components/task/simple/comment-renderer-context";
 import { ActiveSessionRefProvider } from "@/components/task/simple/components/active-session-ref-context";
 import { TopbarWorkingIndicator } from "@/components/task/simple/components/topbar-working-indicator";
 import { useWorkspaceOrchestrators } from "@/hooks/domains/orchestration/use-orchestrator-conversation";
@@ -20,6 +21,7 @@ import {
   type Orchestrator,
 } from "@/lib/api/domains/orchestration-api";
 import type { Task, TaskComment, TaskSession } from "@/app/office/tasks/[id]/types";
+import { ProposalsBanner, useProposalRenderer } from "./conversation-proposals";
 
 function usePersona(workspaceId: string, orchestratorId: string, provided?: Orchestrator) {
   const { data } = useWorkspaceOrchestrators(provided ? "" : workspaceId);
@@ -89,6 +91,7 @@ export function OrchestratorConversationPane({
     [persona],
   );
   const transport = useMemo(() => createConversationSender(task.id), [task.id]);
+  const proposals = useProposalRenderer(task.workspaceId, orchestratorId, comments);
   const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
   return (
     <ChatIdentityContext.Provider value={identity}>
@@ -104,17 +107,20 @@ export function OrchestratorConversationPane({
             )}
             <ConversationHeading title={task.title} persona={persona} />
             <TopbarWorkingIndicator taskId={task.id} comments={comments} />
+            <ProposalsBanner count={proposals.pendingCount} targetId={proposals.firstPendingId} />
             <RecoveryTransportContext.Provider value={retryConversation}>
               <CommentTransportContext.Provider value={transport}>
-                <TaskChat
-                  taskId={task.id}
-                  comments={comments}
-                  sessions={sessions}
-                  timeline={[]}
-                  scrollParent={scrollParent}
-                  onCommentsChanged={onCommentsChanged}
-                  openAtLatest
-                />
+                <CommentRendererContext.Provider value={proposals.renderer}>
+                  <TaskChat
+                    taskId={task.id}
+                    comments={comments}
+                    sessions={sessions}
+                    timeline={[]}
+                    scrollParent={scrollParent}
+                    onCommentsChanged={onCommentsChanged}
+                    openAtLatest
+                  />
+                </CommentRendererContext.Provider>
               </CommentTransportContext.Provider>
             </RecoveryTransportContext.Provider>
           </section>
