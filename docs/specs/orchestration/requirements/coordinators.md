@@ -54,10 +54,13 @@ agent configuration.
   assignment, the system shall require a role, an enabled execution profile and
   an executor, and shall accept workspace context and delegation guidance. It
   shall not create a workspace, workflow or delivery task.
-- **AC-ORCHESTRATION-COORDINATOR-001.4:** A workspace shall accept any number of
-  assignments. The same role can run under different execution profiles in
-  different workspaces, and each assignment shall keep its own conversation,
-  memory, delegated tasks and pause state.
+- **AC-ORCHESTRATION-COORDINATOR-001.4:** A workspace shall have at most one
+  assignment. Adding or importing a second one shall be rejected as a conflict
+  that names the existing assignment. The same role can run under different
+  execution profiles in different workspaces, and each assignment shall keep
+  its own conversation, memory, delegated tasks and pause state. Workspaces
+  that already have several assignments from an earlier build shall keep all
+  of them working until a person deletes the extras.
 - **AC-ORCHESTRATION-COORDINATOR-001.5:** When an assignment is paused, the
   system shall start no new turn for it and shall not interrupt a running turn.
   Resuming shall not replay callbacks that were rejected while paused.
@@ -159,6 +162,31 @@ repeating effects.
 - **AC-ORCHESTRATION-COORDINATOR-005.4:** The feature shall work with Office
   disabled, and Office routes shall not operate on coordinator assignments or
   conversations.
+
+### REQ-ORCHESTRATION-COORDINATOR-006: Named orchestrator and behavior settings
+
+**Intent:** Let a person name their workspace's orchestrator and choose how
+much it does on its own.
+
+**User story:** As a workspace administrator, I want to rename "Chief of Staff"
+to "Jeb" without changing the shared role, so that the chat, navigation and
+settings use the name I chose.
+
+#### Acceptance criteria
+
+- **AC-ORCHESTRATION-COORDINATOR-006.1:** An assignment shall have an instance
+  name of at most 60 characters without control characters, separate from its
+  role's name. An empty instance name shall mean the role's name.
+- **AC-ORCHESTRATION-COORDINATOR-006.2:** When the instance name changes, the
+  assignment's name in every response, its chat identity, its conversation
+  title and its next prompt shall use the new name. Renaming the role shall
+  not overwrite an instance name.
+- **AC-ORCHESTRATION-COORDINATOR-006.3:** An assignment shall store three
+  settings: ask before creating tasks (default off), automatic source issue
+  comments (default on) and automatic move of the source issue to done on
+  completion (default off). The coordinator's prompt shall state them.
+- **AC-ORCHESTRATION-COORDINATOR-006.4:** A person with workspace-manage access
+  shall be able to change the name and settings while a turn is running.
 
 ## Out of scope
 

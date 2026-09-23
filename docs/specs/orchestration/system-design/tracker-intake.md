@@ -4,6 +4,7 @@ system: orchestration
 requirements:
   - REQ-ORCHESTRATION-TRACKER-001
   - REQ-ORCHESTRATION-TRACKER-002
+  - REQ-ORCHESTRATION-TRACKER-003
 ---
 
 # Tracker Intake System Design
@@ -23,6 +24,7 @@ authorization around them.
 | --- | --- |
 | `REQ-ORCHESTRATION-TRACKER-001` | [Write-back](#write-back) |
 | `REQ-ORCHESTRATION-TRACKER-002` | [Intake deduplication](#intake-deduplication) |
+| `REQ-ORCHESTRATION-TRACKER-003` | [Automatic write-back](#automatic-write-back) |
 
 ## Write-back
 
@@ -47,9 +49,30 @@ returns 422.
 
 The services expose `AddCommentForWorkspace` and
 `TransitionToCategoryForWorkspace`, following the existing `*ForWorkspace`
-pattern, so the workspace's own credentials are used. Write-back is
-coordinator-initiated only; callbacks carry the task's source so the
-coordinator can decide to report.
+pattern, so the workspace's own credentials are used. Callbacks carry the
+task's source so the coordinator can decide to report.
+
+## Automatic write-back
+
+On `TaskStateChanged` and `TaskMoved`, `observeSourceWriteBack` runs before the
+task callback, and its errors are logged without blocking the callback. It
+acts only on a delegated task with a source issue whose assignment is not
+paused. It wants a comment when `auto_comment_source` is on and the state is
+REVIEW or COMPLETED, and a move to `done` when `auto_move_source_done` is on
+and the state is COMPLETED.
+
+`orchestration_source_writebacks` holds one row per task: the last observed
+state, an episode counter and the outcome. `ObserveTaskState` does nothing when
+the state is unchanged; a changed state starts a new episode, which is claimed
+(`status = claimed`) only when a write is wanted. Claiming happens before
+posting, so a write happens at most once per transition. The claimed write
+runs off the event goroutine with a 60-second timeout through the same
+`SourceIssueWriter` as `update_source_issue`. The comment is at most 4,000
+bytes and redacted. The outcome is recorded as `posted`, `skipped` (no writer,
+or the integration is unavailable) or `failed`; a failure queues one callback
+keyed `source-writeback:<assignment>:<task>:<episode>` carrying
+`source_writeback_error`, and the prompt tells the coordinator to retry with
+`update_source_issue` only if the user wants it.
 
 ## Intake deduplication
 
