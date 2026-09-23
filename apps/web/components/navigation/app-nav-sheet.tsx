@@ -18,8 +18,7 @@ import { usePathname } from "@/lib/routing/client-router";
 import { useHasSavedSidebarLayout } from "@/hooks/domains/sidebar/use-sidebar-layout-navigation";
 import { AppNavSections, useAppNavDialogs } from "./app-nav-sections";
 import { MobileAutomationsSection } from "./mobile-automations-section";
-import { AssistantNav } from "@/components/app-sidebar/assistant-nav";
-import { WorkspaceChiefNav } from "@/components/app-sidebar/workspace-chief-nav";
+import { OrchestrationNav } from "@/components/app-sidebar/orchestration-nav";
 import { AppNavTrigger } from "./app-nav-trigger";
 import { AppNavSurface } from "./app-nav-surface";
 
@@ -76,8 +75,6 @@ export function AppNavSheet({ pageNav, omitDestinations, onOpenTaskViews }: AppN
           onClick={closeOnLinkClick}
         >
           {isMobile && <NavigationWorkspacePicker close={close} />}
-          <AssistantNav onNavigate={close} />
-          <WorkspaceChiefNav onNavigate={close} />
           {!isMobile && renderedPageNav}
           <AppNavSections
             onNavigate={close}
@@ -185,6 +182,7 @@ function MobileNavigationExtras({
   const { t } = useTranslation();
   return (
     <>
+      <OrchestrationNav onNavigate={close} />
       {localNav && (
         <section className="flex flex-col gap-3" aria-label={t("common:pageNavigation")}>
           <h3 className="text-sm font-medium">{t("common:pageNavigation")}</h3>

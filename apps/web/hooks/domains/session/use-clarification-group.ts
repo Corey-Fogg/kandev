@@ -2,11 +2,7 @@
 
 /* eslint-disable max-lines, max-depth -- clarification submission and recovery share one wire contract. */
 
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ClarificationTransportContext,
-  type ClarificationTransport,
-} from "@/components/task/chat/clarification-transport";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ClarificationAnswer, ClarificationRequestMetadata, Message } from "@/lib/types/http";
 import { getBackendConfig } from "@/lib/config";
@@ -562,7 +558,6 @@ function hasNewerAuthoritativeMessage(
 }
 
 type UseClarificationSubmissionArgs = {
-  transport?: ClarificationTransport;
   pendingId: string | null;
   questionIds: string[];
   answersRef: { current: Record<string, ClarificationAnswer> };
@@ -633,7 +628,6 @@ function useClarificationSubmission(args: UseClarificationSubmissionArgs) {
     getLatestMessage,
     updateMessage,
     defaultSkipReason,
-    transport,
   } = args;
   const lastActionRef = useRef<{ kind: "submit" } | { kind: "skip"; reason: string } | null>(null);
 
@@ -655,10 +649,7 @@ function useClarificationSubmission(args: UseClarificationSubmissionArgs) {
       setAnswers(current);
       lastActionRef.current = { kind: "submit" };
       await runClarificationRequest({
-        post: () =>
-          transport
-            ? transport.respond(pendingId, { answers: ordered, rejected: false })
-            : postClarificationBatch(pendingId, ordered),
+        post: () => postClarificationBatch(pendingId, ordered),
         ownStatus: "answered",
         ownAnswers: current,
         ...baseClarificationRequestArgs(pendingId, args),
@@ -682,7 +673,6 @@ function useClarificationSubmission(args: UseClarificationSubmissionArgs) {
       inactivePendingIdRef,
       getLatestMessage,
       updateMessage,
-      transport,
     ],
   );
 
@@ -694,10 +684,7 @@ function useClarificationSubmission(args: UseClarificationSubmissionArgs) {
       const effectiveReason = reason ?? defaultSkipReason;
       lastActionRef.current = { kind: "skip", reason: effectiveReason };
       await runClarificationRequest({
-        post: () =>
-          transport
-            ? transport.respond(pendingId, { rejected: true, reject_reason: effectiveReason })
-            : postClarificationSkip(pendingId, effectiveReason),
+        post: () => postClarificationSkip(pendingId, effectiveReason),
         ownStatus: "rejected",
         ownAnswers: {},
         ...baseClarificationRequestArgs(pendingId, args),
@@ -719,11 +706,23 @@ function useClarificationSubmission(args: UseClarificationSubmissionArgs) {
       getLatestMessage,
       updateMessage,
       defaultSkipReason,
-      transport,
     ],
   );
 
-  const { retry, resetLastAction } = useClarificationRetry(lastActionRef, submitCollected, skipAll);
+  const retry = useCallback(async () => {
+    const action = lastActionRef.current;
+    if (!action) return;
+    if (action.kind === "submit") {
+      await submitCollected();
+    } else {
+      await skipAll(action.reason);
+    }
+  }, [submitCollected, skipAll]);
+
+  const resetLastAction = useCallback(() => {
+    lastActionRef.current = null;
+  }, []);
+
   return { submitCollected, skipAll, retry, resetLastAction };
 }
 
@@ -745,7 +744,6 @@ export function useClarificationGroup(
 ): ClarificationGroupApi {
   const { t } = useTranslation();
   const storeApi = useAppStoreApi();
-  const transport = useContext(ClarificationTransportContext);
   const [answers, setAnswers] = useState<Record<string, ClarificationAnswer>>({});
   const answersRef = useRef(answers);
   useEffect(() => {
@@ -816,7 +814,6 @@ export function useClarificationGroup(
   // i18n-exempt: the default reason is POSTed as the clarification answer and
   // reaches the agent verbatim; it is not rendered in the UI.
   const { submitCollected, skipAll, retry, resetLastAction } = useClarificationSubmission({
-    transport,
     pendingId,
     questionIds,
     answersRef,
@@ -833,7 +830,7 @@ export function useClarificationGroup(
     onOutcome,
     inactivePendingIdRef,
     getLatestMessage,
-    updateMessage: transport?.updateMessage ?? storeApi.getState().updateMessage,
+    updateMessage: storeApi.getState().updateMessage,
     defaultSkipReason: t("task:userSkippedClarification"),
   });
 
@@ -964,26 +961,4 @@ export function useClarificationGroup(
     retryLateAnswer,
     lastResult,
   };
-}
-
-function useClarificationRetry(
-  lastActionRef: { current: { kind: "submit" } | { kind: "skip"; reason: string } | null },
-  submitCollected: () => Promise<void>,
-  skipAll: (reason: string) => Promise<void>,
-) {
-  const retry = useCallback(async () => {
-    const action = lastActionRef.current;
-    if (!action) return;
-    if (action.kind === "submit") {
-      await submitCollected();
-    } else {
-      await skipAll(action.reason);
-    }
-  }, [submitCollected, skipAll]);
-
-  const resetLastAction = useCallback(() => {
-    lastActionRef.current = null;
-  }, []);
-
-  return { retry, resetLastAction };
 }
