@@ -38,12 +38,7 @@ import { OrchestrationGate } from "./orchestration-gate";
 import { OpenOrchestratorConversation, OrchestratorTasks } from "./orchestrator-connections";
 import { OrchestratorFields } from "./orchestrator-fields";
 import { validDisplayName } from "./orchestrator-identity-fields";
-import {
-  existingOrchestratorId,
-  initialConfiguration,
-  normalizedConfiguration,
-  patchFor,
-} from "./orchestrator-save";
+import { initialConfiguration, normalizedConfiguration, patchFor } from "./orchestrator-save";
 export function OrchestratorEditor({ workspaceId, id }: { workspaceId: string; id: string }) {
   return (
     <OrchestrationGate>
@@ -111,15 +106,7 @@ function useEditorForm({
     try {
       await save();
     } catch (e) {
-      const existing = existingOrchestratorId(e);
-      if (existing === null) toast.error(String(e));
-      else {
-        toast.error(t("orchestration:orchestratorExists"));
-        notifyOrchestrationChanged(workspaceId);
-        router.replace(
-          existing ? orchestratorHref(workspaceId, existing) : orchestratorsHref(workspaceId),
-        );
-      }
+      toast.error(String(e));
     } finally {
       setBusy(false);
     }

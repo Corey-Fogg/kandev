@@ -5,7 +5,7 @@ import {
   resetWorkspaceOrchestrators,
 } from "../../helpers/orchestration";
 
-test("the workspace orchestrator can be renamed and is listed by name in both navigation layouts", async ({
+test("an orchestrator can be renamed and is listed by name in both navigation layouts", async ({
   testPage: page,
   backend,
   seedData,
@@ -84,10 +84,12 @@ test("the workspace orchestrator can be renamed and is listed by name in both na
   await page.goto(`/?workspaceId=${ws}`);
   await expect(navEntry).toHaveText(created.role_name);
 
-  // Only one orchestrator per workspace: the settings list offers no second one.
+  // The settings list always offers another orchestrator; a second one is accepted.
   await page.goto(`/settings/workspaces/${ws}/orchestration`);
   await expect(page.getByTestId("orchestrator-card")).toHaveCount(1);
-  await expect(page.getByRole("link", { name: "Add orchestrator", exact: true })).toHaveCount(0);
-  const second = await page.request.post(base, { data: renamed });
-  expect(second.status()).toBe(409);
+  await expect(page.getByRole("link", { name: "Add orchestrator", exact: true })).toBeVisible();
+  const second = await page.request.post(base, { data: { ...renamed, display_name: "Val" } });
+  expect(second.status()).toBe(201);
+  await page.reload();
+  await expect(page.getByTestId("orchestrator-card")).toHaveCount(2);
 });

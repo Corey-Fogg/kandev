@@ -1,4 +1,3 @@
-import { ApiError } from "@/lib/api/client";
 import type {
   Orchestrator,
   OrchestratorConfiguration,
@@ -58,12 +57,4 @@ export function patchFor(
     if (saved[key] !== next[key]) Object.assign(body, { [key]: next[key] });
   }
   return body;
-}
-
-/** The existing orchestrator's id when a create was refused because the workspace has one. */
-export function existingOrchestratorId(error: unknown): string | null {
-  if (!(error instanceof ApiError) || error.status !== 409) return null;
-  const body = error.body as { error?: unknown; orchestrator_id?: unknown } | null;
-  if (body?.error !== "orchestrator_exists") return null;
-  return typeof body.orchestrator_id === "string" ? body.orchestrator_id : "";
 }

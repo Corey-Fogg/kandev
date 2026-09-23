@@ -16,7 +16,7 @@ export async function resetWorkspaceOrchestrators(
   }
 }
 
-/** Adds the workspace's orchestrator through the settings form and returns its id. */
+/** Adds an orchestrator through the settings form and returns its id. */
 export async function addOrchestratorThroughSettings(page: Page, workspaceId: string) {
   await page.goto(`/settings/workspaces/${workspaceId}/orchestration/new`);
   await page.getByTestId("orchestrator-profile").click();

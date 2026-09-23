@@ -35,10 +35,10 @@ const coordinated = (id: string, chief: string, pending?: string) => ({
   statusSummary: pending ? { pending_action: pending } : undefined,
 });
 const orchestrator = (id: string, name: string, status = "idle") => ({ id, name, status });
-const renderNav = (onNavigate?: () => void) =>
+const renderNav = (onNavigate?: () => void, collapsed = false) =>
   render(
     <TooltipProvider>
-      <OrchestrationNav onNavigate={onNavigate} />
+      <OrchestrationNav onNavigate={onNavigate} collapsed={collapsed} />
     </TooltipProvider>,
   );
 
@@ -92,6 +92,19 @@ describe("OrchestrationNav", () => {
     expect(jeb.textContent).toContain("Jeb");
     expect(jeb.getAttribute("href")).toBe("/workspaces/ws%201/coordinator?orchestratorId=jeb");
     expect(screen.getByTestId("workspace-coordinator-link-old").textContent).toContain("Ops");
+  });
+
+  it("marks each orchestrator with its initial in the collapsed rail", () => {
+    orchestrators.data = {
+      orchestrators: [orchestrator("jeb", "jeb"), orchestrator("old", " Ops")],
+    };
+    renderNav(undefined, true);
+    expect(screen.getByTestId(`${JEB}-marker`).textContent).toBe("J");
+    expect(screen.getByTestId("workspace-coordinator-link-old-marker").textContent).toBe("O");
+    expect(screen.getByRole("link", { name: "jeb" })).toBeTruthy();
+    cleanup();
+    renderNav();
+    expect(screen.queryByTestId(`${JEB}-marker`)).toBeNull();
   });
 
   it("badges only the tasks each orchestrator delegated", () => {

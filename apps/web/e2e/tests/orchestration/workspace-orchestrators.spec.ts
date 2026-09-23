@@ -63,20 +63,16 @@ test("orchestrators connect workspace navigation, profiles, roles and clean conv
     await testPage.request.get(`${base}/workspaces/${ws}/orchestrators/${firstId}`)
   ).json();
   expect(first.profile_id).toBeTruthy();
-  // A workspace has exactly one orchestrator; a second create is refused with the existing id.
+  // A workspace can have several orchestrators, each with its own name.
   const created = await testPage.request.post(`${base}/workspaces/${ws}/orchestrators`, {
-    data: first,
+    data: { ...first, display_name: "Val" },
   });
-  expect(created.status()).toBe(409);
-  expect(await created.json()).toMatchObject({
-    error: "orchestrator_exists",
-    orchestrator_id: firstId,
-  });
+  expect(created.status()).toBe(201);
+  const secondId = (await created.json()).id as string;
+  expect(secondId).not.toBe(firstId);
   await testPage.goto(settings);
-  await expect(testPage.getByTestId("orchestrator-card")).toHaveCount(1);
-  await expect(testPage.getByRole("link", { name: "Add orchestrator", exact: true })).toHaveCount(
-    0,
-  );
+  await expect(testPage.getByTestId("orchestrator-card")).toHaveCount(2);
+  await expect(testPage.getByRole("link", { name: "Add orchestrator", exact: true })).toBeVisible();
   await testPage
     .getByTestId("orchestrator-card")
     .filter({ hasText: "Personal coordinator" })
@@ -123,6 +119,11 @@ test("orchestrators connect workspace navigation, profiles, roles and clean conv
   const conversationUrl = testPage.url();
   await testPage.getByTestId("app-nav-trigger").click();
   const drawer = testPage.getByTestId("app-nav-sheet");
+  // The navigation lists every orchestrator by name.
+  await expect(drawer.getByTestId(`workspace-coordinator-link-${firstId}`)).toHaveText(
+    "Personal coordinator",
+  );
+  await expect(drawer.getByTestId(`workspace-coordinator-link-${secondId}`)).toHaveText("Val");
   await drawer.getByTestId(`workspace-coordinator-link-${firstId}`).click();
   await expect(drawer).not.toBeVisible();
   await expect(testPage).toHaveURL(
@@ -133,7 +134,17 @@ test("orchestrators connect workspace navigation, profiles, roles and clean conv
     "href",
     `/workspaces/${ws}/coordinator?orchestratorId=${firstId}`,
   );
+  // Renaming one orchestrator renames only its entry.
+  const renamedSecond = await testPage.request.patch(
+    `${base}/workspaces/${ws}/orchestrators/${secondId}`,
+    { data: { display_name: "Vera" } },
+  );
+  expect(renamedSecond.status()).toBe(200);
   await testPage.goto(conversationUrl);
+  await expect(testPage.getByTestId(`workspace-coordinator-link-${secondId}`)).toHaveText("Vera");
+  await expect(testPage.getByTestId(`workspace-coordinator-link-${firstId}`)).toHaveText(
+    "Personal coordinator",
+  );
   await testPage.setViewportSize({ width: 393, height: 852 });
   await testPage.getByRole("link", { name: "Configure orchestrator", exact: true }).click();
   await expect(testPage).toHaveURL(new RegExp(firstId));

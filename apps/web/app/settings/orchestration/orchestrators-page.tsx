@@ -23,17 +23,14 @@ export function OrchestratorsPage({ workspaceId }: { workspaceId: string }) {
 function OrchestratorList({ workspaceId }: { workspaceId: string }) {
   const { t } = useTranslation();
   const { data, error } = useWorkspaceOrchestrators(workspaceId);
-  const count = data?.orchestrators.length ?? 0;
   return (
     <section className="space-y-5" data-testid="workspace-orchestrators">
       <h2 className="text-xl font-semibold">{t("orchestration:orchestration")}</h2>
       <p className="text-sm text-muted-foreground">{t("orchestration:orchestratorsHint")}</p>
       <div className="flex flex-wrap gap-4">
-        {data && count === 0 && (
-          <Link className="underline" href={`${orchestratorsHref(workspaceId)}/new`}>
-            {t("orchestration:addOrchestrator")}
-          </Link>
-        )}
+        <Link className="underline" href={`${orchestratorsHref(workspaceId)}/new`}>
+          {t("orchestration:addOrchestrator")}
+        </Link>
         <Link className="underline" href="/settings/orchestration">
           {t("orchestration:manageRoles")}
         </Link>
@@ -44,14 +41,6 @@ function OrchestratorList({ workspaceId }: { workspaceId: string }) {
       {error && <p role="alert">{error}</p>}
       {!data && !error && <p>{t("common:loading")}</p>}
       {data?.orchestrators.length === 0 && <p>{t("orchestration:noOrchestrators")}</p>}
-      {count >= 1 && (
-        <p className="text-sm text-muted-foreground">{t("orchestration:singleOrchestratorHint")}</p>
-      )}
-      {count > 1 && (
-        <p role="note" className="text-sm text-amber-600" data-testid="legacy-orchestrators">
-          {t("orchestration:legacyMultipleOrchestrators")}
-        </p>
-      )}
       <div className="grid gap-4 lg:grid-cols-2">
         {data?.orchestrators.map((o) => (
           <OrchestratorCard key={o.id} item={o} />

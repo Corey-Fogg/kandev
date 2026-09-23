@@ -87,6 +87,11 @@ function CoordinatorLink({
   );
 }
 
+/** The name's first character, marking the entry in the collapsed rail. */
+export function nameInitial(name: string): string {
+  return (Array.from(name.trim())[0] ?? "").toLocaleUpperCase();
+}
+
 /** With several entries only the selected orchestrator's entry is active. */
 function useEntryActive(workspaceId: string, orchestratorId: string, only: boolean) {
   const pathname = usePathname();
@@ -116,6 +121,7 @@ function OrchestratorNavItem({
       label={label}
       href={href}
       collapsed={collapsed}
+      marker={nameInitial(orchestrator.name)}
       badge={pendingInput}
       badgeDescription={t("orchestration:navPendingInput", { count: pendingInput })}
       onClick={useNavigate(href, onNavigate)}
