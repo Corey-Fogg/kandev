@@ -5,7 +5,7 @@ import { StateProvider } from "@/components/state-provider";
 import type { CoordinatorWorkspace } from "@/hooks/domains/orchestration/use-coordinator-workspace";
 import { CoordinatorChat } from "./coordinator-chat";
 import { CoordinatorPage } from "./coordinator-page";
-import { resolveCoordinatorSelection } from "./use-coordinator-selection";
+import { resolveCoordinatorSelection, selectionNeedsUrl } from "./use-coordinator-selection";
 
 vi.mock("@/components/page-shell", () => ({
   PageShell: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -62,4 +62,11 @@ it("uses a still-valid remembered selection but honors explicit clearing and inv
   expect(resolveCoordinatorSelection(assignments, null, "removed")).toBe("");
   expect(resolveCoordinatorSelection(assignments, "", "two")).toBe("");
   expect(resolveCoordinatorSelection(assignments, "foreign", "two")).toBe("");
+});
+
+it("writes a selection resolved without the URL into it only when several orchestrators exist", () => {
+  expect(selectionNeedsUrl(2, null, "jeb")).toBe(true);
+  expect(selectionNeedsUrl(1, null, "jeb")).toBe(false);
+  expect(selectionNeedsUrl(2, "jeb", "jeb")).toBe(false);
+  expect(selectionNeedsUrl(2, null, "")).toBe(false);
 });

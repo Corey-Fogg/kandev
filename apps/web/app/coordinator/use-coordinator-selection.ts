@@ -21,6 +21,20 @@ export function resolveCoordinatorSelection(
   return assignments.length === 1 ? assignments[0].id : "";
 }
 
+/**
+ * Whether the page should write a selection it resolved without the URL
+ * (remembered, or the only orchestrator) into the URL, so the left navigation
+ * can mark the selected orchestrator active. With one orchestrator the entry
+ * is active anyway.
+ */
+export function selectionNeedsUrl(
+  assignmentCount: number,
+  requested: string | null,
+  selected: string,
+) {
+  return requested === null && selected !== "" && assignmentCount > 1;
+}
+
 export function useCoordinatorSelection(catalog: CoordinatorWorkspace) {
   const params = useSearchParams();
   const router = useRouter();
@@ -36,9 +50,11 @@ export function useCoordinatorSelection(catalog: CoordinatorWorkspace) {
     requested,
     selections.get(workspace),
   );
+  const needsUrl = selectionNeedsUrl(catalog.assignments.length, requested, selected);
   useEffect(() => {
     if (selected || requested === "") selections.set(workspace, selected);
-  }, [workspace, requested, selected]);
+    if (needsUrl) router.replace(coordinatorHref(workspace, selected), { scroll: false });
+  }, [workspace, requested, selected, needsUrl, router]);
   const choose = (id: string) => {
     const value = id === "none" ? "" : id;
     selections.set(workspace, value);

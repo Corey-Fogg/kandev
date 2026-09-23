@@ -107,6 +107,14 @@ describe("OrchestrationNav", () => {
     renderNav();
     expect(screen.getByTestId(JEB).textContent).toContain("2");
     expect(screen.getByTestId("workspace-coordinator-link-old").textContent).toContain("1");
+    expect(screen.getByRole("link", { name: "Jeb, 2 waiting for input" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Ops, 1 waiting for input" })).toBeTruthy();
+  });
+
+  it("keeps the plain name when nothing is waiting", () => {
+    orchestrators.data = { orchestrators: [orchestrator("jeb", "Jeb")] };
+    renderNav();
+    expect(screen.getByRole("link", { name: "Jeb" })).toBeTruthy();
   });
 
   it("badges delegated tasks on the generic entry", () => {

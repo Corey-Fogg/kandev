@@ -100,6 +100,8 @@
   "legacyMultipleOrchestrators": "このワークスペースには以前のバージョンで作成された複数のオーケストレーターがあります。引き続き動作しますが、現在ワークスペースのオーケストレーターは 1 つです。不要なものを削除してください。",
   "conversationWith": "{{name}} との会話",
   "orchestratorPausedLabel": "{{name}}（一時停止中）",
+  "navPendingInput_one": "{{count}} 件が入力待ち",
+  "navPendingInput_other": "{{count}} 件が入力待ち",
   "criteriaHeading": "受け入れ基準",
   "criteriaProgress": "基準 {{met}}/{{total}} 達成",
   "criterionStatus_unverified": "未確認",

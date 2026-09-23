@@ -100,6 +100,8 @@
   "legacyMultipleOrchestrators": "此工作區有多個來自早期版本的編排器。它們仍可正常工作，但現在每個工作區只有一個編排器。請刪除不再需要的編排器。",
   "conversationWith": "與 {{name}} 的對話",
   "orchestratorPausedLabel": "{{name}}（已暫停）",
+  "navPendingInput_one": "{{count}} 項等待輸入",
+  "navPendingInput_other": "{{count}} 項等待輸入",
   "criteriaHeading": "驗收標準",
   "criteriaProgress": "已滿足標準 {{met}}/{{total}}",
   "criterionStatus_unverified": "未驗證",

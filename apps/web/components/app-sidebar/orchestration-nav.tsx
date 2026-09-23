@@ -80,6 +80,7 @@ function CoordinatorLink({
       href={href}
       collapsed={collapsed}
       badge={pendingInput}
+      badgeDescription={t("orchestration:navPendingInput", { count: pendingInput })}
       onClick={useNavigate(href, onNavigate)}
       testId="workspace-coordinator-link"
     />
@@ -116,6 +117,7 @@ function OrchestratorNavItem({
       href={href}
       collapsed={collapsed}
       badge={pendingInput}
+      badgeDescription={t("orchestration:navPendingInput", { count: pendingInput })}
       onClick={useNavigate(href, onNavigate)}
       isActive={active}
       testId={`workspace-coordinator-link-${orchestrator.id}`}

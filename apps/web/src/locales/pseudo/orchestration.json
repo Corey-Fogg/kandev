@@ -100,6 +100,8 @@
   "legacyMultipleOrchestrators": "Ţĥĩś ŵōŕķśƥàćē ĥàś ḿōŕē ţĥàń ōńē ōŕćĥēśţŕàţōŕ ƒŕōḿ àń ēàŕĺĩēŕ vēŕśĩōń. Ţĥēŷ ķēēƥ ŵōŕķĩńĝ, ƀũţ à ŵōŕķśƥàćē ńōŵ ĥàś ōńē. Ďēĺēţē ţĥē ōńēś ŷōũ ńō ĺōńĝēŕ ńēēď.",
   "conversationWith": "Ćōńvēŕśàţĩōń ŵĩţĥ {{name}}",
   "orchestratorPausedLabel": "{{name}} (ƥàũśēď)",
+  "navPendingInput_one": "{{count}} ŵàĩţĩńĝ ƒōŕ ĩńƥũţ",
+  "navPendingInput_other": "{{count}} ŵàĩţĩńĝ ƒōŕ ĩńƥũţ",
   "criteriaHeading": "Àććēƥţàńćē ćŕĩţēŕĩà",
   "criteriaProgress": "Ćŕĩţēŕĩà {{met}}/{{total}} ḿēţ",
   "criterionStatus_unverified": "Ńōţ vēŕĩƒĩēď",

@@ -100,6 +100,8 @@
   "legacyMultipleOrchestrators": "This workspace has more than one orchestrator from an earlier version. They keep working, but a workspace now has one. Delete the ones you no longer need.",
   "conversationWith": "Conversation with {{name}}",
   "orchestratorPausedLabel": "{{name}} (paused)",
+  "navPendingInput_one": "{{count}} waiting for input",
+  "navPendingInput_other": "{{count}} waiting for input",
   "criteriaHeading": "Acceptance criteria",
   "criteriaProgress": "Criteria {{met}}/{{total}} met",
   "criterionStatus_unverified": "Not verified",

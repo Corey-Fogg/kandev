@@ -18,6 +18,11 @@ type AppSidebarNavItemProps = {
   badgeVariant?: "primary" | "muted";
   /** Appended after the number, e.g. "+" for a capped/truncated count. */
   badgeSuffix?: string;
+  /**
+   * What the badge means, for the accessible name: with a badge shown, the
+   * trigger is announced as "label, badgeDescription" instead of the label alone.
+   */
+  badgeDescription?: string;
   activity?: QuickChatActivityState;
   onClick?: () => void;
   collapsed: boolean;
@@ -103,6 +108,7 @@ export function AppSidebarNavItem({
   badge,
   badgeVariant = "primary",
   badgeSuffix,
+  badgeDescription,
   onClick,
   collapsed,
   isActive,
@@ -140,7 +146,16 @@ export function AppSidebarNavItem({
     </>
   );
 
-  const buttonOrLink = renderTrigger({ onClick, disabled, baseClass, label, href, inner, testId });
+  const accessibleName = badgeLabel && badgeDescription ? `${label}, ${badgeDescription}` : label;
+  const buttonOrLink = renderTrigger({
+    onClick,
+    disabled,
+    baseClass,
+    label: accessibleName,
+    href,
+    inner,
+    testId,
+  });
 
   if (!collapsed) return buttonOrLink;
   return (
