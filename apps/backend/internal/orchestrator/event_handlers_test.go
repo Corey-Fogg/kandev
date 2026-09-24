@@ -2516,6 +2516,25 @@ func TestDeliverPassthroughPrompt(t *testing.T) {
 		}
 	})
 
+	t.Run("refuses the prompt when config resolution fails", func(t *testing.T) {
+		repo := setupTestRepo(t)
+		seedSession(t, repo, "t1", "s1", "step1")
+		configErr := errors.New("agent definition is unavailable")
+		agentMgr := &mockAgentManager{
+			isPassthrough:        true,
+			passthroughConfigErr: configErr,
+		}
+		svc := createTestServiceWithAgent(repo, newMockStepGetter(), newMockTaskRepo(), agentMgr)
+
+		err := svc.writePassthroughPrompt(context.Background(), "s1", strings.Repeat("long prompt ", 100))
+		if !errors.Is(err, configErr) {
+			t.Fatalf("writePassthroughPrompt error = %v, want config error", err)
+		}
+		if got := len(agentMgr.passthroughStdinCalls); got != 0 {
+			t.Fatalf("stdin calls after config failure = %d, want 0", got)
+		}
+	})
+
 	t.Run("cancellation interrupts submit delay", func(t *testing.T) {
 		repo := setupTestRepo(t)
 		seedSession(t, repo, "t1", "s1", "step1")
