@@ -15,7 +15,6 @@ acceptance_criteria:
   - AC-AGENTS-HOST-CLI-002.1
   - AC-AGENTS-HOST-CLI-002.5
   - AC-AGENTS-HOST-CLI-003.3
-  - AC-AGENTS-HOST-CLI-003.6
 system_design:
   - ../../specs/agents/system-design/host-cli-model-discovery.md
 ---
